@@ -1,0 +1,28 @@
+# ----------------------------------------------------
+# docker-compose.yml (Force-Focus 프로젝트 최상위 폴더 - Firestore 기반)
+
+# 1. Docker Compose 파일 형식 버전 지정
+version: '3.8'
+
+# 2. 서비스 정의: 이 프로젝트에서 실행할 컨테이너들을 정의합니다.
+services:
+  # --- backend 서비스 정의 ---
+  backend:
+    # 2.1. 이미지 빌드 지시: ./backend 폴더의 Dockerfile을 사용하여 이미지를 빌드합니다.
+    build: ./backend
+    # 2.2. 컨테이너 이름 지정 (선택적)
+    container_name: force-focus-backend
+    # 2.3. 포트 매핑: 로컬 PC의 8000번 포트를 컨테이너 내부의 8000번 포트와 연결합니다.
+    ports:
+      - "8000:8000"
+    # 2.4. 볼륨 매핑: 로컬 코드 변경 시 컨테이너에 즉시 반영되도록 합니다.
+    #     - ./backend:/app : 로컬 backend 폴더를 컨테이너 /app 폴더와 동기화합니다.
+    #     - ./gcp-key.json:/app/gcp-key.json : Google Cloud 서비스 계정 키 파일을 컨테이너로 마운트합니다.
+    volumes:
+      - ./backend:/app
+      # - ./gcp-key.json:/app/gcp-key.json
+    # 2.5. 환경 변수 파일 지정: 최상위 .env 파일에서 환경 변수를 로드합니다.
+    env_file:
+      - .env
+    # 2.6. 컨테이너 시작 명령어 재정의: 개발 모드에서 자동 재시작(--reload)을 활성화합니다.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
