@@ -15,6 +15,9 @@ class SessionCreate(BaseModel):
     start_time: datetime
     goal_duration: Optional[float] = None # 목표 집중 시간 (분 단위)
 
+    # ML 모델 도입전 실험적 필드
+    profile_id: Optional[str] = None # 사용할 프로필 ID. 없으면 기본 프로필 사용
+
 class SessionUpdate(BaseModel):
     """
     [요청] PUT /sessions/{session_id}
@@ -35,6 +38,10 @@ class SessionRead(BaseModel):
     id: str
     user_id: str
     task_id: Optional[str] = None
+
+    # ML 모델 도입전 실험적 필드
+    profile_id: Optional[str] = None 
+
     start_time: datetime
     end_time: Optional[datetime] = None
     duration: Optional[float] = None # 세션 종료 후 계산된 시간 (초 단위)
