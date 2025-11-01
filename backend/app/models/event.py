@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import List, Optional
+from typing import Dict, Optional
 
 class EventInDB(BaseModel):
     """
@@ -15,7 +15,7 @@ class EventInDB(BaseModel):
     timestamp: datetime
     app_name: str
     window_title: str
-    activity_vector: List[float] # 예: [활성창 전환 빈도, 키 입력 빈도, 유휴 상태, 마우스 활동, 클립보드 활동 등]
+    activity_vector: Dict[str, float] # List[float] -> Dict[str, float] # 예: [활성창 전환 빈도, 키 입력 빈도, 유휴 상태, 마우스 활동, 클립보드 활동 등]
 
     class Config:
         allow_population_by_field_name = True # '_id' 필드명으로도 데이터 채우기 허용

@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel
 from datetime import datetime
-from typing import List, Optional
+from typing import Dict, Optional
 
 class EventCreate(BaseModel):
     """
@@ -13,7 +13,7 @@ class EventCreate(BaseModel):
     timestamp: datetime
     app_name: str
     window_title: str
-    activity_vector: List[float] # 예: [활성창 전환 빈도, 키 입력 빈도, 유휴 상태, 마우스 활동, 클립보드 활동]
+    activity_vector: Dict[str, float] # 예: [활성창 전환 빈도, 키 입력 빈도, 유휴 상태, 마우스 활동, 클립보드 활동]
 
 
 class EventCreateResponse(BaseModel):
