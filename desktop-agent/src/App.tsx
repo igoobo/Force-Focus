@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
@@ -11,6 +11,14 @@ function App() {
     // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
     setGreetMsg(await invoke("greet", { name }));
   }
+
+  // test 코드
+  useEffect(() => {
+    invoke('get_current_active_window_info')
+      .then((res) => console.log('Active Window Info:', res))
+      .catch((err) => console.error('Error:', err));
+  }, []);
+
 
   return (
     <main className="container">
