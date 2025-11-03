@@ -36,3 +36,6 @@ screenshots = "0.8.10"
 
 # 4. 활성 창 정보
 active-win-pos-rs = "0.9.1" 
+
+# 5. 시간 관련 유틸리티
+chrono = "0.4.42"

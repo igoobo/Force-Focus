@@ -21,7 +21,7 @@ pub struct SysinfoState(pub Mutex<System>);
 
 // 사용자 입력 통계 추적을 위한 공유 상태
 // 앱 시작 시 한 번 초기화되어 계속 사용되므로 Arc로 공유됩니다.
-#[derive(Debug, Default, Clone, Serialize)] 
+#[derive(Debug, Default, Clone, Serialize, Deserialize)] 
 pub struct InputStats {
     pub total_input_events: u64, // 총 입력 이벤트 수
     pub last_input_timestamp_ms: u64, // 마지막 입력 이벤트 발생 시점 (밀리초)
@@ -48,32 +48,19 @@ pub struct ActiveWindowInfo {
     pub y: f64,            // 창의 Y 좌표
     pub width: f64,        // 창의 너비
     pub height: f64,       // 창의 높이
-    pub window_state: String, // 창의 상태 (예: "Focused", "Minimized", "Maximized" 등 - 이 값은 직접 판단해야 함)
 }
 
 
-// 현재 활성 창의 정보를 가져오는 Tauri Command
-#[command]
-pub fn get_current_active_window_info() -> Result<ActiveWindowInfo, String> {
-    // 현재 시간을 밀리초 단위의 Unix 타임스탬프로 가져옵니다.
+// ActiveWindowInfo를 생성하는 내부 헬퍼 함수
+pub fn _get_active_window_info_internal() -> Result<ActiveWindowInfo, String> {
+    // 현재 시간을 밀리초 단위의 Unix 타임스탬프로 가져옴
     let timestamp_ms = SystemTime::now().duration_since(UNIX_EPOCH)
-                                .unwrap_or_else(|_| std::time::Duration::from_secs(0)) // 에러 처리 추가
-                                .as_millis() as u64;
+                                    .unwrap_or_else(|_| std::time::Duration::from_secs(0)) // 에러 처리 추가
+                                    .as_millis() as u64;
 
-    // active-win-pos-rs 크레이트를 사용하여 현재 활성 창 정보를 가져옵니다.
-    // get_active_window() 함수는 Result<ActiveWindow, ()>를 반환합니다.
+    // 현재 활성 창 정보
     match get_active_window() {
         Ok(active_window) => {
-            // https://docs.rs/active-win-pos-rs/latest/active_win_pos_rs/struct.ActiveWindow.html
-            // active-win-pos-rs::ActiveWindow 구조체 필드 
-            // pub title: String,
-            // pub process_path: PathBuf,
-            // pub app_name: String,
-            // pub window_id: String,
-            // pub process_id: u64,
-            // pub position: WindowPosition { x: f64, y: f64, width: f64, height: f64 }
-
-            // ActiveWindowInfo 구조체에 맞춰 데이터를 매핑합니다.
             Ok(ActiveWindowInfo {
                 timestamp_ms,
                 title: active_window.title,
@@ -85,15 +72,20 @@ pub fn get_current_active_window_info() -> Result<ActiveWindowInfo, String> {
                 y: active_window.position.y,
                 width: active_window.position.width,
                 height: active_window.position.height,
-                // window_state는 active-win-pos-rs에서 직접 제공하지 않으므로,
-                // 현재로서는 "Focused"로 가정합니다. (나중에 더 정교한 로직 추가 가능)
-                window_state: "Focused".to_string(),
             })
         },
         // 활성 창을 가져오는 데 실패했을 경우 (에러나 활성 창 없음)
-        Err(()) => Err("Failed to get active window info.".to_string()),
+        Err(e) => Err(format!("Failed to get active window info: {:?}", e)),
     }
 }
+
+// 현재 활성 창의 정보를 가져오는 Tauri Command
+#[tauri::command]
+pub fn get_current_active_window_info() -> Result<ActiveWindowInfo, String> {
+    _get_active_window_info_internal()
+}
+
+
 
 // --- 2. 시스템 상태 관련 데이터 모델 및 명령어 ---
 

@@ -1,6 +1,7 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
 mod commands;
+mod logging;
 
 use tauri::{Manager, Builder, State};
 use std::sync::{Mutex, Arc};
@@ -54,6 +55,12 @@ pub fn run() {
             // 백그라운드 스레드에서 rdev 이벤트를 리스닝하고,
             // input_stats_arc_mutex_for_thread를 업데이트합니다.
             start_input_listener(input_stats_arc_mutex_for_thread);
+
+            
+            // 데이터 수집 및 로깅 기능 시작
+            let input_stats_arc_mutex_for_logging = Arc::clone(app_handle.state::<InputStatsArcMutex>().inner());
+            logging::start_data_collection_and_logging(input_stats_arc_mutex_for_logging, 10); // 10초마다 로깅
+
     
             Ok(())
         })
@@ -93,7 +100,7 @@ fn start_input_listener(input_stats_arc_mutex: InputStatsArcMutex) {
                     // (디버깅용) 키보드 이벤트 발생 시 콘솔 출력
                     // eprintln!("KeyPress/Release detected: {:?}", event.event_type);
                 },
-                // 마우스 버튼 누름
+                // 마우스 버튼 누름 (마우스 휠 추가 예정)
                 EventType::ButtonPress(_) => {
                     let mut stats_guard = input_stats_arc_mutex.lock().unwrap();
                     stats_guard.total_input_events += 1;
