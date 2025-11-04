@@ -3,26 +3,7 @@ import { useState, useEffect } from "react";
 import "./App.css";
 
 import LoginView from './components/LoginView.tsx';
-
-// (임시) MainView Placeholder 컴포넌트
-interface MainViewProps {
-  onLogout: () => void;
-}
-
-const MainView: React.FC<MainViewProps> = ({ onLogout }) => {
-  return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-800 text-white">
-      <h1 className="text-4xl font-bold mb-4">환영합니다!</h1>
-      <p className="text-xl mb-8">메인 화면입니다. 여기에 대시보드 UI가 들어갈 예정입니다.</p>
-      <button
-        onClick={onLogout}
-        className="px-6 py-3 bg-red-600 hover:bg-red-700 rounded-lg text-lg font-semibold"
-      >
-        로그아웃 (Mock)
-      </button>
-    </div>
-  );
-};
+import MainView from './components/MainView';
 
 
 function App() {

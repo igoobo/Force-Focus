@@ -1,211 +1,116 @@
 // 파일 위치: Force-Focus/desktop-agent/src/mocks/handlers.ts
-import { http, HttpResponse } from 'msw';
-import { v4 as uuidv4 } from 'uuid';
+import { HttpResponse, http, delay } from 'msw';
+import { User, Task, Schedule, Profile, Session } from '../types'; // types에서 인터페이스 임포트
+
+const API_BASE_URL = '/api/v1';
 
 // --- 가짜 데이터 정의 ---
-const mockDefaultProfile = {
+export const mockDefaultProfile: Profile = {
   id: 'profile-default-desktop',
   user_id: 'desktop-user-123',
-  profile_name: '데스크탑 기본 집중',
+  profile_name: '기본 집중 프로필',
   is_default: true,
-  model_type: 'time_sliced_rules',
+  model_type: 'focus_optimization_v1',
   time_slices: [
-    { slice_index: 0, rules: { typing_freq_min: 0.2, context_switch_max: 10 } },
-    { slice_index: 1, rules: { typing_freq_min: 0.7, context_switch_max: 2 } },
-    { slice_index: 2, rules: { typing_freq_min: 0.6, context_switch_max: 3 } },
+    { slice_index: 0, rules: { allowed_app_groups: 1, notification_control: 1 } },
   ],
-  model_confidence_score: 0.92,
-  last_updated_at: new Date().toISOString(),
-  custom_thresholds: { global_sensitivity: 0.9 },
+  model_confidence_score: 0.85,
+  last_updated_at: '2023-10-26T00:00:00Z',
+  custom_thresholds: {
+    interruption_sensitivity: 0.7,
+  },
 };
 
-const mockCurrentUser = {
+export const mockCurrentUser: User = {
   id: 'desktop-user-123',
-  email: 'desktop@example.com',
-  username: 'desktopUser',
+  email: 'user@example.com',
+  username: 'desktop_user',
   settings: {
     notifications_enabled: true,
-    dark_mode: false,
+    dark_mode: true,
   },
-  blocked_apps: ['slack.exe', 'discord.exe'],
+  blocked_apps: ['explorer.exe', 'steam.exe'],
 };
 
-// --- (추가) 가짜 할 일(Task) 데이터 정의 ---
-let mockTasks = [
+// --- 가짜 할 일(Task) 데이터 정의 ---
+export const mockTasks: Task[] = [
   {
     id: 'task-coding-session',
     user_id: 'desktop-user-123',
-    task_name: 'FastAPI 백엔드 개발',
-    description: 'API 계약서 기반 백엔드 로직 구현',
-    due_date: '2024-12-31T23:59:59Z',
+    task_name: '코딩 세션 진행',
+    description: 'Force-Focus 데스크톱 앱 프런트엔드 개발',
+    due_date: '2023-12-31T23:59:59Z',
     status: 'active',
-    target_executable: 'Code.exe', // Visual Studio Code
-    target_arguments: ['force-focus-project'],
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    target_executable: 'vscode.exe',
+    target_arguments: [],
+    created_at: '2023-10-26T10:00:00Z',
+    updated_at: '2023-10-26T10:00:00Z',
   },
   {
     id: 'task-report-writing',
     user_id: 'desktop-user-123',
     task_name: '주간 보고서 작성',
-    description: '지난 주 진척 사항 정리',
-    due_date: '2024-07-26T17:00:00Z',
-    status: 'active',
-    target_executable: 'WINWORD.EXE', // MS Word
-    target_arguments: ['C:\\Users\\User\\Documents\\weekly_report.docx'],
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'task-meeting-prep',
-    user_id: 'desktop-user-123',
-    task_name: '팀 미팅 준비',
-    description: '발표 자료 검토',
-    due_date: '2024-07-25T10:00:00Z',
-    status: 'completed',
-    target_executable: null, // 특정 앱 없음
+    description: '지난 주 작업 내용 정리 및 보고서 초안 작성',
+    due_date: '2023-11-03T18:00:00Z',
+    status: 'pending',
+    target_executable: 'word.exe',
     target_arguments: [],
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: '2023-10-25T09:00:00Z',
+    updated_at: '2023-10-25T09:00:00Z',
   },
 ];
 // ------------------------------------
 
 // --- 가짜 스케줄 데이터 정의 (Task ID 참조 업데이트) ---
-let mockSchedules = [
+export const mockSchedules: Schedule[] = [
   {
-    id: 'schedule-001',
+    id: 'schedule-coding-mon-wed',
     user_id: 'desktop-user-123',
-    task_id: 'task-coding-session', // <-- task-coding-session 참조
-    name: '오전 코딩 집중 세션',
+    task_id: 'task-coding-session',
+    name: '월/수 코딩 집중',
     start_time: '09:00',
-    end_time: '11:00',
-    days_of_week: [1, 2, 3, 4, 5], // 월-금
-    created_at: new Date().toISOString(),
-    is_active: true,
-  },
-  {
-    id: 'schedule-002',
-    user_id: 'desktop-user-123',
-    task_id: 'task-report-writing', // <-- task-report-writing 참조
-    name: '점심 후 보고서 작성',
-    start_time: '13:00',
-    end_time: '14:00',
-    days_of_week: [1, 3, 5], // 월, 수, 금
-    created_at: new Date().toISOString(),
+    end_time: '12:00',
+    days_of_week: [1, 3], // 월요일, 수요일
+    created_at: '2023-10-20T08:00:00Z',
     is_active: true,
   },
 ];
 // ------------------------------------
+// --- Mock 세션 상태를 동적으로 관리하기 위한 변수 ---
+let activeUserSession: Session | null = null;
 
-// --- 핸들러 정의 ---
+// --- MSW 핸들러 정의 ---
 export const handlers = [
-  // 1. GET /users/me
-  http.get('/api/v1/users/me', () => {
+  // 사용자 로그인 (Mock)
+  http.post(`${API_BASE_URL}/user/login`, async ({ request }) => {
+    await delay(500); // 네트워크 지연 시뮬레이션
+    const { email, password } = await request.json() as any;
+
+    if (email === 'user@example.com' && password === 'password123') {
+      return HttpResponse.json({
+        message: '로그인 성공',
+        token: 'mock-jwt-token-123',
+        user: mockCurrentUser,
+      }, { status: 200 });
+    }
+    return HttpResponse.json({ message: '잘못된 이메일 또는 비밀번호' }, { status: 401 });
+  }),
+
+  // 현재 사용자 정보 조회
+  http.get(`${API_BASE_URL}/users/me`, async () => {
+    await delay(300);
     return HttpResponse.json(mockCurrentUser, { status: 200 });
   }),
 
-  // 2. GET /profiles
-  http.get('/api/v1/profiles', () => {
-    return HttpResponse.json([mockDefaultProfile], { status: 200 });
-  }),
-
-  // 3. GET /profiles/{profile_id}
-  http.get('/api/v1/profiles/:profileId', ({ params }) => {
-    const { profileId } = params;
-    if (profileId === mockDefaultProfile.id) {
-      return HttpResponse.json(mockDefaultProfile, { status: 200 });
-    }
-    return HttpResponse.json({ detail: 'Profile not found' }, { status: 404 });
-  }),
-
-  // 4. POST /events
-  http.post('/api/v1/events', async ({ request }) => {
-    const requestBody = await request.json();
-    console.log('[Mock API] Received Event:', requestBody);
-    return HttpResponse.json({ status: 'success', event_id: uuidv4() }, { status: 200 });
-  }),
-
-  // 5. POST /sessions/start
-  http.post('/api/v1/sessions/start', async ({ request }) => {
-    const requestBody = await request.json();
-    console.log('[Mock API] Session Start:', requestBody);
-    return HttpResponse.json({ session_id: uuidv4(), status: 'started' }, { status: 200 });
-  }),
-
-  // 6. PUT /sessions/{session_id}
-  http.put('/api/v1/sessions/:sessionId', async ({ params, request }) => {
-    const { sessionId } = params;
-    const requestBody = await request.json();
-    console.log(`[Mock API] Session ${sessionId} Update:`, requestBody);
-    return HttpResponse.json({ success: true, session_id: sessionId }, { status: 200 });
-  }),
-
-  // 7. GET /sessions/current
-  http.get('/api/v1/sessions/current', () => {
-    const activeSession = {
-      id: 'session-active-123',
-      user_id: 'desktop-user-123',
-      profile_id: mockDefaultProfile.id,
-      start_time: new Date(Date.now() - 3600 * 1000).toISOString(),
-      status: 'active',
-      goal_duration: 180,
-      interruption_count: 5,
-    };
-    return HttpResponse.json(activeSession, { status: 200 });
-  }),
-
-  // 8. GET /schedules (사용자 스케줄 목록 조회)
-  http.get('/api/v1/schedules', () => {
-    return HttpResponse.json(mockSchedules, { status: 200 });
-  }),
-
-  // 9. POST /schedules (새로운 스케줄 등록)
-  http.post('/api/v1/schedules', async ({ request }) => {
-    const newScheduleData = await request.json();
-    const newSchedule = {
-      id: uuidv4(),
-      user_id: 'desktop-user-123', // Mock user_id
-      created_at: new Date().toISOString(),
-      is_active: true,
-      ...newScheduleData as any,
-    };
-    mockSchedules.push(newSchedule);
-    return HttpResponse.json(newSchedule, { status: 200 });
-  }),
-
-  // 10. PUT /schedules/{schedule_id}
-  http.put('/api/v1/schedules/:scheduleId', async ({ params, request }) => {
-    const { scheduleId } = params;
-    const updatedData = await request.json();
-    const index = mockSchedules.findIndex(s => s.id === scheduleId);
-
-    if (index !== -1) {
-      mockSchedules[index] = { ...mockSchedules[index], ...updatedData as any};
-      return HttpResponse.json({ success: true, schedule_id: scheduleId }, { status: 200 });
-    }
-    return HttpResponse.json({ detail: 'Schedule not found' }, { status: 404 });
-  }),
-
-  // 11. DELETE /schedules/{schedule_id}
-  http.delete('/api/v1/schedules/:scheduleId', ({ params }) => {
-    const { scheduleId } = params;
-    const initialLength = mockSchedules.length;
-    mockSchedules = mockSchedules.filter(s => s.id !== scheduleId);
-
-    if (mockSchedules.length < initialLength) {
-      return HttpResponse.json({ success: true, schedule_id: scheduleId }, { status: 200 });
-    }
-    return HttpResponse.json({ detail: 'Schedule not found' }, { status: 404 });
-  }),
-
-  // --- (추가) 12. GET /tasks (사용자 할 일 목록 조회) ---
-  http.get('/api/v1/tasks', () => {
+  // 모든 Task 조회
+  http.get(`${API_BASE_URL}/tasks`, async () => {
+    await delay(300);
     return HttpResponse.json(mockTasks, { status: 200 });
   }),
 
-  // --- (추가) 13. GET /tasks/{task_id} (특정 할 일 상세 조회) ---
-  http.get('/api/v1/tasks/:taskId', ({ params }) => {
+  // 특정 Task ID로 조회
+  http.get(`${API_BASE_URL}/tasks/:taskId`, async ({ params }) => {
+    await delay(300);
     const { taskId } = params;
     const task = mockTasks.find(t => t.id === taskId);
     if (task) {
@@ -214,31 +119,69 @@ export const handlers = [
     return HttpResponse.json({ detail: 'Task not found' }, { status: 404 });
   }),
 
-  // --- (추가) 14. POST /tasks (새로운 할 일 추가) ---
-  http.post('/api/v1/tasks', async ({ request }) => {
-    const newTaskData = await request.json();
-    const newTask = {
-      id: uuidv4(),
-      user_id: 'desktop-user-123',
-      status: 'active',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      ...newTaskData as any,
-    };
-    mockTasks.push(newTask);
-    return HttpResponse.json(newTask, { status: 200 });
+  // 모든 Schedule 조회
+  http.get(`${API_BASE_URL}/schedules`, async () => {
+    await delay(300);
+    return HttpResponse.json(mockSchedules, { status: 200 });
   }),
 
-  // --- (추가) 15. PUT /tasks/{task_id} (특정 할 일 업데이트) ---
-  http.put('/api/v1/tasks/:taskId', async ({ params, request }) => {
-    const { taskId } = params;
-    const updatedData = await request.json();
-    const index = mockTasks.findIndex(t => t.id === taskId);
+  // 기본 프로필 조회
+  http.get(`${API_BASE_URL}/profiles/default`, async () => {
+    await delay(300);
+    return HttpResponse.json(mockDefaultProfile, { status: 200 });
+  }),
 
-    if (index !== -1) {
-      mockTasks[index] = { ...mockTasks[index], ...updatedData as any, updated_at: new Date().toISOString() };
-      return HttpResponse.json({ success: true, task_id: taskId }, { status: 200 });
+  // 현재 활성 세션 조회 (동적 처리)
+  http.get(`${API_BASE_URL}/sessions/current`, async () => {
+    await delay(500);
+    if (activeUserSession && activeUserSession.status === 'active') {
+      // 현재 시간 기준으로 경과 시간 업데이트 (Mock)
+      const updatedSession = { ...activeUserSession };
+      // start_time을 기준으로 경과 시간을 계산하여 클라이언트에서 타이머가 자연스럽게 이어지도록 함
+      return HttpResponse.json(updatedSession, { status: 200 });
     }
-    return HttpResponse.json({ detail: 'Task not found' }, { status: 404 });
+    // 활성 세션이 없으면 404 반환
+    return HttpResponse.json({ detail: 'No active session found' }, { status: 404 });
+  }),
+
+  // 세션 시작 (동적 처리)
+  http.post(`${API_BASE_URL}/sessions/start`, async ({ request }) => {
+    await delay(700);
+    const { task_id, goal_duration } = await request.json() as any;
+
+    if (activeUserSession && activeUserSession.status === 'active') {
+      return HttpResponse.json({ detail: 'Another session is already active.' }, { status: 409 }); // Conflict
+    }
+
+    const newSession: Session = {
+      id: `session-${Date.now()}`,
+      user_id: mockCurrentUser.id,
+      profile_id: mockDefaultProfile.id, // 기본 프로필 사용
+      task_id: task_id || 'task-coding-session', // task_id가 없으면 기본값
+      start_time: new Date().toISOString(),
+      status: 'active',
+      goal_duration: goal_duration || 60, // 기본 60분
+      interruption_count: 0,
+    };
+    activeUserSession = newSession; // 활성 세션으로 설정
+    return HttpResponse.json(newSession, { status: 200 });
+  }),
+
+  // 세션 종료 (동적 처리)
+  http.put(`${API_BASE_URL}/sessions/:sessionId`, async ({ params }) => {
+    await delay(500);
+    const { sessionId } = params;
+
+    if (activeUserSession && activeUserSession.id === sessionId && activeUserSession.status === 'active') {
+      activeUserSession = null; // 활성 세션 종료
+      return HttpResponse.json({ success: true, session_id: sessionId }, { status: 200 });
+    }
+    return HttpResponse.json({ detail: 'Active session not found or already ended.' }, { status: 404 });
+  }),
+
+  // 이벤트 전송 (Mock)
+  http.post(`${API_BASE_URL}/events`, async () => {
+    await delay(200);
+    return HttpResponse.json({ status: 'success', event_id: `event-${Date.now()}` }, { status: 200 });
   }),
 ];
