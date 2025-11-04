@@ -112,10 +112,13 @@ pub fn get_all_processes_summary(sys_state: State<'_, SysinfoState>) -> Result<V
     let mut processes_summary = Vec::new();
     // sys_guard.processes()는 (Pid, &Process) 형태의 Iterator를 반환합니다.
     for (_pid, process) in sys_guard.processes() {
-        processes_summary.push(ProcessSummary {
-            name: process.name().to_string_lossy().into_owned(), // &OsStr을 String으로 안전하게 변환
-            start_time_unix_s: process.start_time(),
-        });
+        if (process.start_time() > 0) {
+            processes_summary.push(ProcessSummary {
+                name: process.name().to_string_lossy().into_owned(), // &OsStr을 String으로 안전하게 변환
+                start_time_unix_s: process.start_time(),
+            });
+        }
+            
     }
     Ok(processes_summary)
 }
