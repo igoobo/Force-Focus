@@ -29,8 +29,8 @@ const SCORE_INACTIVITY_MILD: u16 = 3;
 const SCORE_INACTIVITY_SEVERE: u16 = 10;
 
 /// 비활성(Inactivity) 판단 기준 시간 (초 단위)
-const INACTIVITY_THRESHOLD_MILD_S: u16 = 180; // 3분
-const INACTIVITY_THRESHOLD_SEVERE_S: u16 = 600; // 10분
+const INACTIVITY_THRESHOLD_MILD_S: u64 = 180; // 3분
+const INACTIVITY_THRESHOLD_SEVERE_S: u64 = 600; // 10분
 
 
 // --- 2. StateEngine 상태 및 로직 ---
@@ -48,17 +48,14 @@ pub enum InterventionTrigger {
 #[derive(Debug)]
 pub struct StateEngine {
     /// 현재 누적된 '이탈 점수'
-    deviation_score: u16,
-    /// 마지막으로 '이탈 점수'가 감소된 시점의 타임스탬프
-    last_decay_timestamp_s: u64,
+    deviation_score: u16
 }
 
 impl StateEngine {
     /// 새로운 세션을 위한 StateEngine을 생성
     pub fn new() -> Self {
         StateEngine {
-            deviation_score: 0,
-            last_decay_timestamp_s: current_timestamp_s(),
+            deviation_score: 0
         }
     }
 
@@ -95,35 +92,34 @@ impl StateEngine {
             title_lower.contains(keyword) || app_name_lower.contains(keyword)
         });
 
-        if is_distraction {
-            score_to_add += SCORE_DISTRACTION_APP;
-        }
-
         // --- 규칙 2: 비활성(Inactivity) 검사 ---
-        let last_input_s = input_stats.last_input_timestamp_ms / 1000;
-        let inactivity_duration_s = now_s.saturating_sub(last_input_s);
+        if is_distraction {
+            // --- 2a. 딴짓 중인 경우 ---
+            // '딴짓' 자체 점수를 추가
+            score_to_add += SCORE_DISTRACTION_APP;
 
-        if inactivity_duration_s >= INACTIVITY_THRESHOLD_SEVERE_S.into() {
-            score_to_add += SCORE_INACTIVITY_SEVERE;
-        } else if inactivity_duration_s >= INACTIVITY_THRESHOLD_MILD_S.into() {
-            score_to_add += SCORE_INACTIVITY_MILD;
-        }
+            // '딴짓' 중에 '비활성' 상태(입력 없음)가 겹치면 점수를 가중
+            // (예: 유튜브를 켜놓고 자리를 비움)
+            let last_input_s = input_stats.last_input_timestamp_ms / 1000;
+            let inactivity_duration_s = now_s.saturating_sub(last_input_s);
 
-        // --- 규칙 3: 점수 감소 (Decay) 로직 ---
-        // 만약 방해 활동이 감지되지 않았고(score_to_add == 0),
-        // 마지막 입력이 최근(예: 1분 이내)에 있었다면, 점수를 서서히 감소
-        let is_productive = !is_distraction && (inactivity_duration_s < 60);
-
-        if is_productive {
-            // 10초마다 1점씩 감소 (예시)
-            let time_since_last_decay = now_s.saturating_sub(self.last_decay_timestamp_s);
-            if time_since_last_decay >= 10 {
-                self.deviation_score = self.deviation_score.saturating_sub(1); // 1점 감소
-                self.last_decay_timestamp_s = now_s;
+            if inactivity_duration_s >= INACTIVITY_THRESHOLD_SEVERE_S {
+                score_to_add += SCORE_INACTIVITY_SEVERE;
+            } else if inactivity_duration_s >= INACTIVITY_THRESHOLD_MILD_S {
+                score_to_add += SCORE_INACTIVITY_MILD;
             }
+
+        } else {
+            // --- 2b. 업무 중인 경우 (is_distraction == false) ---
+            // "생각하는 시간" (문서 읽기, 코드 리뷰 등)을 존중
+            // 이 때는 '비활성' 점수 부과 안함
+            // '이탈 점수'를 감소
+            
+            self.deviation_score = self.deviation_score.saturating_sub(1); 
+            
         }
 
-        // --- 최종 점수 계산 및 개입 결정 ---
+        // --- 3. 최종 점수 계산 및 개입 결정 ---
         if score_to_add > 0 {
             // 딴짓을 하면 점수가 즉시 오르지만, 최대치를 제한 (예: 100)
             self.deviation_score = (self.deviation_score + score_to_add).min(100);
@@ -200,22 +196,21 @@ mod tests {
     }
 
     #[test]
-    fn test_inactivity_score_increases() {
+    fn test_inactivity_score_only_if_distraction() {
         let mut engine = StateEngine::new();
-        let window_info = mock_window_info("Working on Document", "word.exe");
         
-        // 4분 (240초) 동안 입력 없음
-        let input_stats_mild = mock_input_stats(240);
-        let trigger_mild = engine.process_activity(&window_info, &input_stats_mild);
-        
-        assert_eq!(engine.get_current_score(), SCORE_INACTIVITY_MILD);
-        
-        // 11분 (660초) 동안 입력 없음
-        let input_stats_severe = mock_input_stats(660);
-        let trigger_severe = engine.process_activity(&window_info, &input_stats_severe);
+        // 1. 업무 중 + 비활성 (생각하는 시간)
+        let window_info_work = mock_window_info("Working on Document", "word.exe");
+        let input_stats_inactive = mock_input_stats(240); // 4분
+        engine.process_activity(&window_info_work, &input_stats_inactive);
+        // 점수가 오르지 않아야 함 (오히려 0이거나 감소)
+        assert_eq!(engine.get_current_score(), 0); 
 
-        // 점수가 누적됨 (기존 점수 + 새로운 점수)
-        assert_eq!(engine.get_current_score(), SCORE_INACTIVITY_MILD + SCORE_INACTIVITY_SEVERE);
+        // 2. 딴짓 중 + 비활성
+        let window_info_distraction = mock_window_info("YouTube", "chrome.exe");
+        engine.process_activity(&window_info_distraction, &input_stats_inactive);
+        // 딴짓 점수 + 비활성 점수
+        assert_eq!(engine.get_current_score(), SCORE_DISTRACTION_APP + SCORE_INACTIVITY_MILD);
     }
 
     #[test]
@@ -223,22 +218,24 @@ mod tests {
         let mut engine = StateEngine::new();
 
         // 1. 점수를 먼저 올림 (방해 앱)
-        let distraction_window = mock_window_info("YouTube - Google Chrome", "chrome.exe");
+        let distraction_window = mock_window_info("YouTube", "chrome.exe");
         let input_stats = mock_input_stats(10);
         engine.process_activity(&distraction_window, &input_stats);
         let initial_score = engine.get_current_score();
-        assert!(initial_score > 0);
+        assert_eq!(initial_score, SCORE_DISTRACTION_APP); // 점수: 5
 
-        // 2. 시간을 10초 이상 흐르게 함 (시뮬레이션)
-        std::thread::sleep(std::time::Duration::from_secs(11));
-
-        // 3. 생산적인 활동으로 전환
+        // 2. 타이머(sleep) 대신, '업무 중' 함수를 1회 호출
         let productive_window = mock_window_info("Productive Task", "code.exe");
-        let productive_stats = mock_input_stats(1); // 1초 전 입력 (활발히 활동 중)
-        engine.process_activity(&productive_window, &productive_stats);
+        let productive_stats_inactive = mock_input_stats(30); // (생각 중)
+        engine.process_activity(&productive_window, &productive_stats_inactive);
         
-        // 점수가 감소해야 함
-        assert!(engine.get_current_score() < initial_score);
-        assert_eq!(engine.get_current_score(), initial_score.saturating_sub(1));
+        // 점수가 1 감소해야 함
+        assert_eq!(engine.get_current_score(), initial_score.saturating_sub(1)); // 점수: 4
+
+        // 3. '업무 중' 함수를 2회 호출
+        engine.process_activity(&productive_window, &productive_stats_inactive);
+
+        // 점수가 1 더 감소해야 함
+        assert_eq!(engine.get_current_score(), initial_score.saturating_sub(2)); // 점수: 3
     }
 }

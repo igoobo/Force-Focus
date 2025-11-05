@@ -23,7 +23,13 @@ pub fn start_input_listener(input_stats_arc_mutex: InputStatsArcMutex) {
                 EventType::Wheel { .. } => {
                     update_stats(&input_stats_arc_mutex);
                 }
-                // 마우스 이동, 키 떼기 등 다른 이벤트는 무시
+
+                 // 마우스 이동을 감지
+                EventType::MouseMove { .. } => {
+                    update_stats(&input_stats_arc_mutex);
+                }
+                
+                // 키 떼기 등 다른 이벤트는 무시
                 _ => (),
             }
         }) {
