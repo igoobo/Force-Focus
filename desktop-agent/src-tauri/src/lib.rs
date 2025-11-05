@@ -5,6 +5,7 @@ mod logging;
 pub mod input_monitor;
 pub mod state_engine;
 pub mod app_core;
+pub mod backend_communicator;
 
 use tauri::{Manager, Builder, State};
 use std::sync::{Mutex, Arc};
@@ -39,6 +40,9 @@ pub fn run() {
     // InputStatsArcMutex 타입을 직접 manage
     let input_stats_manager_state: InputStatsArcMutex = Arc::new(Mutex::new(initial_input_stats));
 
+    // BackendCommunicator 인스턴스를 생성
+    let backend_communicator_state = backend_communicator::BackendCommunicator::new();
+
     // StateEngine 인스턴스를 생성
     let state_engine_manager_state: StateEngineArcMutex = 
         Arc::new(Mutex::new(state_engine::StateEngine::new()));
@@ -56,6 +60,9 @@ pub fn run() {
 
         // StateEngine을 전역 상태로 등록
         .manage(state_engine_manager_state.clone())
+
+        // BackendCommunicator를 전역 상태로 등록
+        .manage(backend_communicator_state)
 
         .setup(|app| {
             let app_handle = app.handle();
@@ -82,6 +89,8 @@ pub fn run() {
             commands::get_all_processes_summary,
             commands::get_input_frequency_stats,
 
+            // backend_communicator 모듈의 커맨드를 핸들러에 등록
+            backend_communicator::submit_feedback
             ])
 
         .run(tauri::generate_context!())
