@@ -81,7 +81,7 @@ impl StateEngine {
         input_stats: &InputStats,
     ) -> InterventionTrigger {
         let now_s = current_timestamp_s();
-        let mut score_to_add: u16 = 0;
+        let score_to_add: u16 = 0;
 
         // --- 규칙 1: 방해 키워드 검사 ---
         // 창 제목과 앱 이름을 모두 소문자로 변환하여 검사
@@ -95,11 +95,12 @@ impl StateEngine {
         // --- 규칙 2: 비활성(Inactivity) 검사 ---
         if is_distraction {
             // --- 2a. 딴짓 중인 경우 ---
-            // '딴짓' 자체 점수를 추가
+            let mut score_to_add: u16 = 0;
+
+            // '딴짓' 자체 점수
             score_to_add += SCORE_DISTRACTION_APP;
 
-            // '딴짓' 중에 '비활성' 상태(입력 없음)가 겹치면 점수를 가중
-            // (예: 유튜브를 켜놓고 자리를 비움)
+            // '딴짓' 중 '비활성' 가중
             let last_input_s = input_stats.last_input_timestamp_ms / 1000;
             let inactivity_duration_s = now_s.saturating_sub(last_input_s);
 
@@ -108,30 +109,28 @@ impl StateEngine {
             } else if inactivity_duration_s >= INACTIVITY_THRESHOLD_MILD_S {
                 score_to_add += SCORE_INACTIVITY_MILD;
             }
+            
+            // 점수를 누적
+            self.deviation_score = (self.deviation_score + score_to_add).min(100);
+
+            // 2b. '개입 결정' 로직을 '딴짓' 블록 내부에서만 수행
+            if self.deviation_score >= THRESHOLD_OVERLAY {
+                return InterventionTrigger::TriggerOverlay;
+            } else if self.deviation_score >= THRESHOLD_NOTIFICATION {
+                return InterventionTrigger::TriggerNotification;
+            } else {
+                // 점수는 쌓였지만 아직 임계값 미만
+                return InterventionTrigger::DoNothing; 
+            }
 
         } else {
-            // --- 2b. 업무 중인 경우 (is_distraction == false) ---
-            // "생각하는 시간" (문서 읽기, 코드 리뷰 등)을 존중
-            // 이 때는 '비활성' 점수 부과 안함
-            // '이탈 점수'를 감소
+            // --- 3. 업무 중인 경우 (is_distraction == false) ---
             
+            // 점수를 능동적으로 감소
             self.deviation_score = self.deviation_score.saturating_sub(1); 
             
-        }
-
-        // --- 3. 최종 점수 계산 및 개입 결정 ---
-        if score_to_add > 0 {
-            // 딴짓을 하면 점수가 즉시 오르지만, 최대치를 제한 (예: 100)
-            self.deviation_score = (self.deviation_score + score_to_add).min(100);
-        }
-
-        // 임계값을 기준으로 개입 명령 결정
-        if self.deviation_score >= THRESHOLD_OVERLAY {
-            InterventionTrigger::TriggerOverlay
-        } else if self.deviation_score >= THRESHOLD_NOTIFICATION {
-            InterventionTrigger::TriggerNotification
-        } else {
-            InterventionTrigger::DoNothing
+            // 3b. '업무 중'일 때는 절대 개입하지 않고 DoNothing을 반환
+            return InterventionTrigger::DoNothing;
         }
     }
 }
@@ -237,5 +236,30 @@ mod tests {
 
         // 점수가 1 더 감소해야 함
         assert_eq!(engine.get_current_score(), initial_score.saturating_sub(2)); // 점수: 3
+    }
+
+    //  업무 복귀 시 알림이 즉시 멈추는지 테스트
+    #[test]
+    fn test_intervention_stops_immediately_on_work() {
+        let mut engine = StateEngine::new();
+        let input_stats = mock_input_stats(10);
+        let distraction_window = mock_window_info("YouTube", "chrome.exe");
+
+        // 1. 점수를 20점 (Overlay 임계값)까지 강제로 증가
+        let trigger1 = engine.process_activity(&distraction_window, &input_stats); // 5
+        let trigger2 = engine.process_activity(&distraction_window, &input_stats); // 10
+        let trigger3 = engine.process_activity(&distraction_window, &input_stats); // 15
+        let trigger_overlay = engine.process_activity(&distraction_window, &input_stats); // 20
+        
+        assert_eq!(engine.get_current_score(), 20);
+        assert_eq!(trigger_overlay, InterventionTrigger::TriggerOverlay); // 딴짓 중 -> 오버레이 발생
+
+        // 2. 업무 앱으로 전환
+        let productive_window = mock_window_info("Productive Task", "code.exe");
+        let trigger_work = engine.process_activity(&productive_window, &input_stats);
+
+        // 3. 점수는 19점으로 감소하지만, 반환값은 DoNothing
+        assert_eq!(engine.get_current_score(), 19);
+        assert_eq!(trigger_work, InterventionTrigger::DoNothing); // [!] 핵심 버그 수정 확인
     }
 }
