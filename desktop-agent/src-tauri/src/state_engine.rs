@@ -48,12 +48,19 @@ pub enum InterventionTrigger {
 pub struct StateEngine {
     /// 현재 누적된 '이탈 점수'
     deviation_score: u16,
+    // 개입 이벤트를 이미 보냈는지 추적하는 플래그
+    notification_sent: bool,
+    overlay_sent: bool,
 }
 
 impl StateEngine {
     /// 새로운 세션을 위한 StateEngine을 생성
     pub fn new() -> Self {
-        StateEngine { deviation_score: 0 }
+        StateEngine { 
+            deviation_score: 0,
+            notification_sent: false,
+            overlay_sent: false,
+         }
     }
 
     /// 현재 점수를 반환 (UI 표시 등에 사용)
@@ -112,18 +119,32 @@ impl StateEngine {
 
             // 2b. '개입 결정' 로직을 '딴짓' 블록 내부에서만 수행
             if self.deviation_score >= THRESHOLD_OVERLAY {
-                return InterventionTrigger::TriggerOverlay;
+                if !self.overlay_sent {
+                    self.overlay_sent = true; // 플래그 설정
+                    return InterventionTrigger::TriggerOverlay;
+                }
             } else if self.deviation_score >= THRESHOLD_NOTIFICATION {
-                return InterventionTrigger::TriggerNotification;
-            } else {
-                // 점수는 쌓였지만 아직 임계값 미만
-                return InterventionTrigger::DoNothing;
+                if !self.notification_sent {
+                    self.notification_sent = true; // 플래그 설정
+                    return InterventionTrigger::TriggerNotification;
+                }
             }
+            // 이미 알림을 보냈거나, 아직 임계값 미만이면 DoNothing
+            return InterventionTrigger::DoNothing; 
+
+
         } else {
             // --- 3. 업무 중인 경우 (is_distraction == false) ---
 
             // 점수를 능동적으로 감소
             self.deviation_score = self.deviation_score.saturating_sub(1);
+
+            // 업무 복귀 시, 모든 플래그를 초기화
+            // (다음 '딴짓' 사이클을 위해 재무장)
+            if self.notification_sent || self.overlay_sent {
+                self.notification_sent = false;
+                self.overlay_sent = false;
+            }
 
             // 3b. '업무 중'일 때는 절대 개입하지 않고 DoNothing을 반환
             return InterventionTrigger::DoNothing;
@@ -255,6 +276,7 @@ mod tests {
 
         assert_eq!(engine.get_current_score(), 20);
         assert_eq!(trigger_overlay, InterventionTrigger::TriggerOverlay); // 딴짓 중 -> 오버레이 발생
+        assert_eq!(engine.overlay_sent, true); // 플래그 설정 확인
 
         // 2. 업무 앱으로 전환
         let productive_window = mock_window_info("Productive Task", "code.exe");
@@ -263,5 +285,29 @@ mod tests {
         // 3. 점수는 19점으로 감소하지만, 반환값은 DoNothing
         assert_eq!(engine.get_current_score(), 19);
         assert_eq!(trigger_work, InterventionTrigger::DoNothing); // [!] 핵심 버그 수정 확인
+        assert_eq!(engine.overlay_sent, false); // 플래그 초기화 확인
+    }
+
+    // 알림이 단 한 번만 발생하는지 테스트
+    #[test]
+    fn test_notification_sent_only_once() {
+        let mut engine = StateEngine::new();
+        let input_stats = mock_input_stats(10);
+        let distraction_window = mock_window_info("YouTube", "chrome.exe");
+
+        // 1. 점수를 10점(Notification 임계값)까지 증가
+        engine.process_activity(&distraction_window, &input_stats); // 5
+        let trigger_notify = engine.process_activity(&distraction_window, &input_stats); // 10
+        
+        assert_eq!(engine.get_current_score(), 10);
+        assert_eq!(trigger_notify, InterventionTrigger::TriggerNotification); // 알림 발생
+        assert_eq!(engine.notification_sent, true); // 플래그 설정됨
+
+        // 2. 딴짓을 계속 (점수 15점)
+        let trigger_nothing = engine.process_activity(&distraction_window, &input_stats); // 15
+        
+        assert_eq!(engine.get_current_score(), 15);
+        // [!] 점수는 임계값을 넘었지만, 플래그가 설정되어 DoNothing을 반환
+        assert_eq!(trigger_nothing, InterventionTrigger::DoNothing); 
     }
 }
