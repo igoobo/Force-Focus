@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { listen, Event } from '@tauri-apps/api/event';
-import { invoke } from "@tauri-apps/api/core";
 
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 
@@ -8,12 +7,10 @@ import { isPermissionGranted, requestPermission, sendNotification } from '@tauri
 type InterventionPayload = "notification" | "overlay";
 
 /**
- * Rust 백엔드의 'intervention-trigger' 이벤트를 수신하고,
- * OS 알림 또는 오버레이 상태를 관리하는 커스텀 훅.
+ * '가벼운 개입(Notification)' 이벤트만 처리하는 커스텀 훅
  */
 export function useInterventionListener() {
-  // 오버레이 표시 여부 상태
-  const [showOverlay, setShowOverlay] = useState<boolean>(false);
+  
   // 백엔드 통신 에러 상태
   const [backendError, setBackendError] = useState<string | null>(null);
 
@@ -58,8 +55,7 @@ export function useInterventionListener() {
           console.log(`Rust Event Received: ${event.payload}`);
           
           if (event.payload === "overlay") {
-            // "강한 개입" 시 오버레이 표시
-            setShowOverlay(true);
+            // 오버레이는 Rust가 처리하므로 무시
           } else if (event.payload === "notification") {
             // "약한 개입" 시 OS 알림 전송
             sendOsNotification();
@@ -80,32 +76,5 @@ export function useInterventionListener() {
     };
   }, []); // 마운트 시 1회 실행
 
-  // "이건 업무임" 피드백 핸들러
-  const handleInterventionFeedback = async () => {
-    console.log("Feedback button clicked. Invoking 'submit_feedback'...");
-    try {
-      await invoke('submit_feedback', { feedbackType: 'is_work' });
-      console.log("Feedback submitted successfully.");
-      setBackendError(null); 
-    } catch (error) {
-      console.error("Failed to submit feedback:", error);
-      setBackendError(`피드백 전송 실패: ${error}`);
-    } finally {
-      setShowOverlay(false); // 오버레이 닫기
-    }
-  };
-
-  // "닫기" 핸들러
-  const handleCloseOverlay = () => {
-    console.log("Close button clicked. Hiding overlay.");
-    setShowOverlay(false);
-  };
-
-  // 훅이 App.tsx에 제공할 값과 함수들
-  return { 
-    showOverlay, 
-    backendError, 
-    handleInterventionFeedback, 
-    handleCloseOverlay 
-  };
+  return { backendError };
 }

@@ -1,50 +1,53 @@
 import React from 'react';
-
-interface InterventionOverlayProps {
-  /** "이건 업무임" 버튼을 클릭했을 때 호출될 함수 */
-  onFeedback: () => void;
-  
-  /** 오버레이를 닫을 때 호출될 함수 (예: 닫기 버튼) */
-  onClose: () => void;
-}
+import { invoke } from '@tauri-apps/api/core';
 
 /**
- * '딴짓' 감지 시 표시되는 개입 오버레이 UI 컴포넌트
+ * '딴짓' 감지 시 *별도의 창*에 표시되는 개입 오버레이 UI
  */
-const InterventionOverlay: React.FC<InterventionOverlayProps> = ({ onFeedback, onClose }) => {
-  
-  const handleFeedbackClick = () => {
-    onFeedback();
+const InterventionOverlay: React.FC = () => {
+
+  const handleFeedbackClick = async () => {
+    try {
+      console.log("Feedback button clicked. Submitting feedback...");
+      await invoke('submit_feedback', { feedbackType: 'is_work' });
+      console.log("Feedback submitted successfully.");
+    } catch (error) {
+      console.error("Failed to submit feedback:", error);
+    } finally {
+      // Rust의 'hide_overlay' 커맨드를 호출
+      console.log("Invoking 'hide_overlay'...");
+      try {
+        await invoke('hide_overlay');
+      } catch (e) {
+        console.error("Failed to hide overlay:", e);
+      }
+    }
   };
 
-  const handleCloseClick = () => {
-    onClose();
+  const handleCloseClick = async () => {
+    // Rust의 'hide_overlay' 커맨드를 호출
+    console.log("Close button clicked. Invoking 'hide_overlay'...");
+    try {
+      await invoke('hide_overlay');
+    } catch (e) {
+      console.error("Failed to hide overlay:", e);
+    }
   };
 
   return (
+    
     <div 
       style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100vw',
-        height: '100vh',
-        backgroundColor: 'rgba(0, 0, 0, 0.75)', // 반투명 검은색 배경
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 9999, // 최상단에 표시
-        color: 'white',
-        fontFamily: 'sans-serif',
+        position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+        backgroundColor: 'rgba(0, 0, 0, 0.75)', display: 'flex',
+        justifyContent: 'center', alignItems: 'center', zIndex: 9999,
+        color: 'white', fontFamily: 'sans-serif',
       }}
     >
       <div 
         style={{
-          backgroundColor: '#282c34', // 어두운 배경색
-          padding: '40px',
-          borderRadius: '12px',
-          textAlign: 'center',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+          backgroundColor: '#282c34', padding: '40px', borderRadius: '12px',
+          textAlign: 'center', boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
           border: '1px solid #444',
         }}
       >
@@ -53,37 +56,10 @@ const InterventionOverlay: React.FC<InterventionOverlayProps> = ({ onFeedback, o
           현재 작업이 '딴짓'으로 감지되었습니다.
         </p>
 
-        {/* 핵심: 피드백 버튼 */}
-        <button
-          onClick={handleFeedbackClick}
-          style={{
-            backgroundColor: '#007bff',
-            color: 'white',
-            border: 'none',
-            padding: '12px 24px',
-            fontSize: '16px',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            marginRight: '15px',
-            fontWeight: 'bold',
-          }}
-        >
+        <button onClick={handleFeedbackClick} style={{ /* ... */ }}>
           이건 업무임 (피드백)
         </button>
-
-        {/* 닫기 버튼 */}
-        <button
-          onClick={handleCloseClick}
-           style={{
-            backgroundColor: '#6c757d',
-            color: 'white',
-            border: 'none',
-            padding: '12px 24px',
-            fontSize: '16px',
-            borderRadius: '8px',
-            cursor: 'pointer',
-          }}
-        >
+        <button onClick={handleCloseClick} style={{ /* ... */ }}>
           닫기
         </button>
       </div>

@@ -1,6 +1,6 @@
 // 파일 위치: src-tauri/src/app_core.rs
 
-use tauri::{AppHandle, Manager, State, Emitter};
+use tauri::{AppHandle, Manager, State, Runtime, Emitter, WebviewWindowBuilder, WebviewUrl};
 use std::thread;
 use std::time::Duration;
 use crate::{
@@ -56,9 +56,41 @@ pub fn start_core_loop(app_handle: AppHandle) {
                         .unwrap_or_else(|e| eprintln!("Failed to emit event: {:?}", e));
                 }
                 state_engine::InterventionTrigger::TriggerOverlay => {
-                    println!("Core Loop: Triggering Overlay"); // (디버깅용)
-                    app_handle.emit("intervention-trigger", "overlay")
-                        .unwrap_or_else(|e| eprintln!("Failed to emit event: {:?}", e));
+                    // '강한 개입'은 Rust가 직접 네이티브 창을 제어
+                    println!("Core Loop: Triggering Overlay (Native)");
+                    
+                    // tauri.conf.json에 정의된 "overlay" 창 찾기
+                    // 2. 'Get-or-Create' 로직
+                    if let Some(overlay_window) = app_handle.get_webview_window("overlay") {
+                        // --- [케이스 1] 창이 존재함 (정상) ---
+                        // (숨겨진 창을 다시 띄우고 포커스)
+                        if let Err(e) = overlay_window.show() {
+                            eprintln!("Failed to show overlay window: {:?}", e);
+                        }
+                        if let Err(e) = overlay_window.set_focus() {
+                             eprintln!("Failed to focus overlay window: {:?}", e);
+                        }
+                    } else {
+                        // --- [케이스 2] 창이 없음 (Alt+F4로 파괴됨) ---
+                        // (tauri.conf.json과 동일한 설정으로 창을 재생성)
+                        println!("Core Loop: Overlay window not found. Re-creating...");
+                        if let Err(e) = WebviewWindowBuilder::new(
+                            &app_handle,
+                            "overlay", // 1. 고유 레이블
+                            WebviewUrl::App("overlay.html".into()) // 2. HTML 경로
+                        )
+                        .fullscreen(true)
+                        .decorations(false)
+                        .transparent(true)
+                        .always_on_top(true)
+                        .skip_taskbar(true)
+                        .resizable(false)
+                        .visible(true) // 3. 생성과 동시에 'show'
+                        .build()
+                        {
+                            eprintln!("Failed to re-create overlay window: {:?}", e);
+                        }
+                    }
                 }
                 state_engine::InterventionTrigger::DoNothing => {
                     // 아무것도 하지 않음

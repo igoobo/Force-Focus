@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Intervention Overlay</title>
+    <!-- (중요) 오버레이 창은 자체 CSS를 가질 수 있습니다. -->
+    <style>
+      /* 창 자체가 투명하도록 설정 */
+      html, body, #root {
+        background-color: transparent;
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- (중요) 메인 앱이 아닌, 오버레이 전용 진입점(entry)을 로드 -->
+    <script type="module" src="/src/overlay_main.tsx"></script>
+  </body>
+</html>

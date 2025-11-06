@@ -6,6 +6,7 @@ pub mod input_monitor;
 pub mod state_engine;
 pub mod app_core;
 pub mod backend_communicator;
+pub mod window_commands;
 
 use tauri::{Manager, Builder, State};
 use std::sync::{Mutex, Arc};
@@ -91,7 +92,9 @@ pub fn run() {
             commands::get_input_frequency_stats,
 
             // backend_communicator 모듈의 커맨드를 핸들러에 등록
-            backend_communicator::submit_feedback
+            backend_communicator::submit_feedback,
+
+            window_commands::hide_overlay
             ])
 
         .run(tauri::generate_context!())
