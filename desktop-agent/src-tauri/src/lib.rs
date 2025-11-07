@@ -7,12 +7,21 @@ pub mod state_engine;
 pub mod app_core;
 pub mod backend_communicator;
 pub mod window_commands;
+pub mod storage_manager;
 
 use tauri::{Manager, Builder, State};
 use std::sync::{Mutex, Arc};
 use sysinfo::System;
 
 use std::time::{SystemTime, UNIX_EPOCH, Duration};
+
+// ---  전역 공유 데이터 모델 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ActiveSessionInfo {
+    pub session_id: String,
+    pub task_id: Option<String>,
+    pub start_time_s: u64, // Unix timestamp (seconds)
+}
 
 
 // 애플리케이션 전역에서 공유할 시스템 정보 상태 정의
@@ -28,15 +37,7 @@ pub type StateEngineArcMutex = Arc<Mutex<state_engine::StateEngine>>;
 pub fn run() {
 
     // InputStats 초기화 데이터를 먼저 생성
-    let initial_input_stats = commands::InputStats {
-        total_input_events: 0,
-        last_input_timestamp_ms: SystemTime::now().duration_since(UNIX_EPOCH)
-                                        .unwrap_or_else(|_| Duration::from_secs(0))
-                                        .as_millis() as u64,
-        start_monitoring_timestamp_ms: SystemTime::now().duration_since(UNIX_EPOCH)
-                                        .unwrap_or_else(|_| Duration::from_secs(0))
-                                        .as_millis() as u64,
-    };
+    let initial_input_stats = commands::InputStats::default();
 
     // InputStatsArcMutex 타입을 직접 manage
     let input_stats_manager_state: InputStatsArcMutex = Arc::new(Mutex::new(initial_input_stats));
@@ -74,9 +75,9 @@ pub fn run() {
             input_monitor::start_input_listener(input_stats_arc_mutex_for_thread);
 
             
-            // 데이터 수집 및 로깅 기능 시작
-            let input_stats_arc_mutex_for_logging = Arc::clone(app_handle.state::<InputStatsArcMutex>().inner());
-            logging::start_data_collection_and_logging(input_stats_arc_mutex_for_logging, 10); // 10초마다 로깅
+            // // 데이터 수집 및 로깅 기능 시작
+            // let input_stats_arc_mutex_for_logging = Arc::clone(app_handle.state::<InputStatsArcMutex>().inner());
+            // logging::start_data_collection_and_logging(input_stats_arc_mutex_for_logging, 10); // 10초마다 로깅
 
             // app_core의 '메인 루프'를 시작
             // app_handle을 복제하여 넘겨주어 스레드가 AppHandle을 소유
