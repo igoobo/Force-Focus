@@ -10,7 +10,6 @@ use crate::{
     StateEngineArcMutex, // lib.rs에서 정의할 타입
     SessionStateArcMutex, // 전역 세션 상태 import
     StorageManagerArcMutex, // LSN import (이벤트 캐싱을 위해)
-    LoggableEventData, // 공유 모델 import
 };
 
 /// '메인 루프'를 별도 스레드에서 시작
@@ -48,18 +47,17 @@ pub fn start_core_loop<R: Runtime>(
                 let input_stats_state: State<'_, InputStatsArcMutex> = app_handle.state();
                 let input_stats = input_stats_state.lock().unwrap(); // Mutex 잠금
 
-                // LoggableEventData 구조체를 생성
-                let event_data = LoggableEventData {
-                    app_name: &window_info.app_name,
-                    window_title: &window_info.title,
-                    input_stats: &*input_stats,
-                };
+                // InputStats를 JSON 문자열로 직렬화 (commands.rs 헬퍼 호출)
+                let activity_vector_json = input_stats.to_activity_vector_json();
+
                 
-                // 단순화된 API를 호출
+                // 단순화된 LSN API를 호출합니다.
                 let storage_manager = storage_manager_mutex.lock().unwrap();
                 storage_manager.cache_event(
                     &active_session.session_id, 
-                    &event_data // [!] 구조체 참조 전달
+                    &window_info.app_name, 
+                    &window_info.title,
+                    &activity_vector_json // JSON 문자열 전달
                 ).unwrap_or_else(|e| eprintln!("Failed to cache event: {}", e));
                 drop(storage_manager); 
 

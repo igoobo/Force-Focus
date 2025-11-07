@@ -1,10 +1,7 @@
 // LSN(Local Storage Manager) 모듈
 
 /*
-Table에 새로운 Column 추가 방법
-1. lib.rs 의 LoggableEventData에 새 필드 추가
-2. app_core.rs 의 LoggableEventData 구조체에 해당 데이터 추가
-3. storage_manager.rs 에서 initialize_db_with_conn / cache_event / test_cache_event 수정
+Table에 새로운 데이터 추가는 commands.rs에서 이루어짐
 */
 
 use rusqlite::{Connection, Result, OptionalExtension};
@@ -86,10 +83,9 @@ impl StorageManager {
                 id INTEGER PRIMARY KEY,
                 session_id TEXT NOT NULL,
                 timestamp INTEGER NOT NULL,
-                app_name TEXT NOT NULL,
-                window_title TEXT NOT NULL,
-                total_input_events INTEGER NOT NULL,
-                last_input_timestamp_ms INTEGER NOT NULL
+                app_name TEXT NOT NULL,       
+                window_title TEXT NOT NULL,   
+                activity_vector TEXT NOT NULL -- JSON
             )",
             [],
         ).map_err(|e| format!("Failed to create cached_events table: {}", e))?;
@@ -152,24 +148,29 @@ impl StorageManager {
     }
 
     // 이벤트를 로컬 DB에 캐싱
-    pub fn cache_event(&self, session_id: &str, event_data: &crate::LoggableEventData) -> Result<(), String> {
+    pub fn cache_event(
+        &self, 
+        session_id: &str, 
+        app_name: &str, 
+        window_title: &str, 
+        activity_vector_json: &str // JSON 문자열을 직접 받음
+    ) -> Result<(), String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         let now_s = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|e| e.to_string())?
             .as_secs();
         
-        // event_data 구조체의 필드를 사용하여 INSERT
+        // 스키마에 맞게 INSERT
         conn.execute(
-            "INSERT INTO cached_events (session_id, timestamp, app_name, window_title, total_input_events, last_input_timestamp_ms) 
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO cached_events (session_id, timestamp, app_name, window_title, activity_vector) 
+             VALUES (?1, ?2, ?3, ?4, ?5)",
             rusqlite::params![
                 session_id,
                 now_s,
-                event_data.app_name,
-                event_data.window_title,
-                event_data.input_stats.total_input_events,
-                event_data.input_stats.last_input_timestamp_ms
+                app_name,
+                window_title,
+                activity_vector_json // JSON 문자열 저장
             ],
         ).map_err(|e| e.to_string())?;
         
@@ -237,43 +238,36 @@ mod tests {
     fn test_cache_event() {
         let storage = setup_test_db();
         
-        // 테스트용 InputStats 목업 데이터 생성
+        // 테스트용 목업 데이터 (JSON 문자열) 생성
         let mock_stats_1 = InputStats {
-            total_input_events: 10,
-            last_input_timestamp_ms: 1234567890,
+            meaningful_input_events: 10,
+            last_meaningful_input_timestamp_ms: 1234567890,
+            last_mouse_move_timestamp_ms: 1234567899,
             start_monitoring_timestamp_ms: 0,
         };
-        // 테스트용 LoggableEventData 생성
-        let event_data_1 = LoggableEventData {
-            app_name: "chrome.exe",
-            window_title: "YouTube",
-            input_stats: &mock_stats_1,
-        };
+        // commands.rs의 헬퍼 함수를 직접 테스트
+        let json_1 = mock_stats_1.to_activity_vector_json(); 
 
         let mock_stats_2 = InputStats {
-            total_input_events: 20,
-            last_input_timestamp_ms: 1234567999,
+            meaningful_input_events: 20,
+            last_meaningful_input_timestamp_ms: 1234567999,
+            last_mouse_move_timestamp_ms: 1234567990,
             start_monitoring_timestamp_ms: 0,
         };
-        let event_data_2 = LoggableEventData {
-            app_name: "code.exe",
-            window_title: "lib.rs",
-            input_stats: &mock_stats_2,
-        };
+        let json_2 = mock_stats_2.to_activity_vector_json();
 
-
-        // 변경된 cache_event 시그니처에 맞게 목업 데이터 전달
-        storage.cache_event("session-1", &event_data_1)
+        // 변경된 cache_event 시그니처 호출
+        storage.cache_event("session-1", "chrome.exe", "YouTube", &json_1)
             .expect("Failed to cache event 1");
-        storage.cache_event("session-1", &event_data_2)
+        storage.cache_event("session-1", "code.exe", "lib.rs", &json_2)
             .expect("Failed to cache event 2");
 
-        // 새 컬럼의 데이터가 올바르게 저장되었는지 검증
         let conn = storage.conn.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT COUNT(*), SUM(total_input_events) FROM cached_events WHERE session_id = 'session-1'").unwrap();
-        let (count, event_sum): (i64, i64) = stmt.query_row([], |row| Ok((row.get(0)?, row.get(1)?))).unwrap();
+        // 스키마(activity_vector)에서 데이터 검증
+        let mut stmt = conn.prepare("SELECT COUNT(*), activity_vector FROM cached_events WHERE app_name = 'chrome.exe'").unwrap();
+        let (count, vector_str): (i64, String) = stmt.query_row([], |row| Ok((row.get(0)?, row.get(1)?))).unwrap();
         
-        assert_eq!(count, 2); // 2개 이벤트 저장 확인
-        assert_eq!(event_sum, 30); // 10 + 20 = 30 (InputStats 저장 확인)
+        assert_eq!(count, 1);
+        assert!(vector_str.contains("meaningful_input_events\":10")); // JSON 내용 검증
     }
 }
