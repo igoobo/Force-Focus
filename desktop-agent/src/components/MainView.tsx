@@ -21,6 +21,9 @@ interface MainViewProps {
   onLogout: () => void;
 }
 
+// '기본 태스크'를 위한 특수 식별자
+const BASIC_TASK_ID = "__BASIC_TASK__";
+
 /**
  * 로그인 후 표시되는 메인 UI.
  * 세션 관리(시작, 종료, 타이머) 및 Task 조회를 담당합니다.
@@ -51,10 +54,12 @@ const MainView: React.FC<MainViewProps> = ({ onLogout }) => {
         }
         const data: Task[] = await response.json();
         setTasks(data);
-        // 첫 번째 작업을 기본 선택
-        if (data.length > 0) {
-          setSelectedTaskId(data[0].id);
-        }
+
+        // Task 목록 로딩이 완료된 후에 기본 선택 ID를 설정
+        // 이 시점에 <select>는 <option> 목록을 모두 가지고 있으므로,
+        // React 상태와 DOM 상태가 일치
+        setSelectedTaskId(BASIC_TASK_ID);
+        
       } catch (e: any) {
         setError(e.message || 'Failed to load data');
       }
@@ -89,23 +94,17 @@ const MainView: React.FC<MainViewProps> = ({ onLogout }) => {
 
   // --- 5. Rust 커맨드 연결 (세션 시작) ---
   const handleStartSession = useCallback(async () => {
-    if (!selectedTaskId) {
-      setError("시작할 작업을 선택하세요.");
-      return;
-    }
+    // selectedTaskId가 'BASIC_TASK_ID'인 경우, Rust로 null을 전송
+    const taskIdToSend = selectedTaskId === BASIC_TASK_ID ? null : selectedTaskId;
+
     setError(null);
-    
     try {
-      // Rust의 start_session 커맨드를 호출합니다.
-      // (goalDuration은 60분으로 하드코딩)
+      // taskId: taskIdToSend (null 가능)
       const sessionInfo: ActiveSessionInfo = await invoke('start_session', {
-        taskId: selectedTaskId,
+        taskId: taskIdToSend, 
         goalDuration: 60,
       });
-      
-      // Rust가 (서버 또는 LSN에서) 반환한 세션 정보로 상태를 업데이트합니다.
       setActiveSession(sessionInfo);
-      
     } catch (e: any) {
       setError(e.toString());
     }
@@ -136,8 +135,10 @@ const MainView: React.FC<MainViewProps> = ({ onLogout }) => {
     return `${h}:${m}:${s}`;
   };
 
-  // 현재 선택된 작업의 이름 찾기 (타이머 표시에 사용)
-  const currentTaskName = tasks.find(t => t.id === activeSession?.task_id)?.task_name || '활성 세션';
+  //'기본 태스크' 선택 시 "Task 없음"을, 그 외에는 Task 이름을 표시
+  const currentTaskName = activeSession?.task_id
+    ? (tasks.find(t => t.id === activeSession.task_id)?.task_name || '알 수 없는 작업')
+    : '기본 집중 (Task 없음)';
 
   return (
     <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
@@ -176,6 +177,10 @@ const MainView: React.FC<MainViewProps> = ({ onLogout }) => {
             onChange={(e) => setSelectedTaskId(e.target.value)}
             style={{ width: '100%', padding: '8px', marginBottom: '15px' }}
           >
+
+            {/* '기본 태스크' 옵션 */}
+            <option value={BASIC_TASK_ID}>-- 기본 집중 (Task 없음) --</option>
+
             {tasks.length === 0 && <option>작업 목록 로딩 중...</option>}
             {tasks.map(task => (
               <option key={task.id} value={task.id}>
