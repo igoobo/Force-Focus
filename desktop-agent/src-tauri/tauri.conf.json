@@ -15,18 +15,6 @@
         "title": "desktop-agent",
         "width": 800,
         "height": 600
-      },
-
-      {
-        "label": "overlay",
-        "url": "overlay.html",
-        "visible": false,
-        "fullscreen": true,
-        "decorations": false,
-        "transparent": true,
-        "alwaysOnTop": true,
-        "skipTaskbar": true,
-        "resizable": false
       }
     ],
     "security": {
