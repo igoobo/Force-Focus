@@ -4,7 +4,7 @@ from bson import ObjectId
 from datetime import datetime
 
 from app.models.task import TaskInDB
-from app.schemas.task import TaskCreate, TaskUpdate, TaskRead  # ✅ FIXED
+from app.schemas.task import TaskCreate, TaskUpdate, TaskRead
 
 client = AsyncIOMotorClient("mongodb://localhost:27017")
 db = client["scheduler_db"]
