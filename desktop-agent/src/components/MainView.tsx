@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-
+import { listen } from '@tauri-apps/api/event';
 // --- 1. 타입 정의 ---
 // (types.ts 또는 유사 파일에서 가져오는 것이 좋으나, 여기서는 직접 정의)
 interface Task {
@@ -62,32 +62,50 @@ const MainView: React.FC<MainViewProps> = ({ onLogout }) => {
       }
     };
 
-    fetchTasks();
-  }, []); // 마운트 시 1회 실행
-
-  // --- 4. 타이머 로직 ---
-  useEffect(() => {
-    let timerId: number | undefined = undefined;
-
-    if (activeSession) {
-      // 세션이 활성화되면 1초마다 타이머를 갱신합니다.
-      timerId = window.setInterval(() => {
-        const nowS = Math.floor(Date.now() / 1000);
-        const elapsed = nowS - activeSession.start_time_s;
-        setElapsedTime(elapsed);
-      }, 1000);
-    } else {
-      // 세션이 비활성화되면 타이머를 멈추고 초기화합니다.
-      setElapsedTime(0);
-    }
-
-    // 컴포넌트 언마운트 또는 activeSession 변경 시 인터벌 정리
-    return () => {
-      if (timerId) {
-        clearInterval(timerId);
+    // 3.2 [추가] Task 3.7: 'Stale Session' (꼬인 세션) 해결
+    //      앱 로드 시 '현재 세션'을 1회 PULL하여 UI 즉시 동기화
+    const fetchCurrentSession = async () => {
+       try {
+        // [수정] core.invoke 사용
+        const sessionInfo: ActiveSessionInfo | null = await invoke('get_current_session_info');
+        if (sessionInfo) {
+          setActiveSession(sessionInfo); // [!] 꼬인 세션 복원
+          // [!] (타이머 시작은 4단계 'listen'이 처리)
+        }
+      } catch (e: any) {
+         setError(e.toString());
       }
     };
-  }, [activeSession]); // 'activeSession' 상태가 변경될 때마다 실행
+
+    fetchTasks();
+    fetchCurrentSession();
+  }, []); // 마운트 시 1회 실행
+
+  // --- [수정] 4. 타이머 로직 (Task 4.12: Rust PUSH 수신) ---
+  useEffect(() => {
+    let unlistenTick: (() => void) | null = null;
+    
+    const setupListener = async () => {
+      try {
+        // [!] 'widget'과 'main' 창 모두 동일한 이벤트를 수신 (ACL 필요)
+        // [수정] event.listen 사용
+        const unlistenTickFn = await listen<number>("widget-tick", (e) => {
+          setElapsedTime(e.payload); // Rust가 보낸 경과 시간(u64)으로 상태 업데이트
+        });
+        unlistenTick = unlistenTickFn;
+      } catch (e: any) {
+         setError(e.toString());
+      }
+    };
+    setupListener();
+
+    // [삭제] React의 타이머 로직 (setInterval) 완전 삭제
+    // useEffect(() => { ... }, [activeSession]);
+
+    return () => {
+      if (unlistenTick) unlistenTick();
+    };
+  }, []); // 'listen'은 마운트 시 1회만
 
   // --- 5. Rust 커맨드 연결 (세션 시작) ---
   const handleStartSession = useCallback(async () => {
@@ -118,7 +136,7 @@ const MainView: React.FC<MainViewProps> = ({ onLogout }) => {
       
       // 세션 상태를 비활성화합니다.
       setActiveSession(null);
-      
+      setElapsedTime(0); // (Rust PUSH('widget-tick', 0)이 1초 안에 덮어쓸 것임)
     } catch (e: any) {
       setError(e.toString());
     }
@@ -133,6 +151,8 @@ const MainView: React.FC<MainViewProps> = ({ onLogout }) => {
   };
 
   //'기본 태스크' 선택 시 "Task 없음"을, 그 외에는 Task 이름을 표시
+  // [수정] 'activeSession' (Optimistic Update) 대신 'elapsedTime' (PUSH)을 기준으로 UI 분기
+  const isSessionActive = elapsedTime > 0; 
   const currentTaskName = activeSession?.task_id
     ? (tasks.find(t => t.id === activeSession.task_id)?.task_name || '알 수 없는 작업')
     : '기본 집중 (Task 없음)';
@@ -145,7 +165,7 @@ const MainView: React.FC<MainViewProps> = ({ onLogout }) => {
       {error && <div style={{ color: 'red', marginBottom: '10px' }}>{error}</div>}
 
       {/* 세션 상태에 따라 UI 분기 */}
-      {activeSession ? (
+      {isSessionActive ? (
         // --- 세션 활성 시 (Must-have 4, 5) ---
         <div style={{ border: '2px solid green', padding: '15px', borderRadius: '8px' }}>
           <h2 style={{ marginTop: 0 }}>집중 세션 진행 중</h2>

@@ -264,6 +264,18 @@ pub async fn end_session(
 }
 
 
+// --- [추가] Task 3.5: '타이머 위젯' 동기화를 위한 'PULL' API ---
+// [!] (비동기 아님) 이 함수는 '읽기'만 수행하므로 매우 빠릅니다.
+#[command]
+pub fn get_current_session_info(
+    session_state_mutex: State<'_, SessionStateArcMutex>
+) -> Result<Option<ActiveSessionInfo>, String> {
+    let session_state = session_state_mutex.lock().map_err(|e| format!("State lock error: {}", e))?;
+    
+    // [!] 전역 상태('SessionState')를 복제(clone)하여 React로 반환
+    Ok(session_state.clone())
+}
+
 
 // --- ['get_tasks' 커맨드 (빌드 오류 수정용) ---
 // MainView.tsx의 'fetch'를 'invoke'로 대체하기 위한 Rust 커맨드.

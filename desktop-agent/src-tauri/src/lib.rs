@@ -8,6 +8,7 @@ pub mod app_core;
 pub mod backend_communicator;
 pub mod window_commands;
 pub mod storage_manager;
+pub mod widget_manager; 
 
 use tauri::{Manager, Builder, State};
 use std::sync::{Mutex, Arc};
@@ -140,6 +141,12 @@ pub fn run() {
                 session_manager_state.clone(), // 세션 상태 전달
                 storage_manager_state.clone(),  // LSN 전달
             );
+            
+             // --- [추가] Task 4.10: '위젯 관리' 모듈 초기화 ---
+            widget_manager::setup_widget_listeners(
+                app_handle.clone(), 
+                session_manager_state.clone()
+            );
 
             Ok(())
         })
@@ -156,6 +163,7 @@ pub fn run() {
             backend_communicator::end_session,   
 
             backend_communicator::get_tasks,
+            backend_communicator::get_current_session_info,
 
             window_commands::hide_overlay
             ])
