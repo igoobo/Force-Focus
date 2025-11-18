@@ -3,9 +3,13 @@ import ReactDOM from 'react-dom/client';
 // [수정] v2 API: 'core'(invoke) 및 'event'(listen) import
 import { core } from '@tauri-apps/api';
 import { listen } from '@tauri-apps/api/event';
-
-// [유지] Rust ActiveSessionInfo (사용되지 않음)
-// interface ActiveSessionInfo { ... }
+import './App.css';
+// [유지] Rust ActiveSessionInfo (PULL 타입)
+interface ActiveSessionInfo {
+  session_id: string;
+  task_id: string | null;
+  start_time_s: number; 
+}
 
 /**
  * [개선] Task 4.12: 글로벌 타이머 위젯 UI
@@ -69,33 +73,125 @@ const WidgetApp: React.FC = () => {
   // [유지] 5. 렌더링
   return (
     // [!] data-tauri-drag-region은 부모(widget.html)의 body/root에 있음
-    <div className="flex items-center justify-between w-full h-full p-3 font-sans text-white select-none">
-      {error && <span className="text-red-500 text-xs">{error}</span>}
-      
-      {elapsedTime > 0 ? (
-        <>
-          <div data-tauri-drag-region className="flex-grow flex items-center">
-            <span className="text-2xl font-mono font-bold text-green-400">
-              {formatTime(elapsedTime)}
-            </span>
-          </div>
-          
-          <button
-            onClick={handleEndSession}
-            title="세션 종료"
-            className="bg-red-600 hover:bg-red-700 text-white font-bold w-10 h-10 rounded-full flex items-center justify-center transition-transform transform hover:scale-110"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M4 4h16v16H4z" />
-            </svg>
-          </button>
-        </>
-      ) : (
-        <div data-tauri-drag-region className="flex-grow flex items-center justify-center">
-          <span className="text-gray-400">비활성</span>
-        </div>
-      )}
+    // [개선] 'Frosted Glass' (반투명, 블러), 둥근 모서리, 그림자
+    <div 
+  style={{ 
+    // [컨테이너] 흰색 배경, 둥근 모서리, 부드러운 그림자
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#ffffff', 
+    borderRadius: '12px', 
+    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '0 16px',
+    boxSizing: 'border-box',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+    overflow: 'hidden', // 둥근 모서리 밖으로 내용이 나가는 것 방지
+    // [상태 표시] 세션 활성 여부에 따라 왼쪽 테두리 색상 변경 (세련된 인디케이터 역할)
+    borderLeft: elapsedTime !== 0 ? '6px solid #10B981' : '6px solid #CBD5E1' 
+  }}
+>
+  {/* 에러 메시지 영역 */}
+  {error && (
+    <div 
+      data-tauri-drag-region 
+      style={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+    >
+      <span style={{ color: '#EF4444', fontSize: '13px', fontWeight: '500' }} title={error}>
+        {error}
+      </span>
     </div>
+  )}
+  
+  {/* --- 활성 상태 (타이머 + 종료 버튼) --- */}
+  {elapsedTime !== 0 && !error && (
+    <>
+      {/* 타이머 영역 (드래그 가능) */}
+      <div 
+        data-tauri-drag-region 
+        style={{ 
+          flexGrow: 1, 
+          display: 'flex', 
+          flexDirection: 'column', // 상하 배치로 변경하여 "FOCUS" 라벨 추가 가능성 열어둠
+          justifyContent: 'center'
+        }}
+      >
+        <span style={{ 
+          fontSize: '11px', 
+          color: '#10B981', // 에메랄드 색상
+          fontWeight: 'bold', 
+          letterSpacing: '1px',
+          marginBottom: '-2px',
+          textTransform: 'uppercase'
+        }}>
+          FOCUSING
+        </span>
+        <span style={{ 
+          fontSize: '28px', 
+          fontWeight: '700', 
+          color: '#1F2937', // 진한 회색 (완전 검정보다 고급스러움)
+          fontFamily: '"SF Mono", "Menlo", "Monaco", "Courier New", monospace',
+          letterSpacing: '-0.5px'
+        }}>
+          {formatTime(elapsedTime)}
+        </span>
+      </div>
+      
+      {/* 종료 버튼 (아이콘 대신 텍스트 유지하되, Pill 형태의 버튼으로 변경) */}
+      <button
+        onClick={handleEndSession}
+        style={{ 
+          backgroundColor: '#FEE2E2', // 연한 빨간 배경
+          color: '#EF4444', // 진한 빨간 텍스트
+          padding: '8px 16px', 
+          border: 'none', 
+          borderRadius: '9999px', // Pill Shape
+          fontWeight: '600',
+          cursor: 'pointer',
+          fontSize: '13px',
+          transition: 'all 0.2s ease',
+          outline: 'none',
+          marginLeft: '12px'
+        }}
+        onMouseOver={(e) => {
+            e.currentTarget.style.backgroundColor = '#EF4444';
+            e.currentTarget.style.color = 'white';
+        }}
+        onMouseOut={(e) => {
+            e.currentTarget.style.backgroundColor = '#FEE2E2';
+            e.currentTarget.style.color = '#EF4444';
+        }}
+      >
+        종료
+      </button>
+    </>
+  )}
+
+  {/* --- 비활성 상태 --- */}
+  {elapsedTime === 0 && !error && (
+    <div 
+      data-tauri-drag-region 
+      style={{ 
+        flexGrow: 1, 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between' 
+      }}
+    >
+      <span style={{ 
+        color: '#94A3B8', // 쿨 그레이
+        fontSize: '14px', 
+        fontWeight: '500' 
+      }}>
+        세션 대기 중
+      </span>
+      {/* 비활성 상태일 때 시각적 균형을 위한 장식용 요소 혹은 시작 버튼 */}
+      <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#CBD5E1' }}></div>
+    </div>
+  )}
+</div>
   );
 };
 
