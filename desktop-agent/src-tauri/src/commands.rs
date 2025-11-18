@@ -1,5 +1,14 @@
 // 파일 위치: Force-Focus/desktop-agent/src-tauri/src/commands.rs
 
+/*
+새로운 데이터를 추가하는 방법
+1. InputStats 구조체에 새 필드 추가
+2. 수집 로직 추가 (input_monitor.rs)
+3. to_activity_vector_json 함수에 키/값 을 추가
+
+*/
+
+
 use tauri::{command, State};
 use serde::{Serialize, Deserialize};
 use std::time::{SystemTime, UNIX_EPOCH}; // 타임스탬프 생성을 위해 필요
@@ -23,9 +32,31 @@ pub struct SysinfoState(pub Mutex<System>);
 // 앱 시작 시 한 번 초기화되어 계속 사용되므로 Arc로 공유됩니다.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)] 
 pub struct InputStats {
-    pub total_input_events: u64, // 총 입력 이벤트 수
-    pub last_input_timestamp_ms: u64, // 마지막 입력 이벤트 발생 시점 (밀리초)
-    pub start_monitoring_timestamp_ms: u64, // 모니터링 시작 시점 (밀리초)
+    // 키/클릭/휠 이벤트만 카운트
+    pub meaningful_input_events: u64,
+    // 키/클릭/휠의 마지막 타임스탬프
+    pub last_meaningful_input_timestamp_ms: u64,
+    
+    // 마우스 이동 전용 타임스탬프
+    pub last_mouse_move_timestamp_ms: u64,
+
+    // 모니터링 시작 시점
+    pub start_monitoring_timestamp_ms: u64,
+}
+
+// FastAPI 모델 activity_vector
+impl InputStats {
+    /// 자신을 FastAPI가 요구하는 Dict[str, float]의 JSON 문자열로 변환
+    pub fn to_activity_vector_json(&self) -> String {
+        // serde_json::json! 매크로를 사용하여 Dict 생성
+        let vector = serde_json::json!({
+            "meaningful_input_events": self.meaningful_input_events,
+            "last_meaningful_input_timestamp_ms": self.last_meaningful_input_timestamp_ms,
+            "last_mouse_move_timestamp_ms": self.last_mouse_move_timestamp_ms,
+            // [추후] "clipboard_events": 0.0 (여기에만 추가하면 됨)
+        });
+        vector.to_string() // JSON 문자열로 반환
+    }
 }
 
 pub type InputStatsArcMutex = Arc<Mutex<InputStats>>;
