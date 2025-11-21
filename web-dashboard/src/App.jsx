@@ -3,16 +3,17 @@ import TitleBar from './components/layout/TitleBar/TitleBar.jsx'
 import InfoBox from './components/layout/InfoBox/InfoBox.jsx'
 import MenuBar from './components/layout/MenuBar/MenuBar.jsx'
 import useMainStore from './MainStore.jsx'
+import HelpModal from './components/layout/Help/HelpModal.jsx'
 
 function App() {
-  const { activeMenu } = useMainStore()
+  const { activeMenu, isHelpOpen, openHelp } = useMainStore()
   
   return (
     <>
     {/* 1. 상단 제목 바 컴포넌트 */}
     <TitleBar
         onRefresh={() => location.reload()}
-        onHelp={() => alert('도움말 페이지로 이동하도록 연결 예정입니다.')}
+        onHelp={openHelp}
     />
 
     {/* 2. 좌측 메뉴 바 컴포넌트 */}
@@ -33,6 +34,9 @@ function App() {
 
     {/* 3. 메뉴별 표시 영역 */}
     <InfoBox />
+
+    {/* 4. 도움말 페이지 */}
+      {isHelpOpen && <HelpModal />}
     </>
   )
 }
