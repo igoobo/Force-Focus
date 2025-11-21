@@ -5,7 +5,7 @@ from typing import List
 from app.schemas.schedule import ScheduleCreate, ScheduleUpdate, ScheduleRead
 from app.crud import schedules as schedule_crud
 
-router = APIRouter(prefix="/schedules", tags=["Schedules"])
+router = APIRouter(tags=["Schedules"])
 
 # TODO: JWT 인증 붙이면 교체 예정
 USER_ID = "test_user_123"
