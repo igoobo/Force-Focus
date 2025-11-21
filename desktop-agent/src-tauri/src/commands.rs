@@ -23,33 +23,27 @@ use std::thread;
 
 
 // [추가] Windows API 사용을 위한 모듈 import (Windows 환경에서만 컴파일)
-#[cfg(target_os = "windows")]
-use winapi::shared::minwindef::{BOOL, DWORD, TRUE, FALSE, LPARAM, MAX_PATH, HRGN}; 
-#[cfg(target_os = "windows")]
-use winapi::shared::windef::{HWND, RECT};
-#[cfg(target_os = "windows")]
-use winapi::um::winuser::{
-    EnumWindows, GetWindowTextW, GetWindowTextLengthW, GetWindowThreadProcessId, 
-    IsIconic, IsWindowVisible, GetWindow, GW_OWNER, 
-    GetTopWindow, GW_HWNDNEXT, GetForegroundWindow, GetWindowRect // [추가] Z-Order 및 활성 창 API
-}; 
-#[cfg(target_os = "windows")]
-use winapi::um::processthreadsapi::{OpenProcess};
-#[cfg(target_os = "windows")]
-use winapi::um::winbase::{QueryFullProcessImageNameW};
-#[cfg(target_os = "windows")]
-use winapi::um::handleapi::{CloseHandle};
-#[cfg(target_os = "windows")]
-use winapi::um::winnt::{HANDLE, PROCESS_QUERY_LIMITED_INFORMATION};
+// [변경] windows 크레이트 import
+use windows::core::{PCWSTR, PWSTR};
+use windows::Win32::Foundation::{BOOL, FALSE, HANDLE, HWND, LPARAM, MAX_PATH, RECT, TRUE, CloseHandle};
+use windows::Win32::Graphics::Gdi::{
+    CombineRgn, CreateRectRgn, CreateRectRgnIndirect, DeleteObject, GetRgnBox, 
+    HGDIOBJ, HRGN, RGN_COMBINE_MODE, RGN_DIFF, RGN_OR, NULLREGION,
+};
+
+use windows::Win32::System::Threading::{
+    OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_NAME_FORMAT,
+};
+use windows::Win32::UI::WindowsAndMessaging::{
+    EnumWindows, GetForegroundWindow, GetWindow, GetWindowRect, GetWindowTextLengthW, 
+    GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindowVisible, GW_OWNER,
+};
+
 #[cfg(target_os = "windows")]
 use std::ffi::{OsString};
 #[cfg(target_os = "windows")]
 use std::os::windows::ffi::OsStringExt;
-#[cfg(target_os = "windows")]
-use winapi::um::wingdi::{
-    CreateRectRgn, CreateRectRgnIndirect, CombineRgn, GetRgnBox, DeleteObject, 
-    RGN_OR, RGN_DIFF, NULLREGION, SIMPLEREGION, COMPLEXREGION
-};
+
 
 
 
@@ -208,8 +202,8 @@ pub fn get_input_frequency_stats(input_stats_arc_mutex: State<'_, InputStatsArcM
 
 // --- [설정] 시각적 임계값 ---
 // 이 크기보다 작게 보이는 창(자투리)은 '안 보임' 처리합니다.
-const MIN_VISIBLE_WIDTH: i32 = 80;
-const MIN_VISIBLE_HEIGHT: i32 = 80;
+const MIN_VISIBLE_WIDTH: i32 = 120;
+const MIN_VISIBLE_HEIGHT: i32 = 100;
 
 // [1] Debug 구현을 위한 Rust용 Rect 구조체
 #[derive(Debug, Clone, Serialize)]
@@ -247,33 +241,39 @@ const IGNORED_TITLES: &[&str] = &[
 
 // --- PID로 프로세스 경로를 얻는 헬퍼 함수 ---
 #[cfg(target_os = "windows")]
-fn get_process_path_from_pid(pid: DWORD) -> Option<String> {
+fn get_process_path_from_pid(pid: u32) -> Option<String> {
     if pid == 0 { return None; }
-
+    
     unsafe {
-        let access_rights: DWORD = PROCESS_QUERY_LIMITED_INFORMATION;
-        let handle = OpenProcess(access_rights, FALSE, pid);
+        // OpenProcess는 Result<HANDLE>을 반환합니다.
+        let handle_result = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
         
-        if handle.is_null() {
-            return None;
-        }
+        if let Ok(handle) = handle_result {
+            // drop되면 자동으로 닫히지 않는 Raw Handle일 수 있으므로 CloseHandle 필요
+            // (windows-rs의 OwnedHandle을 쓰지 않고 Raw 호출 시)
+            
+            let mut buffer = [0u16; MAX_PATH as usize];
+            let mut size = MAX_PATH;
 
-        let mut path_buf: Vec<u16> = vec![0; MAX_PATH as usize + 1];
-        let mut size = MAX_PATH as DWORD;
-        
-        let success = QueryFullProcessImageNameW(handle, 0, path_buf.as_mut_ptr(), &mut size);
-        
-        CloseHandle(handle);
+            // K32QueryFullProcessImageNameW 사용 (Kernel32 wrapper)
+            let success = QueryFullProcessImageNameW(
+                handle,
+                PROCESS_NAME_FORMAT(0), // 0: Win32 format
+                PWSTR(buffer.as_mut_ptr()),
+                &mut size,
+            );
 
-        if success > 0 {
-            let slice = &path_buf[..size as usize];
-            let path_os_string = OsString::from_wide(slice);
-            path_os_string.into_string().ok()
-        } else {
-            None
+            let _ = windows::Win32::Foundation::CloseHandle(handle);
+
+            if success.is_ok() {
+                // 슬라이스에서 문자열 변환
+                return OsString::from_wide(&buffer[..size as usize]).into_string().ok();
+            }
         }
+        None
     }
 }
+
 // --- EnumWindows를 위한 상태 구조체 ---
 #[cfg(target_os = "windows")]
 struct EnumContext {
@@ -286,39 +286,54 @@ struct EnumContext {
 // --- 콜백 함수  ---
 #[cfg(target_os = "windows")]
 unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
-    let context = &mut *(lparam as *mut EnumContext);
+    let context = &mut *(lparam.0 as *mut EnumContext);
 
-    if IsIconic(hwnd) != 0 { return TRUE; }
+    // 1. 상태 체크 (IsIconic, IsWindowVisible 반환값은 BOOL/bool)
+    if IsIconic(hwnd).as_bool() {
+        return TRUE;
+    }
 
-    if IsWindowVisible(hwnd) != 0 && GetWindow(hwnd, GW_OWNER).is_null() {
+    // [수정됨] GetWindow 결과 처리 로직
+    // GetWindow(GW_OWNER)가 Ok(handle)을 반환하면 소유자가 있다는 뜻(즉, 팝업/자식 창).
+    // Err를 반환하면 소유자가 없다는 뜻(즉, 최상위 창).
+    let has_owner = match GetWindow(hwnd, GW_OWNER) {
+        Ok(handle) => handle.0 != std::ptr::null_mut(), // 핸들이 0이 아니면 소유자가 있음
+        Err(_) => false,             // 에러(NULL)면 소유자가 없음
+    };
+
+    // 소유자가 없고(최상위 창이고) + 보이는 창인 경우에만 처리
+    if IsWindowVisible(hwnd).as_bool() && !has_owner {
         
-        // 1. 먼저 창의 좌표를 구함
-        let mut rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
-        GetWindowRect(hwnd, &mut rect);
+        // 2. 좌표 가져오기
+        let mut rect = RECT::default();
+        let _ = GetWindowRect(hwnd, &mut rect);
         let width = rect.right - rect.left;
         let height = rect.bottom - rect.top;
 
-        // 너무 작은 창은 시각적 노이즈로 간주하고 무시
-        if width < 100 || height < 100 {
+        // 크기 1차 필터링
+        if width < MIN_VISIBLE_WIDTH || height < MIN_VISIBLE_HEIGHT {
             return TRUE;
         }
 
         let length = GetWindowTextLengthW(hwnd);
         if length > 0 {
-            let mut buffer: Vec<u16> = vec![0; (length + 1) as usize];
-            let copied_len = GetWindowTextW(hwnd, buffer.as_mut_ptr(), buffer.len() as i32);
+            let mut buffer = vec![0u16; (length + 1) as usize];
+            // GetWindowTextW는 복사된 문자 수를 반환
+            let copied_len = GetWindowTextW(hwnd, &mut buffer);
             
             if copied_len > 0 {
-                if let Ok(title) = OsString::from_wide(&buffer[..copied_len as usize]).into_string() {
+                let title_raw = OsString::from_wide(&buffer[..copied_len as usize]);
+                if let Ok(title) = title_raw.into_string() {
                     let trimmed_title = title.trim();
 
-                    // 블랙리스트 필터
+                    // 블랙리스트 체크
                     if IGNORED_TITLES.contains(&trimmed_title) {
-                        return TRUE; 
+                        return TRUE;
                     }
 
-                    let mut pid: DWORD = 0;
-                    GetWindowThreadProcessId(hwnd, &mut pid);
+                    let mut pid: u32 = 0;
+                    GetWindowThreadProcessId(hwnd, Some(&mut pid));
+                    
                     let is_system = if let Some(path) = get_process_path_from_pid(pid) {
                         let p = path.to_lowercase();
                         WINDOWS_SYSTEM_PATHS.iter().any(|sys| p.starts_with(&sys.to_lowercase()))
@@ -326,36 +341,37 @@ unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BO
 
                     if !is_system {
                         // ---------------------------------------------------------
-                        // [핵심 로직: Region Occlusion Calculation]
+                        // [GDI Region Logic - windows-rs 버전]
                         // ---------------------------------------------------------
                         
-                        // 1. 현재 창의 영역 생성
+                        // A. 현재 창 Region 생성
                         let current_win_rgn = CreateRectRgnIndirect(&rect);
                         
-                        // 2. 실제로 보이는 영역 계산 (현재 창 - 이미 가려진 영역)
+                        // B. Visible Region (현재 - 누적)
                         let visible_part_rgn = CreateRectRgn(0, 0, 0, 0);
-                        let region_type = CombineRgn(visible_part_rgn, current_win_rgn, context.covered_rgn, RGN_DIFF);
+                        
+                        // CombineRgn: 리턴값은 Region Type (i32)
+                        let region_type = CombineRgn(
+                            visible_part_rgn, 
+                            current_win_rgn, 
+                            context.covered_rgn, 
+                            RGN_DIFF // RGN_COMBINE_MODE(4) -> DIFF
+                        );
 
-                        // 3. 보이는 영역이 존재하는지 확인
-                       let mut is_visually_visible = false;
+                        let mut is_visually_visible = false;
 
-                        if region_type != NULLREGION {
-                            // [추가된 로직] 남은 영역의 Bounding Box 크기 측정
-                            let mut box_rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+                        // NULLREGION == 1 (windows-rs 상수에 따라 다를 수 있으니 상수 사용 권장)
+                        if region_type != windows::Win32::Graphics::Gdi::GDI_REGION_TYPE(NULLREGION.0 as i32) {
+                            let mut box_rect = RECT::default();
                             GetRgnBox(visible_part_rgn, &mut box_rect);
 
                             let visible_w = box_rect.right - box_rect.left;
                             let visible_h = box_rect.bottom - box_rect.top;
 
-                            // C. 실제로 보이는 부분이 임계값 이상이어야 함
                             if visible_w >= MIN_VISIBLE_WIDTH && visible_h >= MIN_VISIBLE_HEIGHT {
                                 is_visually_visible = true;
                             }
                         }
-
-                        // (옵션) 보이는 면적이 너무 작으면(예: 픽셀 몇 개) 안 보이는 것으로 칠 수도 있음
-                        // 정확도를 위해 GetRgnBox로 visible_part_rgn의 크기를 체크할 수도 있으나, 
-                        // 여기서는 '조금이라도 보이면 보임'으로 처리.
 
                         if is_visually_visible {
                             context.windows.push(WindowInfo {
@@ -366,23 +382,29 @@ unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BO
                                 },
                             });
 
-                            // 4. 이 창이 보이는 만큼, 다음 창들을 가리게 됨. 누적 가림막에 추가(Union).
-                            CombineRgn(context.covered_rgn, context.covered_rgn, current_win_rgn, RGN_OR);
+                            // D. 누적(Union)
+                            CombineRgn(
+                                context.covered_rgn, 
+                                context.covered_rgn, 
+                                current_win_rgn, 
+                                RGN_OR // RGN_COMBINE_MODE(2) -> OR
+                            );
                         } else {
-                            // 완전히 가려진 창은 리스트에 넣되 false로 표시하거나, 아예 뺄 수도 있음.
-                            // 디버깅을 위해 일단 리스트에는 넣고 false 처리
-                             context.windows.push(WindowInfo {
+                            // 안 보이는 창 (디버깅용 포함)
+                            context.windows.push(WindowInfo {
                                 title: trimmed_title.to_string(),
-                                is_visible_on_screen: false, // 가려짐!
+                                is_visible_on_screen: false,
                                 rect: WinRect {
                                     left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom,
                                 },
                             });
                         }
 
-                        // 5. GDI 객체 정리 (메모리 누수 방지)
-                        DeleteObject(current_win_rgn as *mut _);
-                        DeleteObject(visible_part_rgn as *mut _);
+                        // E. 리소스 해제 (HGDIOBJ 변환 필요)
+                        // windows-rs의 HRGN은 HGDIOBJ로 바로 cast 되지 않을 수 있음. 
+                        // 핸들 값(.0)을 이용해 HGDIOBJ 생성
+                        DeleteObject(HGDIOBJ(current_win_rgn.0));
+                        DeleteObject(HGDIOBJ(visible_part_rgn.0));
                     }
                 }
             }
@@ -409,14 +431,14 @@ pub fn _get_all_visible_windows_internal() -> Vec<WindowInfo> {
             };
 
             // EnumWindows 호출 (안정적인 순회)
-            let lparam = &mut context as *mut _ as LPARAM;
-            if EnumWindows(Some(enum_window_callback), lparam) == 0 {
-                // 에러 처리 필요 시 추가 (현재는 빈 벡터 반환 가능성 있음)
-                // eprintln!("EnumWindows failed"); 
-            }
+            let lparam = LPARAM(&mut context as *mut _ as isize);
+            let _ = EnumWindows(Some(enum_window_callback), lparam);
+
 
             // [정리] 다 쓰고 난 누적 영역 삭제
-            DeleteObject(context.covered_rgn as *mut _);
+            // [핵심 수정] 'as *mut _' 제거 및 HGDIOBJ로 올바르게 감싸기
+            // HRGN의 내부 값(.0)을 꺼내 HGDIOBJ 생성자에 전달합니다.
+            DeleteObject(HGDIOBJ(context.covered_rgn.0));
 
             context.windows
         }
