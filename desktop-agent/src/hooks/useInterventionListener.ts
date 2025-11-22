@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { listen, Event } from '@tauri-apps/api/event';
+import { listen } from '@tauri-apps/api/event';
 
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 

@@ -1,6 +1,6 @@
 // 파일 위치: Force-Focus/desktop-agent/src/api/index.ts
 
-import { User, Task, Session, Profile } from '../types';
+import { User, Task, Session } from '../types';
 
 const API_BASE_URL = '/api/v1'; // MSW가 가로챌 기본 경로
 

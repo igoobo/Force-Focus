@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "desktop-agent",
+  "productName": "Force-Focus",
   "version": "0.1.0",
   "identifier": "com.desktop-agent.app",
   "build": {
@@ -15,18 +15,6 @@
         "title": "desktop-agent",
         "width": 800,
         "height": 600
-      },
-
-      {
-        "label": "overlay",
-        "url": "overlay.html",
-        "visible": false,
-        "fullscreen": true,
-        "decorations": false,
-        "transparent": true,
-        "alwaysOnTop": true,
-        "skipTaskbar": true,
-        "resizable": false
       }
     ],
     "security": {

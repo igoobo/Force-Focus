@@ -1,8 +1,7 @@
 // 파일 위치: src-tauri/src/state_engine.rs
 
 use crate::commands::{ActiveWindowInfo, InputStats};
-use std::time::{SystemTime, UNIX_EPOCH}; // commands.rs에서 정의한 데이터 모델
-
+use std::time::{SystemTime, UNIX_EPOCH, Duration}; 
 // --- 1. 상수 정의 ---
 
 /// '방해 앱'으로 간주되는 키워드 목록
@@ -32,6 +31,13 @@ const SCORE_INACTIVITY_SEVERE: u16 = 10;
 const INACTIVITY_THRESHOLD_MILD_S: u64 = 180; // 3분
 const INACTIVITY_THRESHOLD_SEVERE_S: u64 = 600; // 10분
 
+// '업무'로 점수를 감소시키는 데 필요한 시간 (초)
+const DECAY_INTERVAL_S: u64 = 10; // 10초마다 1점 감소
+
+// 다시 개입하기 위한 대기 시간
+const SNOOZE_DURATION_S: u64 = 10; 
+
+
 // --- 2. StateEngine 상태 및 로직 ---
 
 /// State Engine이 반환할 개입(Intervention) 명령의 종류
@@ -48,9 +54,13 @@ pub enum InterventionTrigger {
 pub struct StateEngine {
     /// 현재 누적된 '이탈 점수'
     deviation_score: u16,
-    // 개입 이벤트를 이미 보냈는지 추적하는 플래그
-    notification_sent: bool,
-    overlay_sent: bool,
+
+     //  마지막 점수 감소 시점
+    last_decay_timestamp_s: u64,
+
+    // '스누즈' 타이머 (마지막 개입 시간)
+    last_intervention_level: u16, // 0=None, 1=Notification, 2=Overlay 
+    last_intervention_timestamp_s: u64,
 }
 
 impl StateEngine {
@@ -58,8 +68,13 @@ impl StateEngine {
     pub fn new() -> Self {
         StateEngine { 
             deviation_score: 0,
-            notification_sent: false,
-            overlay_sent: false,
+
+            // 타이머 초기화
+            last_decay_timestamp_s: current_timestamp_s(),
+
+            // 스누즈 타이머 초기화 (0으로 설정하여 앱 시작 시 즉시 개입 가능하도록)
+            last_intervention_level: 0,
+            last_intervention_timestamp_s: 0,
          }
     }
 
@@ -85,7 +100,6 @@ impl StateEngine {
         input_stats: &InputStats,
     ) -> InterventionTrigger {
         let now_s = current_timestamp_s();
-        let score_to_add: u16 = 0;
 
         // --- 규칙 1: 방해 키워드 검사 ---
         // 창 제목과 앱 이름을 모두 소문자로 변환하여 검사
@@ -105,7 +119,7 @@ impl StateEngine {
             score_to_add += SCORE_DISTRACTION_APP;
 
             // '딴짓' 중 '비활성' 가중
-            let last_input_s = input_stats.last_input_timestamp_ms / 1000;
+            let last_input_s = input_stats.last_meaningful_input_timestamp_ms / 1000;
             let inactivity_duration_s = now_s.saturating_sub(last_input_s);
 
             if inactivity_duration_s >= INACTIVITY_THRESHOLD_SEVERE_S {
@@ -116,36 +130,57 @@ impl StateEngine {
 
             // 점수를 누적
             self.deviation_score = (self.deviation_score + score_to_add).min(100);
+            
+            // 딴짓 중일 때는 '점수 감소 타이머'를 현재 시간으로 리셋
+            self.last_decay_timestamp_s = now_s;
 
-            // 2b. '개입 결정' 로직을 '딴짓' 블록 내부에서만 수행
+
+            // 2b. '개입 결정' 로직:  '스누즈 타이머' 검사
+            // 마지막 개입 이후 '스누즈 시간'(10초)이 지났는지 확인
+            let time_since_last_intervention = now_s.saturating_sub(self.last_intervention_timestamp_s);
+            let is_snooze_over = time_since_last_intervention >= SNOOZE_DURATION_S;
+
             if self.deviation_score >= THRESHOLD_OVERLAY {
-                if !self.overlay_sent {
-                    self.overlay_sent = true; // 플래그 설정
+                // [수준 2: Overlay]
+                // '이전 개입'이 'Overlay'(수준 2) 미만이었거나, 스누즈가 끝났다면
+                if self.last_intervention_level < 2 || is_snooze_over {
+                    self.last_intervention_level = 2;
+                    self.last_intervention_timestamp_s = now_s; // 스누즈 타이머 리셋
                     return InterventionTrigger::TriggerOverlay;
                 }
             } else if self.deviation_score >= THRESHOLD_NOTIFICATION {
-                if !self.notification_sent {
-                    self.notification_sent = true; // 플래그 설정
+                // [수준 1: Notification]
+                // '이전 개입'이 'Notification'(수준 1) 미만이었거나, 스누즈가 끝났다면
+                if self.last_intervention_level < 1 || is_snooze_over {
+                    self.last_intervention_level = 1;
+                    self.last_intervention_timestamp_s = now_s; // 스누즈 타이머 리셋
                     return InterventionTrigger::TriggerNotification;
                 }
             }
-            // 이미 알림을 보냈거나, 아직 임계값 미만이면 DoNothing
+
+            // 아직 임계값 미만이면 DoNothing
             return InterventionTrigger::DoNothing; 
 
 
         } else {
             // --- 3. 업무 중인 경우 (is_distraction == false) ---
 
-            // 점수를 능동적으로 감소
-            self.deviation_score = self.deviation_score.saturating_sub(1);
+            // '시간 기반'으로 점수를 감소
+            let time_since_last_decay = now_s.saturating_sub(self.last_decay_timestamp_s);
 
-            // 업무 복귀 시, 모든 플래그를 초기화
-            // (다음 '딴짓' 사이클을 위해 재무장)
-            if self.notification_sent || self.overlay_sent {
-                self.notification_sent = false;
-                self.overlay_sent = false;
+            if time_since_last_decay >= DECAY_INTERVAL_S {
+                self.deviation_score = self.deviation_score.saturating_sub(1);
+                // 점수 감소 타이머를 리셋
+                self.last_decay_timestamp_s = now_s;
+                
             }
 
+            // '쿨다운' 로직: 점수가 낮아지면 '개입 수준'을 리셋
+            if self.deviation_score < THRESHOLD_NOTIFICATION && self.last_intervention_level > 0 {
+                self.last_intervention_level = 0;
+                self.last_intervention_timestamp_s = 0; // 스누즈 타이머 리셋
+            }
+            
             // 3b. '업무 중'일 때는 절대 개입하지 않고 DoNothing을 반환
             return InterventionTrigger::DoNothing;
         }
@@ -167,6 +202,8 @@ fn current_timestamp_s() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::{ActiveWindowInfo, InputStats};
+    use std::time::Duration; // [추가] 10초 쿨다운을 시뮬레이션
 
     // 테스트용 목업(Mock) 데이터 생성
     fn mock_window_info(title: &str, app_name: &str) -> ActiveWindowInfo {
@@ -184,15 +221,16 @@ mod tests {
         }
     }
 
+    // 'InputStats' 맞게 목업 데이터 생성
     fn mock_input_stats(last_input_ago_s: u64) -> InputStats {
         let now_ms = current_timestamp_s() * 1000;
         InputStats {
-            total_input_events: 1, // 테스트에서는 중요하지 않음
-            last_input_timestamp_ms: now_ms.saturating_sub(last_input_ago_s * 1000),
+            meaningful_input_events: 1, 
+            last_meaningful_input_timestamp_ms: now_ms.saturating_sub(last_input_ago_s * 1000),
+            last_mouse_move_timestamp_ms: now_ms, 
             start_monitoring_timestamp_ms: 0,
         }
     }
-
     #[test]
     fn test_distraction_score_increases() {
         let mut engine = StateEngine::new();
@@ -245,69 +283,105 @@ mod tests {
         let initial_score = engine.get_current_score();
         assert_eq!(initial_score, SCORE_DISTRACTION_APP); // 점수: 5
 
-        // 2. 타이머(sleep) 대신, '업무 중' 함수를 1회 호출
+        // 2. 'DECAY_INTERVAL_S' (10초) 이상 시간이 흐르도록 시뮬레이션
+        std::thread::sleep(Duration::from_secs(DECAY_INTERVAL_S + 1));
+
+        // 3. '업무 중' 함수를 1회 호출
         let productive_window = mock_window_info("Productive Task", "code.exe");
         let productive_stats_inactive = mock_input_stats(30); // (생각 중)
         engine.process_activity(&productive_window, &productive_stats_inactive);
 
-        // 점수가 1 감소해야 함
+        //  10초가 지났으므로 점수가 1 감소해야 함
         assert_eq!(engine.get_current_score(), initial_score.saturating_sub(1)); // 점수: 4
 
-        // 3. '업무 중' 함수를 2회 호출
+        // 4. 10초가 흐르기 *전*에 '업무 중' 함수를 다시 호출
         engine.process_activity(&productive_window, &productive_stats_inactive);
 
-        // 점수가 1 더 감소해야 함
-        assert_eq!(engine.get_current_score(), initial_score.saturating_sub(2));
-        // 점수: 3
+        //  쿨다운이 갱신되지 않았으므로 점수가 4점으로 유지되어야 함
+        assert_eq!(engine.get_current_score(), initial_score.saturating_sub(1));
     }
 
     //  업무 복귀 시 알림이 즉시 멈추는지 테스트
     #[test]
-    fn test_intervention_stops_immediately_on_work() {
+    fn test_intervention_stops_immediately_on_work_and_escalates() {
         let mut engine = StateEngine::new();
         let input_stats = mock_input_stats(10);
         let distraction_window = mock_window_info("YouTube", "chrome.exe");
 
-        // 1. 점수를 20점 (Overlay 임계값)까지 강제로 증가
-        let trigger1 = engine.process_activity(&distraction_window, &input_stats); // 5
-        let trigger2 = engine.process_activity(&distraction_window, &input_stats); // 10
-        let trigger3 = engine.process_activity(&distraction_window, &input_stats); // 15
-        let trigger_overlay = engine.process_activity(&distraction_window, &input_stats); // 20
-
+        // 1. 점수를 20점 (Overlay)까지 강제로 증가
+        engine.process_activity(&distraction_window, &input_stats); // 5 (Lvl 0)
+        let trigger_notify = engine.process_activity(&distraction_window, &input_stats); // 10 (Lvl 1)
+        let trigger_nothing = engine.process_activity(&distraction_window, &input_stats); // 15 (Lvl 1, Snooze)
+        let trigger_overlay = engine.process_activity(&distraction_window, &input_stats); // 20 (Lvl 2)
+        
+        // Notify(Lvl 1)는 Overlay(Lvl 2)를 막지 못해야 함
+        assert_eq!(trigger_notify, InterventionTrigger::TriggerNotification);
+        assert_eq!(trigger_nothing, InterventionTrigger::DoNothing); 
+        assert_eq!(trigger_overlay, InterventionTrigger::TriggerOverlay); 
         assert_eq!(engine.get_current_score(), 20);
-        assert_eq!(trigger_overlay, InterventionTrigger::TriggerOverlay); // 딴짓 중 -> 오버레이 발생
-        assert_eq!(engine.overlay_sent, true); // 플래그 설정 확인
+        assert_eq!(engine.last_intervention_level, 2);
 
         // 2. 업무 앱으로 전환
         let productive_window = mock_window_info("Productive Task", "code.exe");
         let trigger_work = engine.process_activity(&productive_window, &input_stats);
 
-        // 3. 점수는 19점으로 감소하지만, 반환값은 DoNothing
-        assert_eq!(engine.get_current_score(), 19);
-        assert_eq!(trigger_work, InterventionTrigger::DoNothing); // [!] 핵심 버그 수정 확인
-        assert_eq!(engine.overlay_sent, false); // 플래그 초기화 확인
+        // 3. 점수는 20으로 *유지* (쿨다운 전)
+        assert_eq!(engine.get_current_score(), 20);
+        // 4. 하지만 반환값은 DoNothing (개입 즉시 멈춤)
+        assert_eq!(trigger_work, InterventionTrigger::DoNothing); 
+        
+        // 5.  쿨다운 로직이 '개입 수준'을 리셋하는지 검증 (루프 사용)
+        // (점수를 20점에서 9점으로, 총 11점 감소시켜야 함)
+        for i in 0..11 {
+            // [!] 10초(DECAY_INTERVAL_S) 이상 시간이 흐르도록 시뮬레이션
+            std::thread::sleep(Duration::from_secs(DECAY_INTERVAL_S + 1));
+            
+            // [!] 쿨다운 로직을 1회 실행
+            engine.process_activity(&productive_window, &input_stats); 
+            
+            //  점수가 1점 감소했는지 확인 (20->19, 19->18 ...)
+            assert_eq!(engine.get_current_score(), 20 - (i + 1));
+        }
+        
+        // 11번의 루프 후 점수가 9점이 되었는지 확인
+        assert_eq!(engine.get_current_score(), 9);
+        // 점수가 10점 미만이 되었으므로, 개입 수준이 0으로 리셋되었는지 확인
+        assert_eq!(engine.last_intervention_level, 0); 
     }
 
-    // 알림이 단 한 번만 발생하는지 테스트
+    //  알림이 '한 번만'이 아니라 '10초 스누즈' 후에
+    // 다시 발생하는지 검증
     #[test]
-    fn test_notification_sent_only_once() {
+    fn test_notification_snoozes_and_resets() {
         let mut engine = StateEngine::new();
         let input_stats = mock_input_stats(10);
         let distraction_window = mock_window_info("YouTube", "chrome.exe");
 
-        // 1. 점수를 10점(Notification 임계값)까지 증가
+        // 1. 10점 도달 -> 알림 1회 발생
         engine.process_activity(&distraction_window, &input_stats); // 5
         let trigger_notify = engine.process_activity(&distraction_window, &input_stats); // 10
         
-        assert_eq!(engine.get_current_score(), 10);
         assert_eq!(trigger_notify, InterventionTrigger::TriggerNotification); // 알림 발생
-        assert_eq!(engine.notification_sent, true); // 플래그 설정됨
+        let first_intervention_time = engine.last_intervention_timestamp_s;
+        assert_eq!(engine.last_intervention_level, 1);
 
         // 2. 딴짓을 계속 (점수 15점)
         let trigger_nothing = engine.process_activity(&distraction_window, &input_stats); // 15
         
         assert_eq!(engine.get_current_score(), 15);
-        // [!] 점수는 임계값을 넘었지만, 플래그가 설정되어 DoNothing을 반환
+        // [!] 스누즈(10초)가 활성 중이고, 레벨(1)이 오르지 않았으므로 DoNothing
         assert_eq!(trigger_nothing, InterventionTrigger::DoNothing); 
+        assert_eq!(engine.last_intervention_timestamp_s, first_intervention_time);
+
+        // 3. 'SNOOZE_DURATION_S' (10초) 이상 시간이 흐르도록 시뮬레이션
+        std::thread::sleep(Duration::from_secs(SNOOZE_DURATION_S + 1));
+
+        // 4. 딴짓을 계속 (점수 20점 -> Overlay로 에스컬레이션)
+        let trigger_notify_again = engine.process_activity(&distraction_window, &input_stats);
+        
+        assert_eq!(engine.get_current_score(), 20);
+        // [!] 10초가 지났으므로, 스누즈가 풀리고 '다시' 개입해야 함
+        assert_eq!(trigger_notify_again, InterventionTrigger::TriggerOverlay);
+        assert!(engine.last_intervention_timestamp_s > first_intervention_time);
     }
 }

@@ -1,7 +1,7 @@
 // 파일 위치: Force-Focus/desktop-agent/src/components/MainView/index.tsx
 
 import { FC, useState, useEffect, useCallback } from 'react';
-import { fetchCurrentSession, fetchTasks, startSession, endSession, fetchTaskById } from '../../api'; // API 함수 임포트
+import { fetchCurrentSession, startSession, endSession, fetchTaskById } from '../../api'; // API 함수 임포트
 import { Session, Task } from '../../types';
 
 // 하위 컴포넌트 임포트
