@@ -1,8 +1,17 @@
-# backend/app/main.py
+# main.py
 from fastapi import FastAPI
 from app.api.endpoints.web import tasks, schedules
+from app.db.mongo import connect_to_mongo, close_mongo_connection
 
 app = FastAPI(title="Force Focus Backend")
+
+@app.on_event("startup")
+async def startup_db():
+    await connect_to_mongo()
+
+@app.on_event("shutdown")
+async def shutdown_db():
+    await close_mongo_connection()
 
 @app.get("/")
 async def read_root():

@@ -1,8 +1,6 @@
-# 파일 위치: backend/app/schemas/schedule.py
-
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, conint, conlist
 from datetime import datetime, time
-from typing import List, Optional
+from typing import Optional
 
 # --- API 요청(Request) 스키마 ---
 
@@ -15,7 +13,9 @@ class ScheduleCreate(BaseModel):
     name: str
     start_time: time
     end_time: time
-    days_of_week: List[int] = Field(..., ge=0, le=6) # 0~6 사이의 값만 허용
+    # 리스트 내부 요소는 0~6, 최소 1개 이상
+    days_of_week: conlist(conint(ge=0, le=6), min_length=1)
+    
 
 class ScheduleUpdate(BaseModel):
     """
@@ -27,7 +27,7 @@ class ScheduleUpdate(BaseModel):
     name: Optional[str] = None
     start_time: Optional[time] = None
     end_time: Optional[time] = None
-    days_of_week: Optional[List[int]] = Field(None, ge=0, le=6)
+    days_of_week: Optional[conlist(conint(ge=0, le=6))] = None
     is_active: Optional[bool] = None
 
 # --- API 응답(Response) 스키마 ---
@@ -43,7 +43,7 @@ class ScheduleRead(BaseModel):
     name: str
     start_time: time
     end_time: time
-    days_of_week: List[int]
+    days_of_week: list[int]
     created_at: datetime
     is_active: bool
 
