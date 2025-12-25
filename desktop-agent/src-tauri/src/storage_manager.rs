@@ -90,6 +90,29 @@ impl StorageManager {
             [],
         ).map_err(|e| format!("Failed to create cached_events table: {}", e))?;
         
+        // 3. 피드백 캐싱 테이블 
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cached_feedback (
+                id INTEGER PRIMARY KEY,
+                timestamp INTEGER NOT NULL,
+                event_id TEXT NOT NULL,
+                feedback_type TEXT NOT NULL
+            )",
+            [],
+        ).map_err(|e| format!("Failed to create cached_feedback table: {}", e))?;
+
+        // 4. 인증 토큰 테이블 
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS auth_token (
+                id INTEGER PRIMARY KEY CHECK (id = 1), 
+                access_token TEXT NOT NULL,
+                refresh_token TEXT NOT NULL,
+                user_email TEXT NOT NULL,
+                updated_at INTEGER NOT NULL
+            )",
+            [],
+        ).map_err(|e| format!("Failed to create auth_token table: {}", e))?;
+
         Ok(())
     }
 }
@@ -176,6 +199,49 @@ impl StorageManager {
         
         Ok(())
     }
+
+    pub fn cache_feedback(&self, event_id: &str, feedback_type: &str) -> Result<(), String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let now_s = SystemTime::now().duration_since(UNIX_EPOCH).map_err(|e| e.to_string())?.as_secs();
+
+        conn.execute(
+            "INSERT INTO cached_feedback (timestamp, event_id, feedback_type) VALUES (?1, ?2, ?3)",
+            rusqlite::params![now_s, event_id, feedback_type],
+        ).map_err(|e| e.to_string())?;
+
+        Ok(())
+    }
+
+    pub fn save_auth_token(&self, access: &str, refresh: &str, email: &str) -> Result<(), String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+
+        conn.execute(
+            "INSERT OR REPLACE INTO auth_token (id, access_token, refresh_token, user_email, updated_at) 
+             VALUES (1, ?1, ?2, ?3, ?4)",
+            rusqlite::params![access, refresh, email, now],
+        ).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn load_auth_token(&self) -> Result<Option<(String, String, String)>, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let mut stmt = conn.prepare("SELECT access_token, refresh_token, user_email FROM auth_token WHERE id = 1")
+            .map_err(|e| e.to_string())?;
+
+        let result = stmt.query_row([], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        }).optional().map_err(|e| e.to_string())?;
+
+        Ok(result)
+    }
+
+    pub fn delete_auth_token(&self) -> Result<(), String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        conn.execute("DELETE FROM auth_token WHERE id = 1", []).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
 }
 // --- 유닛 테스트 모듈 ---
 #[cfg(test)]
