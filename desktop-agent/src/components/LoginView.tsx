@@ -2,6 +2,9 @@ import React from 'react';
 // 분리된 스타일 파일 import
 import { styles } from './LoginView.styles';
 
+import { open } from '@tauri-apps/plugin-shell';
+
+
 interface LoginViewProps {
   onLoginSuccess: () => void;
 }
@@ -9,8 +12,19 @@ interface LoginViewProps {
 const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   // --- 핸들러 로직 ---
   const handleGoogleLogin = async () => {
-    console.log("Google Login Clicked (Not implemented yet)");
-    // 추후 딥 링크 로직 추가 예정
+    try {
+      // 환경 변수(.env)에서 API 주소 로드
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1';
+      const targetUrl = `${apiBaseUrl}/auth/google/login`;
+
+      console.log(`Opening Google Login page: ${targetUrl}`);
+      
+      // 시스템 브라우저로 열기 (임시 함수 호출)
+      await open(targetUrl);
+      
+    } catch (e) {
+      console.error("Failed to open browser:", e);
+    }
   };
 
   const handleOfflineLogin = () => {
