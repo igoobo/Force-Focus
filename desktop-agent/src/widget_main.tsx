@@ -4,12 +4,12 @@ import ReactDOM from 'react-dom/client';
 import { core } from '@tauri-apps/api';
 import { listen } from '@tauri-apps/api/event';
 import './App.css';
-// [유지] Rust ActiveSessionInfo (PULL 타입)
-interface ActiveSessionInfo {
-  session_id: string;
-  task_id: string | null;
-  start_time_s: number; 
-}
+// // [유지] Rust ActiveSessionInfo (PULL 타입)
+// interface ActiveSessionInfo {
+//   session_id: string;
+//   task_id: string | null;
+//   start_time_s: number; 
+// }
 
 /**
  * [개선] Task 4.12: 글로벌 타이머 위젯 UI

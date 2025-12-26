@@ -9,6 +9,7 @@ pub mod backend_communicator;
 pub mod window_commands;
 pub mod storage_manager;
 pub mod widget_manager; 
+pub mod tray_manager; 
 
 use tauri::{Manager, Builder, State};
 use std::sync::{Mutex, Arc};
@@ -142,6 +143,8 @@ pub fn run() {
                 storage_manager_state.clone(),  // LSN 전달
             );
             
+            tray_manager::setup_tray_menu(app.handle())?;
+
              // --- [추가] Task 4.10: '위젯 관리' 모듈 초기화 ---
             widget_manager::setup_widget_listeners(
                 app_handle.clone(), 
