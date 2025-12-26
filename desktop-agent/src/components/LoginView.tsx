@@ -1,9 +1,9 @@
-import React from 'react';
+import { useEffect } from 'react';
 // 분리된 스타일 파일 import
 import { styles } from './LoginView.styles';
 
 import { open } from '@tauri-apps/plugin-shell';
-
+import { listen } from '@tauri-apps/api/event';
 
 interface LoginViewProps {
   onLoginSuccess: () => void;
@@ -11,6 +11,31 @@ interface LoginViewProps {
 
 const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   // --- 핸들러 로직 ---
+  // Rust(lib.rs)의 로그인 성공 이벤트 수신
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+
+    const setupListener = async () => {
+      try {
+        // lib.rs가 토큰 저장 후 "login-success" 이벤트를 보냅니다.
+        const unlistenFn = await listen<string>('login-success', (event) => {
+          console.log(`Login Success Event Received for: ${event.payload}`);
+          onLoginSuccess();
+        });
+        unlisten = unlistenFn;
+      } catch (e) {
+        console.error("Failed to setup login listener:", e);
+      }
+    };
+
+    setupListener();
+
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, [onLoginSuccess]);
+
+  // 구글 로그인 버튼 핸들러
   const handleGoogleLogin = async () => {
     try {
       // 환경 변수(.env)에서 API 주소 로드
