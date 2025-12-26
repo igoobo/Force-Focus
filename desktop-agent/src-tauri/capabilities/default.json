@@ -3,14 +3,17 @@
   "identifier": "default",
   "description": "Capability for the main window",
   "windows": [
-    "main", "widget"
+    "main",
+    "widget"
   ],
   "permissions": [
     "core:default",
     "opener:default",
     "notification:default",
-    "core:window:default", 
+    "core:window:default",
     "core:window:allow-start-dragging",
-    "core:event:allow-listen"
+    "core:event:allow-listen",
+    "deep-link:default",
+    "shell:default"
   ]
 }

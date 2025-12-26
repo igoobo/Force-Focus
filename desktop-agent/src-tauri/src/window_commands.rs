@@ -1,4 +1,4 @@
-use tauri::{AppHandle, Manager, Runtime}; 
+use tauri::{AppHandle, Manager, Runtime};
 
 /// 'overlay' 창을 숨기는 Tauri 커맨드
 /// React의 InterventionOverlay.tsx에서 이 커맨드를 호출

@@ -1,8 +1,8 @@
 // [추가] Task 4.10: '위젯' 로직을 lib.rs에서 분리 (관심사 분리)
-use tauri::{AppHandle, Manager, Runtime, WebviewWindowBuilder, WebviewUrl, Url, WindowEvent};
 use crate::SessionStateArcMutex; // lib.rs에서 정의한 전역 세션 상태
-use std::time::{Instant, Duration};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+use tauri::{AppHandle, Manager, Runtime, Url, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 /// [추가] setup 훅에서 호출될 '위젯' 이벤트 리스너 설정 함수
 pub fn setup_widget_listeners<R: Runtime>(
@@ -27,7 +27,7 @@ pub fn setup_widget_listeners<R: Runtime>(
                 let last_gain = *last_focus_gain_time_clone.lock().unwrap();
                 if last_gain.elapsed() < Duration::from_millis(200) {
                     println!("Ignored Focused(false) due to cooldown (restore noise).");
-                    return; 
+                    return;
                 }
 
                 if session_state.is_some() {
@@ -35,11 +35,10 @@ pub fn setup_widget_listeners<R: Runtime>(
                     println!("Main window lost focus, showing widget...");
                     show_widget_window(&app_handle_clone);
                 }
-            },
-            
+            }
+
             // [유지] v2 API: '메인 창'이 '포커스를 얻음'
             WindowEvent::Focused(true) => {
-
                 // [추가] 포커스 획득 시점 기록
                 let mut last_gain = last_focus_gain_time_clone.lock().unwrap();
                 *last_gain = Instant::now();
@@ -51,7 +50,7 @@ pub fn setup_widget_listeners<R: Runtime>(
                         widget.hide().ok();
                     }
                 }
-            },
+            }
             _ => {}
         }
     });
@@ -66,7 +65,7 @@ fn show_widget_window<R: Runtime>(app_handle: &AppHandle<R>) {
         }
     } else {
         println!("Widget window not found. Re-creating...");
-        
+
         #[cfg(debug_assertions)]
         let url = WebviewUrl::External("http://localhost:1420/widget.html".parse().unwrap());
         #[cfg(not(debug_assertions))]
@@ -77,7 +76,7 @@ fn show_widget_window<R: Runtime>(app_handle: &AppHandle<R>) {
             .decorations(false)
             .resizable(false)
             .skip_taskbar(true)
-            .inner_size(220.0, 70.0) 
+            .inner_size(220.0, 70.0)
             .position(1680.0, 20.0) // [임시]
             .visible(true)
             .build()

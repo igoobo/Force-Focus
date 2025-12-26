@@ -17,17 +17,15 @@ pub fn start_input_listener(input_stats_arc_mutex: InputStatsArcMutex) {
 
             match event.event_type {
                 // 유의미한 입력 (키/클릭/휠)
-                EventType::KeyPress(_) |
-                EventType::ButtonPress(_) |
-                EventType::Wheel { .. } => {
+                EventType::KeyPress(_) | EventType::ButtonPress(_) | EventType::Wheel { .. } => {
                     update_meaningful_stats(&input_stats_arc_mutex, now_ms);
                 }
-                
+
                 // 마우스 이동 (분리)
                 EventType::MouseMove { .. } => {
                     update_mouse_move_stats(&input_stats_arc_mutex, now_ms);
                 }
-                
+
                 _ => (), // 다른 이벤트 무시
             }
         }) {

@@ -8,15 +8,14 @@
 
 */
 
-
-use tauri::{command, State};
-use serde::{Serialize, Deserialize};
-use std::time::{SystemTime, UNIX_EPOCH}; // 타임스탬프 생성을 위해 필요
 use active_win_pos_rs::get_active_window; // 활성 창 정보를 가져오는 함수
-use std::path::PathBuf; // active-win-pos-rs::ActiveWindow 구조체 필드에 PathBuf가 포함
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH}; // 타임스탬프 생성을 위해 필요
+use tauri::{command, State}; // active-win-pos-rs::ActiveWindow 구조체 필드에 PathBuf가 포함
 
-use sysinfo::{System};
-use std::sync::{Mutex, Arc};
+use std::sync::{Arc, Mutex};
+use sysinfo::System;
 
 use rdev::{listen, Event, EventType};
 use std::thread;
@@ -28,28 +27,26 @@ use std::path::Path;
 // [추가] Windows API 사용을 위한 모듈 import (Windows 환경에서만 컴파일)
 // [변경] windows 크레이트 import
 use windows::core::{PCWSTR, PWSTR};
-use windows::Win32::Foundation::{BOOL, FALSE, HANDLE, HWND, LPARAM, MAX_PATH, RECT, TRUE, CloseHandle};
+use windows::Win32::Foundation::{
+    CloseHandle, BOOL, FALSE, HANDLE, HWND, LPARAM, MAX_PATH, RECT, TRUE,
+};
 use windows::Win32::Graphics::Gdi::{
-    CombineRgn, CreateRectRgn, CreateRectRgnIndirect, DeleteObject, GetRgnBox, 
-    HGDIOBJ, HRGN, RGN_COMBINE_MODE, RGN_DIFF, RGN_OR, NULLREGION,
+    CombineRgn, CreateRectRgn, CreateRectRgnIndirect, DeleteObject, GetRgnBox, HGDIOBJ, HRGN,
+    NULLREGION, RGN_COMBINE_MODE, RGN_DIFF, RGN_OR,
 };
 
 use windows::Win32::System::Threading::{
-    OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_NAME_FORMAT,
+    OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_FORMAT, PROCESS_QUERY_LIMITED_INFORMATION,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, GetForegroundWindow, GetWindow, GetWindowRect, GetWindowTextLengthW, 
+    EnumWindows, GetForegroundWindow, GetWindow, GetWindowRect, GetWindowTextLengthW,
     GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindowVisible, GW_OWNER,
 };
 
 #[cfg(target_os = "windows")]
-use std::ffi::{OsString};
+use std::ffi::OsString;
 #[cfg(target_os = "windows")]
 use std::os::windows::ffi::OsStringExt;
-
-
-
-
 
 // --- 공유 상태 관리 ---
 // Mutex<System>만 포함하며, System 인스턴스를 공유 상태로 관리합니다.
@@ -57,13 +54,13 @@ pub struct SysinfoState(pub Mutex<System>);
 
 // 사용자 입력 통계 추적을 위한 공유 상태
 // 앱 시작 시 한 번 초기화되어 계속 사용되므로 Arc로 공유됩니다.
-#[derive(Debug, Default, Clone, Serialize, Deserialize)] 
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct InputStats {
     // 키/클릭/휠 이벤트만 카운트
     pub meaningful_input_events: u64,
     // 키/클릭/휠의 마지막 타임스탬프
     pub last_meaningful_input_timestamp_ms: u64,
-    
+
     // 마우스 이동 전용 타임스탬프
     pub last_mouse_move_timestamp_ms: u64,
 
@@ -72,8 +69,8 @@ pub struct InputStats {
 
     // 시각 센서 데이터 (보이는 창 목록)
     // app_core.rs에서 _get_all_visible_windows_internal() 결과를 여기에 채워 넣습니다.
-    #[serde(default)] 
-    pub visible_windows: Vec<WindowInfo>, 
+    #[serde(default)]
+    pub visible_windows: Vec<WindowInfo>,
 }
 
 // FastAPI 모델 activity_vector
@@ -86,16 +83,15 @@ impl InputStats {
             "last_meaningful_input_timestamp_ms": self.last_meaningful_input_timestamp_ms,
             "last_mouse_move_timestamp_ms": self.last_mouse_move_timestamp_ms,
 
-            
+
             "visible_windows": self.visible_windows,
-            
+
         });
         vector.to_string() // JSON 문자열로 반환
     }
 }
 
 pub type InputStatsArcMutex = Arc<Mutex<InputStats>>;
-
 
 // --- 1. 활성 창 정보 관련 데이터 모델 및 명령어 ---
 
@@ -104,25 +100,25 @@ pub type InputStatsArcMutex = Arc<Mutex<InputStats>>;
 // active_win_pos_rs::ActiveWindow 구조체와 유사하게 정의하되, 필요한 추가 필드를 포함
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ActiveWindowInfo {
-    pub timestamp_ms: u64, // 정보 수집 시점의 타임스탬프 (밀리초)
-    pub title: String,     // 창의 제목 (예: "Google Chrome - Wikipedia")
+    pub timestamp_ms: u64,    // 정보 수집 시점의 타임스탬프 (밀리초)
+    pub title: String,        // 창의 제목 (예: "Google Chrome - Wikipedia")
     pub process_path: String, // 실행 파일의 전체 경로 (예: "C:\Program Files\Google\Chrome\Application\chrome.exe")
-    pub app_name: String,  // 애플리케이션 이름 (예: "chrome", "firefox")
-    pub window_id: String, // 운영체제별 고유 창 ID
-    pub process_id: u64,   // 프로세스 ID
-    pub x: f64,            // 창의 X 좌표
-    pub y: f64,            // 창의 Y 좌표
-    pub width: f64,        // 창의 너비
-    pub height: f64,       // 창의 높이
+    pub app_name: String,     // 애플리케이션 이름 (예: "chrome", "firefox")
+    pub window_id: String,    // 운영체제별 고유 창 ID
+    pub process_id: u64,      // 프로세스 ID
+    pub x: f64,               // 창의 X 좌표
+    pub y: f64,               // 창의 Y 좌표
+    pub width: f64,           // 창의 너비
+    pub height: f64,          // 창의 높이
 }
-
 
 // ActiveWindowInfo를 생성하는 내부 헬퍼 함수
 pub fn _get_active_window_info_internal() -> Result<ActiveWindowInfo, String> {
     // 현재 시간을 밀리초 단위의 Unix 타임스탬프로 가져옴
-    let timestamp_ms = SystemTime::now().duration_since(UNIX_EPOCH)
-                                    .unwrap_or_else(|_| std::time::Duration::from_secs(0)) // 에러 처리 추가
-                                    .as_millis() as u64;
+    let timestamp_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_else(|_| std::time::Duration::from_secs(0)) // 에러 처리 추가
+        .as_millis() as u64;
 
     // 현재 활성 창 정보
     match get_active_window() {
@@ -149,7 +145,7 @@ pub fn _get_active_window_info_internal() -> Result<ActiveWindowInfo, String> {
                 width: active_window.position.width,
                 height: active_window.position.height,
             })
-        },
+        }
         // 활성 창을 가져오는 데 실패했을 경우 (에러나 활성 창 없음)
         Err(e) => Err(format!("Failed to get active window info: {:?}", e)),
     }
@@ -161,23 +157,21 @@ pub fn get_current_active_window_info() -> Result<ActiveWindowInfo, String> {
     _get_active_window_info_internal()
 }
 
-
-
 // --- 2. 시스템 상태 관련 데이터 모델 및 명령어 ---
 
 // 모든 프로세스에 대한 요약 정보를 담을 Rust 구조체
 // 이 구조체는 웹 프론트엔드로 전송될 것이므로 Serialize/Deserialize 트레이트를 파생합니다.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ProcessSummary {
-    pub name: String,            // 프로세스의 이름 (예: "chrome", "notepad.exe")
-    pub start_time_unix_s: u64,  // 프로세스 시작 시점의 Unix 타임스탬프 (초 단위)
-
+    pub name: String,           // 프로세스의 이름 (예: "chrome", "notepad.exe")
+    pub start_time_unix_s: u64, // 프로세스 시작 시점의 Unix 타임스탬프 (초 단위)
 }
-
 
 // 시스템의 모든 실행 중인 프로세스 요약 정보를 가져오는 Tauri Command
 #[command]
-pub fn get_all_processes_summary(sys_state: State<'_, SysinfoState>) -> Result<Vec<ProcessSummary>, String> {
+pub fn get_all_processes_summary(
+    sys_state: State<'_, SysinfoState>,
+) -> Result<Vec<ProcessSummary>, String> {
     // SysinfoState가 Mutex<System>만 가지므로 sys_state.0.lock()으로 접근합니다.
     let mut sys_guard = sys_state.0.lock().unwrap();
 
@@ -194,7 +188,6 @@ pub fn get_all_processes_summary(sys_state: State<'_, SysinfoState>) -> Result<V
                 start_time_unix_s: process.start_time(),
             });
         }
-            
     }
     Ok(processes_summary)
 }
@@ -202,21 +195,18 @@ pub fn get_all_processes_summary(sys_state: State<'_, SysinfoState>) -> Result<V
 // --- 3. (향후 추가될) 스크린샷 관련 데이터 모델 및 명령어 ---
 // (현재 비어 있음)
 
-
-
-
 // --- 4. 사용자 입력 및 유휴 시간 관련 데이터 모델 및 명령어 ---
 
 // 현재까지의 사용자 입력 빈도 통계를 반환하는 Command
 #[command]
-pub fn get_input_frequency_stats(input_stats_arc_mutex: State<'_, InputStatsArcMutex>) -> Result<InputStats, String> {
+pub fn get_input_frequency_stats(
+    input_stats_arc_mutex: State<'_, InputStatsArcMutex>,
+) -> Result<InputStats, String> {
     // input_stats_arc_mutex는 직접 Arc<Mutex<InputStats>>의 참조 가짐.
     // .lock().unwrap()을 호출하여 MutexGuard를 얻고, 내부 데이터를 클론
     let stats = input_stats_arc_mutex.lock().unwrap();
     Ok((*stats).clone())
 }
-
-
 
 // --- 5. 시각 센서 (Visible Windows) ---
 // 화면에 보이는 창을 수집
@@ -227,7 +217,7 @@ const MIN_VISIBLE_WIDTH: i32 = 120;
 const MIN_VISIBLE_HEIGHT: i32 = 100;
 
 // [1] Debug 구현을 위한 Rust용 Rect 구조체
-#[derive(Debug, Clone, Serialize, Deserialize)] 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WinRect {
     pub left: i32,
     pub top: i32,
@@ -236,7 +226,7 @@ pub struct WinRect {
 }
 
 // [2] WindowInfo 구조체 정의
-#[derive(Debug, Clone, Serialize, Deserialize)] 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WindowInfo {
     pub title: String,
     // 시맨틱 태깅을 위한 앱 이름 필드
@@ -244,16 +234,16 @@ pub struct WindowInfo {
     pub app_name: String,
 
     pub is_visible_on_screen: bool,
-    
-    pub rect: WinRect, 
+
+    pub rect: WinRect,
 }
 
 // --- OS 유틸리티 경로 목록 (필터링용) ---
 #[cfg(target_os = "windows")]
 const WINDOWS_SYSTEM_PATHS: &[&str] = &[
-    "C:\\WINDOWS\\SYSTEM32", 
-    "C:\\WINDOWS\\SYSTEMAPPS", 
-    "C:\\PROGRAM FILES\\WINDOWSAPPS", 
+    "C:\\WINDOWS\\SYSTEM32",
+    "C:\\WINDOWS\\SYSTEMAPPS",
+    "C:\\PROGRAM FILES\\WINDOWSAPPS",
     "C:\\WINDOWS\\EXPLORER.EXE",
 ];
 
@@ -268,16 +258,18 @@ const IGNORED_TITLES: &[&str] = &[
 // --- PID로 프로세스 경로를 얻는 헬퍼 함수 ---
 #[cfg(target_os = "windows")]
 fn get_process_path_from_pid(pid: u32) -> Option<String> {
-    if pid == 0 { return None; }
-    
+    if pid == 0 {
+        return None;
+    }
+
     unsafe {
         // OpenProcess는 Result<HANDLE>을 반환합니다.
         let handle_result = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
-        
+
         if let Ok(handle) = handle_result {
             // drop되면 자동으로 닫히지 않는 Raw Handle일 수 있으므로 CloseHandle 필요
             // (windows-rs의 OwnedHandle을 쓰지 않고 Raw 호출 시)
-            
+
             let mut buffer = [0u16; MAX_PATH as usize];
             let mut size = MAX_PATH;
 
@@ -293,7 +285,9 @@ fn get_process_path_from_pid(pid: u32) -> Option<String> {
 
             if success.is_ok() {
                 // 슬라이스에서 문자열 변환
-                return OsString::from_wide(&buffer[..size as usize]).into_string().ok();
+                return OsString::from_wide(&buffer[..size as usize])
+                    .into_string()
+                    .ok();
             }
         }
         None
@@ -306,7 +300,7 @@ struct EnumContext {
     windows: Vec<WindowInfo>,
     foreground_hwnd: HWND,
     // 지금까지 화면을 덮어버린 영역들의 합집합 (누적 가림막)
-    covered_rgn: HRGN, 
+    covered_rgn: HRGN,
 }
 
 // --- 콜백 함수  ---
@@ -324,12 +318,11 @@ unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BO
     // Err를 반환하면 소유자가 없다는 뜻(즉, 최상위 창).
     let has_owner = match GetWindow(hwnd, GW_OWNER) {
         Ok(handle) => handle.0 != std::ptr::null_mut(), // 핸들이 0이 아니면 소유자가 있음
-        Err(_) => false,             // 에러(NULL)면 소유자가 없음
+        Err(_) => false,                                // 에러(NULL)면 소유자가 없음
     };
 
     // 소유자가 없고(최상위 창이고) + 보이는 창인 경우에만 처리
     if IsWindowVisible(hwnd).as_bool() && !has_owner {
-        
         // 2. 좌표 가져오기
         let mut rect = RECT::default();
         let _ = GetWindowRect(hwnd, &mut rect);
@@ -346,7 +339,7 @@ unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BO
             let mut buffer = vec![0u16; (length + 1) as usize];
             // GetWindowTextW는 복사된 문자 수를 반환
             let copied_len = GetWindowTextW(hwnd, &mut buffer);
-            
+
             if copied_len > 0 {
                 let title_raw = OsString::from_wide(&buffer[..copied_len as usize]);
                 if let Ok(title) = title_raw.into_string() {
@@ -361,44 +354,48 @@ unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BO
                     GetWindowThreadProcessId(hwnd, Some(&mut pid));
 
                     // [수정] app_name 추출을 위한 변수
-                    let mut app_name = String::from("Unknown"); 
+                    let mut app_name = String::from("Unknown");
                     let mut is_system = false;
 
                     if let Some(path) = get_process_path_from_pid(pid) {
                         let p = path.to_lowercase();
-                        is_system = WINDOWS_SYSTEM_PATHS.iter().any(|sys| p.starts_with(&sys.to_lowercase()));
-                        
+                        is_system = WINDOWS_SYSTEM_PATHS
+                            .iter()
+                            .any(|sys| p.starts_with(&sys.to_lowercase()));
+
                         // 경로에서 파일명(app_name) 추출
                         if !is_system {
                             if let Some(name) = Path::new(&path).file_name() {
                                 app_name = name.to_string_lossy().into_owned();
                             }
                         }
-                    } 
+                    }
 
                     if !is_system {
                         // ---------------------------------------------------------
                         // [GDI Region Logic - windows-rs 버전]
                         // ---------------------------------------------------------
-                        
+
                         // A. 현재 창 Region 생성
                         let current_win_rgn = CreateRectRgnIndirect(&rect);
-                        
+
                         // B. Visible Region (현재 - 누적)
                         let visible_part_rgn = CreateRectRgn(0, 0, 0, 0);
-                        
+
                         // CombineRgn: 리턴값은 Region Type (i32)
                         let region_type = CombineRgn(
-                            visible_part_rgn, 
-                            current_win_rgn, 
-                            context.covered_rgn, 
-                            RGN_DIFF // RGN_COMBINE_MODE(4) -> DIFF
+                            visible_part_rgn,
+                            current_win_rgn,
+                            context.covered_rgn,
+                            RGN_DIFF, // RGN_COMBINE_MODE(4) -> DIFF
                         );
 
                         let mut is_visually_visible = false;
 
                         // NULLREGION == 1 (windows-rs 상수에 따라 다를 수 있으니 상수 사용 권장)
-                        if region_type != windows::Win32::Graphics::Gdi::GDI_REGION_TYPE(NULLREGION.0 as i32) {
+                        if region_type
+                            != windows::Win32::Graphics::Gdi::GDI_REGION_TYPE(NULLREGION.0 as i32)
+                        {
                             let mut box_rect = RECT::default();
                             GetRgnBox(visible_part_rgn, &mut box_rect);
 
@@ -412,20 +409,23 @@ unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BO
 
                         if is_visually_visible {
                             context.windows.push(WindowInfo {
-                                app_name, 
+                                app_name,
                                 title: trimmed_title.to_string(),
                                 is_visible_on_screen: true,
                                 rect: WinRect {
-                                    left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom,
+                                    left: rect.left,
+                                    top: rect.top,
+                                    right: rect.right,
+                                    bottom: rect.bottom,
                                 },
                             });
 
                             // D. 누적(Union)
                             CombineRgn(
-                                context.covered_rgn, 
-                                context.covered_rgn, 
-                                current_win_rgn, 
-                                RGN_OR // RGN_COMBINE_MODE(2) -> OR
+                                context.covered_rgn,
+                                context.covered_rgn,
+                                current_win_rgn,
+                                RGN_OR, // RGN_COMBINE_MODE(2) -> OR
                             );
                         } else {
                             // // 안 보이는 창 (디버깅용 포함)
@@ -439,7 +439,7 @@ unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BO
                         }
 
                         // E. 리소스 해제 (HGDIOBJ 변환 필요)
-                        // windows-rs의 HRGN은 HGDIOBJ로 바로 cast 되지 않을 수 있음. 
+                        // windows-rs의 HRGN은 HGDIOBJ로 바로 cast 되지 않을 수 있음.
                         // 핸들 값(.0)을 이용해 HGDIOBJ 생성
                         DeleteObject(HGDIOBJ(current_win_rgn.0));
                         DeleteObject(HGDIOBJ(visible_part_rgn.0));
@@ -472,7 +472,6 @@ pub fn _get_all_visible_windows_internal() -> Vec<WindowInfo> {
             let lparam = LPARAM(&mut context as *mut _ as isize);
             let _ = EnumWindows(Some(enum_window_callback), lparam);
 
-
             // [정리] 다 쓰고 난 누적 영역 삭제
             // [핵심 수정] 'as *mut _' 제거 및 HGDIOBJ로 올바르게 감싸기
             // HRGN의 내부 값(.0)을 꺼내 HGDIOBJ 생성자에 전달합니다.
@@ -489,7 +488,6 @@ pub fn _get_all_visible_windows_internal() -> Vec<WindowInfo> {
     }
 }
 
-
 /// [Tauri 커맨드] 프론트엔드나 app_core에서 호출 가능한 래퍼
 #[command]
 pub fn get_visible_windows() -> Result<Vec<WindowInfo>, String> {
@@ -497,11 +495,8 @@ pub fn get_visible_windows() -> Result<Vec<WindowInfo>, String> {
     Ok(windows)
 }
 
-
-
-
 // --- 토큰화 및 숫자 필터링 = 시맨틱 태깅 ---
-// 목표: 
+// 목표:
 // 1. 네이티브 앱 -> 파일 확장자만 추출
 // 2. 웹 브라우저 -> 제목 전체를 토큰화한 뒤, '숫자가 포함된 토큰'만 제거하여 맥락 보존
 // 전략: 복잡한 파싱 대신, 단순히 띄어쓰기로 나누고 숫자가 섞인 '위험한 토큰'을 모두 버림.
@@ -514,12 +509,14 @@ pub fn extract_semantic_keywords(app_name: &str, window_title: &str) -> Vec<Stri
     let ext_re = Regex::new(r"\.([a-z0-9]{2,4})\b").unwrap();
     for cap in ext_re.captures_iter(&lower_title) {
         if let Some(match_) = cap.get(1) {
-            tokens.push(format!(".{}", match_.as_str())); 
+            tokens.push(format!(".{}", match_.as_str()));
         }
     }
 
     // 2. 브라우저 감지
-    let browsers = ["chrome", "edge", "firefox", "whale", "brave", "opera", "safari", "browser"];
+    let browsers = [
+        "chrome", "edge", "firefox", "whale", "brave", "opera", "safari", "browser",
+    ];
     let is_browser = browsers.iter().any(|&b| lower_app.contains(b));
 
     if is_browser {
@@ -530,11 +527,36 @@ pub fn extract_semantic_keywords(app_name: &str, window_title: &str) -> Vec<Stri
 
         // 4. 불용어 목록
         let stopwords: HashSet<&str> = [
-            "google", "microsoft", "chrome", "edge", "firefox", "whale",
-            "profile", "프로필", "guest", "게스트", "search", "검색",
-            "새 탭", "new tab", "loading", "로딩", "sign in", "login", "로그인",
-            "window", "application", "site", "page", "web", "browser", "view"
-        ].iter().cloned().collect();
+            "google",
+            "microsoft",
+            "chrome",
+            "edge",
+            "firefox",
+            "whale",
+            "profile",
+            "프로필",
+            "guest",
+            "게스트",
+            "search",
+            "검색",
+            "새 탭",
+            "new tab",
+            "loading",
+            "로딩",
+            "sign in",
+            "login",
+            "로그인",
+            "window",
+            "application",
+            "site",
+            "page",
+            "web",
+            "browser",
+            "view",
+        ]
+        .iter()
+        .cloned()
+        .collect();
 
         // 5. 공백 기준 분리 및 필터링
         for token in clean_title.split_whitespace() {
@@ -560,7 +582,7 @@ pub fn extract_semantic_keywords(app_name: &str, window_title: &str) -> Vec<Stri
     // 6. 중복 제거 및 정렬
     tokens.sort();
     tokens.dedup();
-    
+
     // 7. 토큰 제한
     if tokens.len() > 15 {
         tokens.truncate(15);

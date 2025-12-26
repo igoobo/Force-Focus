@@ -1,16 +1,16 @@
 // 파일 위치: Force-Focus/desktop-agent/src-tauri/src/logging.rs
 
-use tauri::AppHandle; 
+use crate::commands;
+use chrono::{DateTime, Datelike, Local, Timelike}; // 시간 및 날짜 처리
+use serde::{Deserialize, Serialize}; // JSON 직렬화/역직렬화
+use serde_json;
+use std::env; // 환경 변수 접근
 use std::fs::{self, File, OpenOptions}; // 파일 시스템 작업
 use std::io::prelude::*; // 파일 쓰기
 use std::path::PathBuf; // 경로 관리
-use chrono::{Local, DateTime, Datelike, Timelike}; // 시간 및 날짜 처리
-use serde::{Serialize, Deserialize}; // JSON 직렬화/역직렬화
-use serde_json; 
-use std::time::Duration; 
 use std::thread; // 백그라운드 스레드 생성
-use std::env; // 환경 변수 접근
-use crate::commands; 
+use std::time::Duration;
+use tauri::AppHandle;
 
 use crate::commands::InputStatsArcMutex;
 
@@ -20,13 +20,12 @@ use crate::commands::InputStatsArcMutex;
 pub struct ActivityLogEntry {
     pub timestamp: String, // ISO 8601 형식의 시간 (예: "2023-10-27T10:00:00+09:00")
     pub active_window: Option<commands::ActiveWindowInfo>, // 활성 창 정보 (없을 수도 있으므로 Option)
-    pub input_stats: Option<commands::InputStats>,       // 입력 통계 정보 (없을 수도 있으므로 Option)
-    
-    // 참고: 프로세스 요약은 데이터가 너무 커질 수 있으므로, 초기 단계에서는 포함 안함
-    // 필요시 나중에 추가하거나, 요약된 형태로 저장하는 것을 고려
-    // pub processes_summary: Option<Vec<commands::ProcessSummary>>,
-}
+    pub input_stats: Option<commands::InputStats>, // 입력 통계 정보 (없을 수도 있으므로 Option)
 
+                                                   // 참고: 프로세스 요약은 데이터가 너무 커질 수 있으므로, 초기 단계에서는 포함 안함
+                                                   // 필요시 나중에 추가하거나, 요약된 형태로 저장하는 것을 고려
+                                                   // pub processes_summary: Option<Vec<commands::ProcessSummary>>,
+}
 
 // 로그 파일을 저장할 기본 디렉토리를 반환
 // 애플리케이션 데이터 디렉토리 찾기
@@ -58,7 +57,10 @@ pub fn get_log_file_path(log_dir: &PathBuf, date: &DateTime<Local>) -> PathBuf {
 }
 
 // 주기적으로 데이터를 수집하고 파일에 로깅하는 함수
-pub fn start_data_collection_and_logging(input_stats_arc_mutex: InputStatsArcMutex, interval_secs: u64) {
+pub fn start_data_collection_and_logging(
+    input_stats_arc_mutex: InputStatsArcMutex,
+    interval_secs: u64,
+) {
     let log_dir_result = get_log_dir(); // 로그 디렉토리 경로 가져오기
 
     if let Err(e) = &log_dir_result {
@@ -76,7 +78,8 @@ pub fn start_data_collection_and_logging(input_stats_arc_mutex: InputStatsArcMut
 
     // 백그라운드 스레드에서 데이터 수집 및 로깅을 수행
     thread::spawn(move || {
-        loop { // 무한 루프
+        loop {
+            // 무한 루프
             let current_time: DateTime<Local> = Local::now();
             let log_file_path = get_log_file_path(&log_dir, &current_time); // 현재 날짜의 로그 파일 경로
 
@@ -87,12 +90,12 @@ pub fn start_data_collection_and_logging(input_stats_arc_mutex: InputStatsArcMut
                 input_stats: None,
             };
 
-            // 1. 활성 창 정보 수집 
-            match commands::_get_active_window_info_internal() { 
+            // 1. 활성 창 정보 수집
+            match commands::_get_active_window_info_internal() {
                 Ok(active_window_info) => {
                     log_entry.active_window = Some(active_window_info);
-                },
-                Err(e) => eprintln!("Logging: Failed to get active window info: {}", e), 
+                }
+                Err(e) => eprintln!("Logging: Failed to get active window info: {}", e),
             }
 
             // 2. 입력 통계 수집 (InputStatsArcMutex에서 직접 읽어오기)

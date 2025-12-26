@@ -1,16 +1,16 @@
 // 파일 위치: src-tauri/src/app_core.rs
 
-use tauri::{AppHandle, Manager, State, Runtime, Emitter, WebviewWindowBuilder, WebviewUrl};
-use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH}; 
 use crate::{
-    commands, // commands 모듈의 _get_active_window_info_internal 사용
-    state_engine, // state_engine 모듈 사용
-    InputStatsArcMutex, // lib.rs에서 정의한 타입
-    StateEngineArcMutex, // lib.rs에서 정의할 타입
-    SessionStateArcMutex, // 전역 세션 상태 import
+    commands,               // commands 모듈의 _get_active_window_info_internal 사용
+    state_engine,           // state_engine 모듈 사용
+    InputStatsArcMutex,     // lib.rs에서 정의한 타입
+    SessionStateArcMutex,   // 전역 세션 상태 import
+    StateEngineArcMutex,    // lib.rs에서 정의할 타입
     StorageManagerArcMutex, // LSN import (이벤트 캐싱을 위해)
 };
+use std::thread;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tauri::{AppHandle, Emitter, Manager, Runtime, State, WebviewUrl, WebviewWindowBuilder};
 
 /// '메인 루프'를 별도 스레드에서 시작
 /// 이 루프는 5초마다 StateEngine을 실행
@@ -21,33 +21,32 @@ pub fn start_core_loop<R: Runtime>(
 ) {
     let mut state_engine_counter = 0;
 
-
     thread::spawn(move || {
         loop {
             // 5초마다 실행
             thread::sleep(Duration::from_secs(1));
-            
+
             state_engine_counter += 1;
-            let now_s = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
+            let now_s = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map_or(0, |d| d.as_secs());
 
             // 세션 활성화 상태 검사
             let session_guard = session_state_mutex.lock().unwrap();
 
-            
             if let Some(active_session) = &*session_guard {
                 // 세션이 활성 상태일 때만 아래 로직을 실행
 
                 // [추가] Task 4.12 (P1): Rust에서 타이머 계산
                 let elapsed_seconds = now_s.saturating_sub(active_session.start_time_s);
-                
+
                 // [수정] Task 4.12 (P1): 'widget-tick' 이벤트를 '모든' 창에 방송(emit)
                 // [!] (v2 API) app_handle.emit()은 'broadcast'입니다.
                 app_handle.emit("widget-tick", elapsed_seconds).ok();
 
-
                 if state_engine_counter >= 5 {
                     state_engine_counter = 0; // 카운터 리셋
-                    
+
                     // --- 1. 센서 데이터 수집 (Activity Monitor) ---
                     let window_info_result = commands::_get_active_window_info_internal();
 
@@ -60,32 +59,31 @@ pub fn start_core_loop<R: Runtime>(
                         }
                     };
 
-                     // 시각 센서 데이터 수집 (Visible Windows Raw Data)
+                    // 시각 센서 데이터 수집 (Visible Windows Raw Data)
                     let mut visible_windows_raw = commands::_get_all_visible_windows_internal();
 
-
-
                     // --- 데이터 가공 (시맨틱 태깅 & 세탁) ---
-                    
+
                     // A. Visible Windows 태깅 (개인정보 보호를 위한 세탁)
                     // 원본 제목을 버리고, '토큰화 + 숫자 필터링'된 문자열로 덮어씌웁니다.
                     for window in &mut visible_windows_raw {
                         let tokens = commands::get_semantic_tokens(&window.app_name, &window.title);
-                        
+
                         if !tokens.is_empty() {
                             // 토큰이 있으면 공백으로 연결하여 저장 (예: "github desktop agent")
-                            window.title = tokens.join(" "); 
+                            window.title = tokens.join(" ");
                         } else {
                             // 토큰이 없으면(네이티브 앱 등), 개인정보 보호를 위해 제목을 비웁니다.
                             // (app_name 필드가 있으므로 식별 가능)
-                            window.title = String::new(); 
+                            window.title = String::new();
                         }
                     }
 
                     // B. 활성 창(Active Window) 태깅
                     // 활성 창 역시 동일한 로직으로 토큰을 추출합니다.
-                    let active_tokens = commands::get_semantic_tokens(&window_info.app_name, &window_info.title);
-                    
+                    let active_tokens =
+                        commands::get_semantic_tokens(&window_info.app_name, &window_info.title);
+
                     // 저장용 세탁된 제목 생성 (로그나 디버깅용)
                     let sanitized_active_title = if !active_tokens.is_empty() {
                         active_tokens.join(" ")
@@ -93,32 +91,29 @@ pub fn start_core_loop<R: Runtime>(
                         String::new()
                     };
 
-
                     // --- 2. 센서 데이터 수집 (Input Monitor) ---
                     let input_stats_state: State<'_, InputStatsArcMutex> = app_handle.state();
                     let mut input_stats = input_stats_state.lock().unwrap(); // Mutex 잠금
-                    
 
                     // [추가] Task 2.2: 수집된 시각 데이터를 InputStats 구조체에 채워 넣음
                     // (WindowInfo 구조체에서 title만 추출하여 String 벡터로 변환)
                     // [!] ML 모델을 위해 '전경 여부'도 포함할 수 있지만, 현재는 title만 저장
                     input_stats.visible_windows = visible_windows_raw;
 
-
                     // InputStats를 JSON 문자열로 직렬화 (commands.rs 헬퍼 호출)
                     let activity_vector_json = input_stats.to_activity_vector_json();
 
-                    
                     // 단순화된 LSN API를 호출합니다.
                     let storage_manager = storage_manager_mutex.lock().unwrap();
-                    storage_manager.cache_event(
-                        &active_session.session_id, 
-                        &window_info.app_name, 
-                        &sanitized_active_title,
-                        &activity_vector_json // JSON 문자열 전달
-                    ).unwrap_or_else(|e| eprintln!("Failed to cache event: {}", e));
-                    drop(storage_manager); 
-
+                    storage_manager
+                        .cache_event(
+                            &active_session.session_id,
+                            &window_info.app_name,
+                            &sanitized_active_title,
+                            &activity_vector_json, // JSON 문자열 전달
+                        )
+                        .unwrap_or_else(|e| eprintln!("Failed to cache event: {}", e));
+                    drop(storage_manager);
 
                     // --- 3. StateEngine에 데이터 주입 ---
                     let engine_state: State<'_, StateEngineArcMutex> = app_handle.state();
@@ -128,7 +123,7 @@ pub fn start_core_loop<R: Runtime>(
 
                     drop(engine); // StateEngine 락 즉시 해제
                     drop(input_stats); // InputStats 락 즉시 해제
-                    
+
                     // (input_stats, engine의 MutexGuard는 여기서 자동으로 해제됨)
 
                     // --- 4. 개입 컨트롤러 (Intervention Controller) ---
@@ -136,14 +131,15 @@ pub fn start_core_loop<R: Runtime>(
                     match trigger {
                         state_engine::InterventionTrigger::TriggerNotification => {
                             println!("Core Loop: Triggering Notification"); // (디버깅용)
-                            // 프론트엔드의 'intervention-trigger' 리스너를 호출
-                            app_handle.emit("intervention-trigger", "notification")
+                                                                            // 프론트엔드의 'intervention-trigger' 리스너를 호출
+                            app_handle
+                                .emit("intervention-trigger", "notification")
                                 .unwrap_or_else(|e| eprintln!("Failed to emit event: {:?}", e));
                         }
                         state_engine::InterventionTrigger::TriggerOverlay => {
                             // '강한 개입'은 Rust가 직접 네이티브 창을 제어
                             println!("Core Loop: Triggering Overlay (Native)");
-                            
+
                             // tauri.conf.json에 정의된 "overlay" 창 찾기
                             // 2. 'Get-or-Create' 로직
                             if let Some(overlay_window) = app_handle.get_webview_window("overlay") {
@@ -162,7 +158,7 @@ pub fn start_core_loop<R: Runtime>(
                                 if let Err(e) = WebviewWindowBuilder::new(
                                     &app_handle,
                                     "overlay", // 1. 고유 레이블
-                                    WebviewUrl::App("overlay.html".into()) // 2. HTML 경로
+                                    WebviewUrl::App("overlay.html".into()), // 2. HTML 경로
                                 )
                                 .fullscreen(true)
                                 .decorations(false)
@@ -185,11 +181,11 @@ pub fn start_core_loop<R: Runtime>(
             } else {
                 // --- [B] 세션이 비활성 상태일 때 ---
                 state_engine_counter = 0; // 카운터 리셋
-                
+
                 // [추가] Task 4.12: 'widget-tick'을 0으로 방송
                 app_handle.emit("widget-tick", 0).ok();
             }
-        drop(session_guard); // 세션 락 해제
+            drop(session_guard); // 세션 락 해제
         }
     });
 }
