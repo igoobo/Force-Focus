@@ -59,8 +59,39 @@ pub fn start_core_loop<R: Runtime>(
                             continue; // 다음 루프 실행
                         }
                     };
-                     // 보이는 창 목록 데이터 수집   반환값: Vec<WindowInfo>
-                    let visible_windows = commands::_get_all_visible_windows_internal();
+
+                     // 시각 센서 데이터 수집 (Visible Windows Raw Data)
+                    let mut visible_windows_raw = commands::_get_all_visible_windows_internal();
+
+
+
+                    // --- 데이터 가공 (시맨틱 태깅 & 세탁) ---
+                    
+                    // A. Visible Windows 태깅 (개인정보 보호를 위한 세탁)
+                    // 원본 제목을 버리고, '토큰화 + 숫자 필터링'된 문자열로 덮어씌웁니다.
+                    for window in &mut visible_windows_raw {
+                        let tokens = commands::get_semantic_tokens(&window.app_name, &window.title);
+                        
+                        if !tokens.is_empty() {
+                            // 토큰이 있으면 공백으로 연결하여 저장 (예: "github desktop agent")
+                            window.title = tokens.join(" "); 
+                        } else {
+                            // 토큰이 없으면(네이티브 앱 등), 개인정보 보호를 위해 제목을 비웁니다.
+                            // (app_name 필드가 있으므로 식별 가능)
+                            window.title = String::new(); 
+                        }
+                    }
+
+                    // B. 활성 창(Active Window) 태깅
+                    // 활성 창 역시 동일한 로직으로 토큰을 추출합니다.
+                    let active_tokens = commands::get_semantic_tokens(&window_info.app_name, &window_info.title);
+                    
+                    // 저장용 세탁된 제목 생성 (로그나 디버깅용)
+                    let sanitized_active_title = if !active_tokens.is_empty() {
+                        active_tokens.join(" ")
+                    } else {
+                        String::new()
+                    };
 
 
                     // --- 2. 센서 데이터 수집 (Input Monitor) ---
@@ -71,7 +102,7 @@ pub fn start_core_loop<R: Runtime>(
                     // [추가] Task 2.2: 수집된 시각 데이터를 InputStats 구조체에 채워 넣음
                     // (WindowInfo 구조체에서 title만 추출하여 String 벡터로 변환)
                     // [!] ML 모델을 위해 '전경 여부'도 포함할 수 있지만, 현재는 title만 저장
-                    input_stats.visible_windows = visible_windows;
+                    input_stats.visible_windows = visible_windows_raw;
 
 
                     // InputStats를 JSON 문자열로 직렬화 (commands.rs 헬퍼 호출)
@@ -83,7 +114,7 @@ pub fn start_core_loop<R: Runtime>(
                     storage_manager.cache_event(
                         &active_session.session_id, 
                         &window_info.app_name, 
-                        &window_info.title,
+                        &sanitized_active_title,
                         &activity_vector_json // JSON 문자열 전달
                     ).unwrap_or_else(|e| eprintln!("Failed to cache event: {}", e));
                     drop(storage_manager); 

@@ -73,3 +73,12 @@ features = [
     "Win32_System_ProcessStatus",   # K32QueryFullProcessImageNameW 등 (프로세스 경로)
 ]
 # -------------------------------------------------------------
+
+# 12. 시맨틱 태깅 위한 regex
+[dependencies.regex]
+version = "1.12.2"
+default-features = false
+# Unless you have a specific reason not to, it's good sense to enable standard
+# library support. It enables several optimizations and avoids spin locks. It
+# also shouldn't meaningfully impact compile times or binary size.
+features = ["std"]
