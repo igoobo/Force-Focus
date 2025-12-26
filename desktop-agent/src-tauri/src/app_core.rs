@@ -59,10 +59,20 @@ pub fn start_core_loop<R: Runtime>(
                             continue; // 다음 루프 실행
                         }
                     };
+                     // 보이는 창 목록 데이터 수집   반환값: Vec<WindowInfo>
+                    let visible_windows = commands::_get_all_visible_windows_internal();
+
 
                     // --- 2. 센서 데이터 수집 (Input Monitor) ---
                     let input_stats_state: State<'_, InputStatsArcMutex> = app_handle.state();
-                    let input_stats = input_stats_state.lock().unwrap(); // Mutex 잠금
+                    let mut input_stats = input_stats_state.lock().unwrap(); // Mutex 잠금
+                    
+
+                    // [추가] Task 2.2: 수집된 시각 데이터를 InputStats 구조체에 채워 넣음
+                    // (WindowInfo 구조체에서 title만 추출하여 String 벡터로 변환)
+                    // [!] ML 모델을 위해 '전경 여부'도 포함할 수 있지만, 현재는 title만 저장
+                    input_stats.visible_windows = visible_windows;
+
 
                     // InputStats를 JSON 문자열로 직렬화 (commands.rs 헬퍼 호출)
                     let activity_vector_json = input_stats.to_activity_vector_json();

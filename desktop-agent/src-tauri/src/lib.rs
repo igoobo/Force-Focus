@@ -156,6 +156,7 @@ pub fn run() {
             commands::get_current_active_window_info,
             commands::get_all_processes_summary,
             commands::get_input_frequency_stats,
+            commands::get_visible_windows, // 시각 센서 커맨드 등록
 
             // backend_communicator 모듈의 커맨드를 핸들러에 등록
             backend_communicator::submit_feedback,
