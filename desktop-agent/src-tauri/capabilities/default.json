@@ -13,6 +13,7 @@
     "core:window:default",
     "core:window:allow-start-dragging",
     "core:event:allow-listen",
-    "deep-link:default"
+    "deep-link:default",
+    "shell:default"
   ]
 }
