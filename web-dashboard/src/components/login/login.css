@@ -1,4 +1,4 @@
-/* 1. 기본 초기화 및 Pretendard 폰트 설정 */
+/* 1. 기본 초기화 및 폰트 설정 */
 * {
   margin: 0;
   padding: 0;
@@ -9,157 +9,78 @@
 html, body {
   width: 100%;
   height: 100%;
-  background-color: #ffffff;
+  background-color: #f9fafb;
 }
 
 .login-container {
   display: flex;
-  justify-content: center; /* 가로 중앙 */
-  align-items: center;     /* 세로 중앙 */
-  width: 100vw;            /* 전체 너비 사용 */
+  justify-content: center;
+  align-items: center;
+  width: 100vw;
   height: 100vh;
-  background-color: #ffffff;
-  position: fixed;         /* 다른 레이아웃 영향 차단 */
+  background-color: #f9fafb;
+  position: fixed;
   top: 0;
   left: 0;
   z-index: 3000;
 }
 
-/* 2. 로그인 폼 박스 */
+/* 2. 로그인 폼 박스 (중앙 카드 디자인) */
 .login-form {
   background: #ffffff;
-  width: 550px;
-  padding: 60px;
-  border-radius: 20px;
-  border: 1.5px solid #e5e7eb; 
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1); 
+  width: 480px;
+  padding: 60px 40px;
+  border-radius: 24px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  margin: 0 auto;
+  align-items: center;
+  text-align: center;
 }
 
 .login-form h2 {
-  margin-bottom: 40px;
-  text-align: center;
+  margin-bottom: 12px;
   color: #111827;
   font-size: 2.2rem;
   font-weight: 800;
   letter-spacing: -0.03em;
 }
 
-/* 3. 입력 그룹 및 좌측 정렬 라벨 */
-.input-group {
-  margin-bottom: 24px;
-  display: flex;
-  flex-direction: column;
-  width: 100%; 
-}
-
-.input-group label {
-  margin-bottom: 10px;
+.login-subtitle {
   font-size: 16px;
-  font-weight: 700;
-  color: #374151;
-  text-align: left; /* Username, Password 좌측 정렬 */
-}
-
-.input-group input {
-  width: 100%;
-  padding: 16px;
-  border: 1.5px solid #d1d5db; 
-  border-radius: 10px;
-  font-size: 18px;
-  color: #111827;
-  transition: all 0.2s ease-in-out;
-  display: block; 
-}
-
-.input-group input:focus {
-  outline: none;
-  border-color: #4f46e5;
-  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.15);
-}
-
-/* 4. 로그인 버튼 (입력창과 동일 너비) */
-.login-btn {
-  width: 100%;
-  padding: 18px;
-  background-color: #4f46e5;
-  color: white;
-  border: none;
-  border-radius: 10px;
-  font-size: 18px;
-  font-weight: 700;
-  cursor: pointer;
-  margin-top: 15px;
-  transition: all 0.2s;
-}
-
-.login-btn:hover:not(:disabled) {
-  background-color: #4338ca;
-  transform: translateY(-1px);
-}
-
-/* 5. 구분선 및 구글 버튼 */
-.divider-container {
-  display: flex;
-  align-items: center;
-  margin: 35px 0;
-  width: 100%;
-}
-
-.divider-line {
-  flex: 1;
-  height: 1.5px;
-  background-color: #f3f4f6;
-}
-
-.divider-text {
-  margin: 0 20px;
-  font-size: 14px;
-  color: #9ca3af;
-  font-weight: 700;
-}
-
-.google-btn {
-  width: 100%;
-  padding: 16px;
-  background-color: #ffffff !important;
-  color: #374151;
-  border: 1.5px solid #d1d5db; 
-  border-radius: 10px;
-  font-size: 17px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 12px;
-  transition: all 0.2s;
-}
-
-.google-btn:hover {
-  background-color: #f9fafb;
-  border-color: #9ca3af;
-}
-
-/* 6. 하단 푸터 */
-.login-footer {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-top: 40px;
-  font-size: 15px;
-}
-
-.login-footer a {
   color: #6b7280;
-  text-decoration: none;
-  font-weight: 600;
+  margin-bottom: 40px;
+  line-height: 1.5;
 }
 
-.footer-divider {
-  margin: 0 15px;
-  color: #e5e7eb;
+/* 3. 구글 버튼 래퍼 */
+.google-login-wrapper {
+  margin: 20px 0;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+/* 4. 하단 보안 공지 */
+.login-footer {
+  margin-top: 20px;
+  padding-top: 24px;
+  border-top: 1px solid #f3f4f6;
+  width: 100%;
+}
+
+.security-notice {
+  font-size: 13px;
+  color: #9ca3af;
+  line-height: 1.8;
+  word-break: keep-all;
+}
+
+/* 반응형 모바일 대응 */
+@media (max-width: 500px) {
+  .login-form {
+    width: 90%;
+    padding: 40px 20px;
+  }
 }
