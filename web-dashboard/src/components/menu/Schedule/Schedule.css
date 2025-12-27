@@ -9,6 +9,7 @@
   border-radius: 12px;
   gap: 12px;
   overflow: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .schedule-header {
@@ -30,7 +31,7 @@
   padding: 6px 10px;
   margin: 0 4px;
   cursor: pointer;
-  transition: background 0.2s ease, transform 0.1s ease;
+  transition: background-color 0.3s ease, color 0.3s ease, transform 0.1s ease;
 }
 
 button:hover { background-color: #d1d5db; }

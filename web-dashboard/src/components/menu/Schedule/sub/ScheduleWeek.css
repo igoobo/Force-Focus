@@ -6,6 +6,7 @@
   border: 1px solid #d1d5db;
   border-radius: 8px;
   box-sizing: border-box;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 /* 좌측 시간 컬럼 */
@@ -15,6 +16,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 /* 상단 '시간' 헤더 */
@@ -29,6 +31,7 @@
   border-bottom: 1px solid #d1d5db;
   background-color: #f9fafb;
   width: 100%;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, transform 0.2s ease;
 }
 
 /* 시간 레이블 */
@@ -53,6 +56,7 @@
   flex-direction: column;
   border-right: 1px solid #e5e7eb;
   box-sizing: border-box;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 /* 요일 헤더 */
@@ -64,6 +68,7 @@
   font-weight: 600;
   padding: 6px 0;
   box-sizing: border-box;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .day-header-cell.sunday {
@@ -110,7 +115,7 @@
   text-align: center;
   padding: 4px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  transition: all 0.2s ease;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, transform 0.2s ease;
   cursor: pointer;
 }
 

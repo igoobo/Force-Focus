@@ -21,6 +21,7 @@
   animation: fadeIn 0.25s ease;
   display: flex;
   flex-direction: column;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .help-title {
@@ -42,7 +43,8 @@
   margin-bottom: 26px;
   padding-bottom: 18px;
   border-bottom: 1px solid #e5e5e8;
-  text-align: left; 
+  text-align: left;
+  transition: border-bottom-color 0.3s ease;
 }
 
 .help-section:last-child {

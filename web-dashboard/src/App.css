@@ -48,7 +48,7 @@ button {
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  transition: background-color 0.25s ease, transform 0.1s ease;
+  transition: background-color 0.3s ease, color 0.3s ease;
   color: #fff;
 }
 
@@ -95,7 +95,7 @@ button:active {
   color: var(--text-main);
   cursor: pointer;
   font-size: 0.9rem;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
 }
 
 .theme-toggle-btn:hover {
@@ -104,5 +104,5 @@ button:active {
 
 /* 기존 버튼 공통 스타일 유지하되 배경색 변수로 수정 권장 */
 button {
-  transition: background-color 0.25s ease, transform 0.1s ease;
+  transition: background-color 0.3s ease, color 0.3s ease, transform 0.1s ease;
 }

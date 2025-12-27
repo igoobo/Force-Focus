@@ -17,7 +17,7 @@
   border-bottom: 1px solid var(--tb-border);
   box-shadow: 0 1px 6px rgba(0,0,0,0.06);
   z-index: 1000;
-  transition: background 0.3s ease, color 0.3s ease; /* 부드러운 전환 효과 */
+  transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
 /* 다크 모드 시 변수 값 업데이트 */
@@ -85,7 +85,7 @@
   background: #4a85c9 !important;
   font-size: 13px;
   cursor: pointer;
-  transition: background 0.2s ease, transform 0.05s ease;
+  transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease, transform 0.05s ease;
 }
 .titlebar__btn:hover { background: #f9fafb; }
 .titlebar__btn:active { transform: translateY(1px); }

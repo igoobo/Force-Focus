@@ -10,7 +10,7 @@
   flex-direction: column;
   overflow: hidden;
   background-color: #f9fafc;
-  transition: all 0.3s ease;
+  transition: left 0.3s ease, width 0.3s ease, background-color 0.3s ease;
 }
 
 .menu-bar.collapsed ~ .infobox {

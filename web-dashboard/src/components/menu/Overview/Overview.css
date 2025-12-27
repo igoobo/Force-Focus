@@ -1,19 +1,21 @@
 .overview-container {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
   width: 100%;
   height: 100%;
-  min-height: calc(100vh - 56px);
   padding: 24px 32px;
   box-sizing: border-box;
-  background-color: #ffffff;
+  background-color: var(--bg-main);
+  transition: background-color 0.3s ease;
+  overflow-y: auto;
 }
 
 .dark-theme .overview-container { background-color: var(--bg-body); }
 
 /* 왼쪽 일정 영역 */
 .overview-left {
+  flex: 2;
   display: flex;
   flex-direction: column;
   background-color: #f8fafc;
@@ -23,6 +25,7 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
   height: 100%; 
   max-height: calc(100vh - 104px);
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, transform 0.2s ease;
 }
 
 .dark-theme .overview-left {
@@ -87,7 +90,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: border-color 0.2s ease;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, transform 0.2s ease;
 }
 
 .dark-theme .schedule-area {
@@ -110,6 +113,18 @@
 }
 
 .dark-theme .schedule-area h3, .schedule-area h4 { color: var(--text-main); }
+
+.overview-top-section {
+  display: flex;
+  gap: 20px;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.overview-bottom-section {
+  width: 100%;
+  flex-shrink: 0;
+}
 
 /* 미리보기 콘텐츠 영역 */
 .schedule-preview-content {
@@ -157,7 +172,7 @@
   padding: 8px 16px;
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
 .view-buttons button:hover {
@@ -178,7 +193,7 @@
   border: none;
   cursor: pointer;
   font-weight: 600;
-  transition: all 0.2s ease;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
 .add-btn {
@@ -221,6 +236,7 @@
   overflow-y: auto;
   border: 1px solid #f3f4f6;
   border-radius: 6px;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, transform 0.2s ease;
 }
 
 .schedule-preview-content > div {
@@ -234,9 +250,16 @@
 
 /* 오른쪽 카드 영역 */
 .overview-right {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
+}
+
+.overview-right .card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .card {
@@ -247,7 +270,7 @@
   padding: 24px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, transform 0.2s ease;
 }
 
 .dark-theme .card {
@@ -274,6 +297,25 @@
   font-size: 1rem;
   color: #4b5563;
   line-height: 1.6;
+}
+
+.overview-graph-wrapper {
+  width: 100%;
+  height: 300px;
+  margin-top: 20px;
+  position: relative;
+}
+
+.overview-bottom-section {
+  width: 100%;
+  margin-top: 24px;
+  flex-shrink: 0;
+}
+
+.graph-full-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 /* 반응형 처리 */

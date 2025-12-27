@@ -1,40 +1,55 @@
-import React, { useState } from "react";
-import "./ActivitySummary.css"
+import React, { useState, useMemo } from "react";
+import "./ActivitySummary.css";
+import ActivityChart, { getActivitySummary } from "./ActivityChart";
 
-// 활동 요약(Activity Summary) 컴포넌트
 export default function ActivitySummary() {
   const [isVertical, setIsVertical] = useState(false);
-
   const toggleLayout = () => setIsVertical(!isVertical);
+
+  const summary = useMemo(() => getActivitySummary(), []);
 
   return (
     <div className={`activity-summary ${isVertical ? "vertical" : "horizontal"}`}>
-      {/* 상단 메뉴 / 전환 버튼 */}
       <div className="summary-header">
-        <span>메뉴바</span>
+        <span className="summary-title">📊 주간 활동 요약 리포트</span>
         <button onClick={toggleLayout} className="toggle-btn">
           {isVertical ? "가로로 보기" : "세로로 보기"}
         </button>
       </div>
 
-      {/* 본문 콘텐츠 */}
       <div className="summary-content">
-        {/* 그래프 영역 */}
         <div className="summary-graph">
-        <h3>그래프</h3>
-        <div className="graph-placeholder">
-            <svg viewBox="0 0 100 40" preserveAspectRatio="none">
-            <path className="wave purple" d="M0 25 Q 20 10, 40 25 T 80 25 T 100 25" />
-            <path className="wave blue" d="M0 20 Q 25 30, 50 15 T 100 20" />
-            </svg>
-        </div>
+          <h3>일별 활동 및 집중 강도</h3>
+          <div className="graph-placeholder">
+            {/* 공통 차트 컴포넌트 사용 */}
+            <ActivityChart />
+          </div>
         </div>
 
-        {/* 보고서 영역 */}
         <div className="summary-report">
-          <h3>보고서</h3>
-          <p>보고서 내용 표시 예정</p>
+        <h3>활동 분석 요약 보고서</h3>
+        <div className="report-list">
+          <div className="report-item">
+            <span className="label">가장 활발한 요일</span>
+            <span className="value">{summary.busiestDay}요일</span>
+          </div>
+          <div className="report-item">
+            <span className="label">주요 사용 앱</span>
+            <span className="value">{summary.mainApp}</span>
+          </div>
+          <div className="report-item">
+            <span className="label">평균 집중 시간</span>
+            <span className="value">{summary.avgFocusTime}</span>
+          </div>
+          <div className="report-item">
+            <span className="label">전체 집중 강도</span>
+            <span className="value highlight">{summary.intensityLevel}</span>
+          </div>
         </div>
+        <div className="report-description">
+          <p dangerouslySetInnerHTML={{ __html: summary.summarySentence }} />
+        </div>
+      </div>
       </div>
     </div>
   );

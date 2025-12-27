@@ -7,6 +7,7 @@
   background-color: #f9fafb;
   box-sizing: border-box;
   overflow-y: auto;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
 /* 제목 */
@@ -17,6 +18,7 @@
   margin-bottom: 8px;
   border-bottom: 2px solid #e5e7eb;
   padding-bottom: 6px;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
 /* 카드 리스트 그리드 */
@@ -37,7 +39,7 @@
   flex-direction: column;
   justify-content: space-between;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  transition: all 0.2s ease;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
   cursor: pointer;
 }
 
@@ -46,6 +48,8 @@
   transform: translateY(-3px);
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
   border-color: #93c5fd;
+  transform: translateY(-3px);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 /* 카드 헤더 */
@@ -88,6 +92,7 @@
   margin-top: auto;
   padding-top: 10px;
   border-top: 1px solid #e5e7eb;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
 /* 생성일 */

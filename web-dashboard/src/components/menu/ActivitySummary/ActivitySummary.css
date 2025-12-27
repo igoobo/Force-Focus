@@ -1,166 +1,179 @@
+/* ActivitySummary.css */
+
 .activity-summary {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  /* 상단 타이틀바(64px)를 제외한 전체 높이 확보 */
+  height: calc(100vh - 64px); 
   width: 100%;
-  min-height: calc(100vh - 50px);
-  padding: 20px;
+  padding: 24px;
   box-sizing: border-box;
-  background-color: #f8fafc;
+  background-color: var(--bg-main);
+  transition: background-color 0.3s ease;
+  overflow: hidden; /* 전체 페이지 스크롤 방지 */
 }
 
 /* 상단 헤더 */
 .summary-header {
+  flex-shrink: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
-  background-color: #f1f5f9;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-weight: 600;
-  color: #334155;
+  margin-bottom: 20px;
+  padding: 0 4px;
+  flex-shrink: 0; /* 헤더 크기 고정 */
+}
+
+.summary-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-main);
+  transition: color 0.3s ease;
 }
 
 .toggle-btn {
-  padding: 6px 12px;
-  border: none;
-  border-radius: 6px;
-  background-color: #6b9def !important;
-  color: #fff;
-  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background-color: #3b82f6 !important;
+  color: #ffffff;
+  font-size: 0.9rem;
   font-weight: 600;
-  transition: background 0.2s ease;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
 }
 
 .toggle-btn:hover {
-  background-color: #2563eb;
+  background-color: #2563eb !important;
 }
 
-/* 기본 콘텐츠 구조 */
+/* 본문 레이아웃 컨테이너 */
 .summary-content {
   display: flex;
-  flex: 1;
-  gap: 16px;
-  height: 100%;
-  min-height: 400px;
+  gap: 20px;
+  flex: 1; /* 남은 화면 높이를 모두 차지 */
+  min-height: 0; /* 자식 요소의 높이 계산 오류 방지 */
+  transition: flex-direction 0.3s ease;
 }
 
-/* 가로 보기: 그래프가 위쪽 전체, 보고서가 아래 */
+/* 가로/세로 레이아웃 대응 */
 .activity-summary.horizontal .summary-content {
   flex-direction: column;
+  overflow-y: auto; /* 내용이 많을 경우 내부 스크롤 */
 }
 
-.activity-summary.horizontal .summary-graph {
-  flex: 1; /* 비율로 영역 확보 */
-  min-height: 200px; /* 보이는 최소 높이 보장 */
-}
-
-.activity-summary.horizontal .summary-report {
-  flex: 1;
-  min-height: 200px;
-}
-
-/* 세로 보기: 그래프가 왼쪽 전체, 보고서가 오른쪽 */
+/* 세로 모드 핵심 수정 부분 */
 .activity-summary.vertical .summary-content {
   flex-direction: row;
+  align-items: stretch;
 }
 
-.activity-summary.vertical .summary-graph {
-  flex: 1.5; /* 그래프가 왼쪽 대부분 차지 */
-  height: auto;
-}
-
+.activity-summary.vertical .summary-graph,
 .activity-summary.vertical .summary-report {
   flex: 1;
-  height: auto;
+  height: 100%; /* 하단까지 꽉 채움 */
+  min-width: 0;
 }
 
-/* 공통 박스 스타일 */
-.summary-graph {
-  background: #f3f4f6;
-  border-radius: 8px;
-  padding: 12px;
-  box-sizing: border-box;
+/* 공통 섹션 스타일 (그래프 & 보고서) */
+.summary-graph, .summary-report {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  flex: 1;
-  height: 100%;
-}
-
-.summary-report {
-  background: #f3f4f6;
-  border-radius: 8px;
-  padding: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+  flex: 1; /* 1:1 비율로 가로 너비 차지 */
+  height: 100%; /* 세로 화면을 전부 채우도록 설정 */
   box-sizing: border-box;
-  overflow: hidden;
 }
 
-.summary-graph h3 {
-  font-size: 0.9rem;
+.summary-graph h3, .summary-report h3 {
+  margin: 0 0 16px 0;
+  font-size: 1.1rem;
   font-weight: 700;
-  margin-bottom: 10px;
-  text-align: center;
+  color: var(--text-main);
+  transition: color 0.3s ease;
+  flex-shrink: 0;
 }
 
-.summary-report h3 {
-  font-size: 0.9rem;
-  font-weight: 700;
-  margin-bottom: 10px;
-}
-
+/* 그래프 영역 */
 .graph-placeholder {
   flex: 1;
   width: 100%;
-  height: 100%;
-  min-height: 250px;
-  background: #f9fafb;
-  border-radius: 8px;
-  overflow: hidden;
-  position: relative;
+  min-height: 200px;
+}
+
+/* 보고서 내부 스크롤 처리 (내용이 길어질 경우 대비) */
+.summary-report {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  overflow-y: auto;
 }
 
-/* SVG 크기 지정 */
-.graph-placeholder svg {
-  width: 100%;
-  height: 100%;
+.report-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-shrink: 0;
 }
 
-/* 곡선 스타일 */
-.wave {
-  fill: none;
-  stroke-width: 0.6;
-  stroke-linecap: round;
-}
-
-/* 보라색 곡선 */
-.wave.purple {
-  stroke: rgba(168, 85, 247, 0.7);
-}
-
-/* 파란색 곡선 */
-.wave.blue {
-  stroke: rgba(99, 102, 241, 0.7);
-}
-
-.dark-theme .activity-summary { background-color: var(--bg-main); }
-
-.dark-theme .summary-header {
-  background-color: var(--bg-sidebar);
-  color: var(--text-main);
-}
-
-.dark-theme .summary-graph, .summary-report {
-  background: var(--card-bg);
-  color: var(--text-main);
+.report-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  background-color: var(--bg-main);
+  border-radius: 8px;
   border: 1px solid var(--border-color);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
-.dark-theme .graph-placeholder {
-  background: var(--bg-main);
+.report-item .label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 500;
 }
 
-.dark-theme .summary-graph h3, .summary-report h3 { color: var(--text-main); }
+.report-item .value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.report-item .value.highlight {
+  color: #3b82f6;
+}
+
+/* 보고서 텍스트 설명 */
+.report-description {
+  flex: 1;
+  margin-top: 10px;
+  line-height: 1.6;
+  line-height: 1.6;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  padding: 16px;
+  background-color: var(--bg-main);
+  border-radius: 8px;
+  border-left: 4px solid #3b82f6;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.report-description strong {
+  color: var(--text-main);
+}
+
+/* 반응형 모바일 대응 */
+@media (max-width: 1024px) {
+  .activity-summary.vertical .summary-content {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .summary-graph, .summary-report {
+    height: auto;
+    min-height: 400px;
+  }
+}

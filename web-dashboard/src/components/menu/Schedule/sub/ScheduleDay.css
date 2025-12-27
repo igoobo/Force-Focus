@@ -8,6 +8,7 @@
   padding: 10px 16px;
   box-sizing: border-box;
   position: relative;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 /* 좌측 버튼 그룹 */
@@ -62,6 +63,7 @@
   height: 100%;
   overflow-y: hidden;
   background: var(--card-bg);;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .day-time-column {
@@ -74,6 +76,7 @@
   position: relative;
   z-index: 1;
   padding-top: 0;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 /* 시간 라벨: 레이아웃 흐름을 방해하지 않도록 높이를 0으로 설정 */
@@ -118,6 +121,7 @@
   overflow-x: visible;
   padding-left: 10px; 
   padding-top: 0;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, transform 0.2s ease;
 }
 
 .time-line {
@@ -166,7 +170,7 @@
   padding: 5px 8px; 
   font-size: 0.9rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  transition: all 0.2s ease;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, transform 0.2s ease;
   overflow: hidden;
   line-height: 1.3;
 }
