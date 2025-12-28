@@ -30,6 +30,11 @@ export default function Overview() {
   const dayClassName = dayIndex === 0 ? "sunday" : dayIndex === 6 ? "saturday" : "";
   const summary = useMemo(() => getActivitySummary(), []);
 
+  const INTEGRATED_FEEDBACK = {
+  title: "효율적 사용자",
+  summary: "전체 작업의 절반 가까이를 핵심 툴에 할애하고 있습니다. 35분 연속 딥 워크는 상위 15%의 생산성 수치입니다.",
+  };
+
   // 자동 스크롤 로직 (기존 유지)
   useEffect(() => {
     if (viewMode === "월") return;
@@ -106,7 +111,10 @@ export default function Overview() {
           
           <div className="card feedback-card" onClick={() => setActiveMenu("피드백")}>
             <h4>최근 작업 피드백</h4>
-            <p>작업 효율성이 개선되었습니다. 집중 시간이 지난주 대비 안정적입니다.</p>
+            <div className="feedback-highlight-container">
+            <span className="feedback-main-title">{INTEGRATED_FEEDBACK.title}</span>
+            <p className="feedback-text">{INTEGRATED_FEEDBACK.summary}</p>
+          </div>
           </div>
         </div>
       </div>

@@ -1,26 +1,179 @@
-/* 전체 영역 */
+/* 1. 전체 영역 및 레이아웃 */
 .feedback-container {
   display: flex;
   flex-direction: column;
   width: 100%;
-  height: calc(100vh - 20px);
-  background: #f9fafb;
-  padding: 10px 20px;
+  height: calc(100vh - 56px);
+  background: #f8fafc;
+  padding: 30px;
   box-sizing: border-box;
-  border-radius: 12px;
-  gap: 12px;
-  overflow: hidden;
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  gap: 20px;
+  font-family: "Pretendard", -apple-system, sans-serif;
+  transition: background-color 0.3s ease;
 }
 
-/* 상단 메뉴바 */
+/* 헤더 & 뱃지 스타일 */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.highlight {
+  color: #2563eb;
+  font-weight: 800;
+}
+
+.badge {
+  background: #dbeafe;
+  color: #1e40af;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-family: "Pretendard", sans-serif;
+}
+
+.feedback-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 25px;
+  width: 100%;
+}
+
+.detail-card {
+  width: 100%;
+  padding: 24px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.detail-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.05);
+}
+
+.detail-card h4 {
+  margin: 0 0 12px 0;
+  font-size: 1rem;
+  color: #1e293b;
+  font-family: "Pretendard", sans-serif;
+}
+
+.detail-card ul {
+  padding-left: 18px;
+  margin: 0;
+}
+
+.detail-card li {
+  margin-bottom: 8px;
+  font-size: 0.95rem;
+  color: #475569;
+}
+
+.detail-card.summary { background: #f0f9ff; border-left: 4px solid #0ea5e9; }
+.detail-card.evaluation { background: #f0fdf4; border-left: 4px solid #22c55e; }
+
+/* 통계 및 진행바 */
+.stats-box.centered {
+  display: flex;
+  justify-content: center; /* 가로 중앙 정렬 */
+  align-items: center;
+  gap: 80px; /* 아이템 사이 간격 확대 */
+  margin: 30px 0 40px 0;
+  padding: 20px;
+  background: #fbfcfd; /* 미세한 배경색으로 섹션 분리 */
+  border-radius: 15px;
+}
+
+.stat-item {
+  text-align: center; /* 텍스트 자체도 중앙 정렬 */
+}
+
+.stat-item .label { font-size: 0.9rem; color: #64748b; }
+.stat-item .value { font-size: 1.8rem; font-weight: 800; color: #1e293b; }
+
+.insight-box.highlight-border {
+  margin-top: 25px;
+  padding: 25px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-left: 5px solid #2563eb;
+  border-radius: 8px;
+}
+
+.insight-box h4 {
+  margin-bottom: 15px;
+  color: #1e293b;
+  font-weight: 800;
+}
+
+.feedback-content-body p {
+  margin-bottom: 20px;
+  line-height: 1.8;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 12px;
+  background: #e2e8f0;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+  transition: width 1s ease-out;
+}
+
+/* 실행 전략 아이템 */
+.strategy-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.strategy-item {
+  padding: 15px;
+  background: #fff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.strategy-item .icon { font-size: 24px; margin-bottom: 10px; }
+.strategy-item h5 { margin: 0 0 5px 0; font-size: 1rem; }
+.strategy-item p { font-size: 0.85rem; color: #64748b; margin: 0; }
+
+.final-tip {
+  margin-top: 25px;
+  padding: 15px;
+  background: #1e293b;
+  color: #f8fafc;
+  border-radius: 8px;
+  text-align: center;
+  font-style: italic;
+  font-family: "Pretendard", sans-serif;
+}
+
+/* 2. 상단 메뉴바 (구분선 로직 유지) */
 .feedback-menu {
   background: #e5e7eb;
-  border-radius: 8px;
-  padding: 10px 16px;
+  border-radius: 10px;
+  padding: 12px 20px;
   box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.05);
   flex-shrink: 0;
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  transition: background-color 0.3s ease;
 }
 
 .feedback-menu ul {
@@ -32,109 +185,236 @@
   padding: 0;
 }
 
-/* 메뉴 항목 */
+/* 메뉴 항목 기본 스타일 */
 .feedback-menu li {
   position: relative;
-  font-weight: 600;
+  font-family: "Pretendard", sans-serif;
+  font-weight: 700;
   font-size: 0.95rem;
-  color: #374151;
+  color: #4b5563;
   cursor: pointer;
-  padding: 0 14px;
-  transition: color 0.2s ease;
+  padding: 0 18px;
+  transition: color 0.2s ease, transform 0.1s ease;
 }
 
-/* 메뉴 항목 사이에 구분선 (|) 추가 */
+/* 메뉴 항목 사이 구분선 (|) */
 .feedback-menu li:not(:last-child)::after {
   content: "|";
   color: #9ca3af;
   position: absolute;
   right: 0;
   top: 0;
+  font-weight: 400;
 }
 
-/* 호버 효과 */
+/* 호버 및 활성화(Active) 상태 */
 .feedback-menu li:hover {
   color: #2563eb;
 }
 
-/* 콘텐츠 영역 */
-.feedback-content {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  gap: 14px;
-  height: 100%;
-  justify-content: stretch;
+.feedback-menu li.active {
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 
-/* 각 섹션 카드 */
+/* 3. 콘텐츠 영역 */
+.feedback-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* 내부 스크롤 보장 */
+}
+
+/* 4. 피드백 섹션 카드 (기존 스타일 계승 및 확장) */
 .feedback-section {
   flex: 1;
-  background: #f3f4f6;
-  border-radius: 10px;
-  padding: 20px 22px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
-  align-items: center;
-  overflow: hidden;
-  min-height: 0;
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  transition: all 0.3s ease;
 }
 
-/* 제목을 상단 배치 */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .feedback-section h3 {
-  margin-top: 0;
-  margin-bottom: 8px;
-  font-size: 1.1rem;
-  color: #1f2937;
-  font-weight: 700;
-  align-self: flex-start;
+  margin: 0 0 20px 0;
+  font-size: 1.4rem;
+  color: #111827;
+  font-weight: 800;
+  border-bottom: 2px solid #f3f4f6;
+  padding-bottom: 12px;
+  width: 100%;
+  font-family: "Pretendard", sans-serif;
 }
 
-/* 본문 텍스트 중앙 정렬 */
-.feedback-section p {
+.feedback-section h4, .feedback-section p {
+  margin: 0 0 16px 0;
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: #374151;
+  word-break: keep-all;
+  font-family: "Pretendard", sans-serif;
+}
+
+/* 종합 피드백용 디테일 카드 스타일 */
+.feedback-detail-card {
+  margin-top: 24px;
+  padding: 24px;
+  background: #f3f7ff; /* 파란색 계열 강조 배경 */
+  border-radius: 10px;
+  border-left: 5px solid #3b82f6;
+}
+
+.feedback-detail-card ul {
+  list-style: none;
+  padding: 0;
   margin: 0;
-  font-size: 1rem;
-  color: #4b5563;
-  text-align: center;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
-/* 반응형 대응 */
-@media (max-width: 768px) {
-  .feedback-menu ul {
-    flex-wrap: wrap;
-  }
-
-  .feedback-menu li {
-    padding: 0 8px;
-  }
-
-  .feedback-section {
-    padding: 14px 16px;
-  }
+.feedback-detail-card li {
+  position: relative;
+  padding-left: 20px;
+  margin-bottom: 12px;
+  font-weight: 600;
+  color: #1e40af;
 }
 
-/* 다크 모드 지원 */
-.dark-theme .feedback-container { background: var(--bg-main); }
+.feedback-detail-card li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: #3b82f6;
+  font-size: 1.2rem;
+}
+
+.feedback-detail-card li:last-child {
+  margin-bottom: 0;
+}
+
+/* 5. 다크 모드 지원 (MainStore의 다크모드 클래스 기준) */
+.dark-theme .feedback-container {
+  background: var(--bg-main);
+}
 
 .dark-theme .feedback-menu {
   background: var(--bg-sidebar);
-  color: var(--text-main);
+  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.2);
 }
 
-.dark-theme .feedback-menu li { color: var(--text-muted); }
-.dark-theme .feedback-menu li:hover { color: var(--accent-color); }
+.dark-theme .feedback-menu li {
+  color: var(--text-muted);
+}
+
+.dark-theme .feedback-menu li.active,
+.dark-theme .feedback-menu li:hover {
+  color: #60a5fa;
+}
 
 .dark-theme .feedback-section {
   background: var(--card-bg);
-  border: 1px solid var(--border-color);
+  border-color: var(--border-color);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-.dark-theme .feedback-section h3 { color: var(--text-main); }
-.dark-theme .feedback-section p { color: var(--text-muted); }
+.dark-theme .feedback-section h3 {
+  color: var(--text-main);
+  border-bottom-color: var(--border-color);
+}
+
+.dark-theme .feedback-section p,
+.dark-theme .description {
+  color: var(--text-muted);
+}
+
+.dark-theme .feedback-detail-card {
+  background: rgba(59, 130, 246, 0.1);
+  border-left-color: #3b82f6;
+}
+
+.dark-theme .feedback-detail-card li {
+  color: #93c5fd;
+}
+
+.dark-theme .detail-card {
+  background: var(--card-bg);
+  border-color: var(--border-color);
+}
+
+.dark-theme .detail-card h4 {
+  color: #f1f5f9; /* Slate 100 */
+}
+
+.dark-theme .detail-card li {
+  color: #94a3b8; /* Slate 400 */
+}
+
+/* 종합 피드백용 강조 카드 (Blue/Green) */
+.dark-theme .detail-card.summary { 
+  background: rgba(14, 165, 233, 0.1); 
+  border-left-color: #38bdf8; 
+}
+.dark-theme .detail-card.evaluation { 
+  background: rgba(34, 197, 94, 0.1); 
+  border-left-color: #4ade80; 
+}
+
+.dark-theme .stats-box.centered {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.dark-theme .stat-item .label { color: #94a3b8; }
+.dark-theme .stat-item .value { color: #f8fafc; }
+
+.dark-theme .insight-box.highlight-border {
+  background: var(--card-bg);
+  border-color: var(--border-color);
+}
+
+.dark-theme .insight-box h4 {
+  color: var(--text-main);
+}
+
+.dark-theme .progress-bar {
+  background: #334155;
+}
+
+.dark-theme .strategy-item {
+  background: #0f172a; /* Slate 900 */
+  border: 1px dashed #475569;
+}
+
+.dark-theme .strategy-item h5 { color: #f1f5f9; }
+
+.dark-theme .final-tip {
+  background: #334155; /* 가시성을 위해 배경색 살짝 밝게 조정 */
+  color: #e2e8f0;
+}
+
+.dark-theme .badge {
+  background: #1e3a8a; /* Deep Blue */
+  color: #bfdbfe;
+}
+
+/* 6. 반응형 대응 */
+@media (max-width: 768px) {
+  .feedback-container {
+    padding: 16px;
+  }
+  
+  .feedback-menu ul {
+    flex-wrap: wrap;
+    gap: 8px 0;
+  }
+
+  .feedback-section {
+    padding: 20px;
+  }
+}
