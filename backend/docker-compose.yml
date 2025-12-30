@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  # 1. FastAPI 백엔드 서버
+  backend:
+    build: .
+    container_name: force-focus-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app # 코드 변경 시 자동 반영 (Hot Reload)
+    env_file:
+      - .env # 로컬의 .env 파일 로드
+    environment:
+      # 로컬 Docker 네트워크 내에서 MongoDB 접근 주소
+      - MONGO_URI=mongodb://mongodb:27017
+      - MONGO_DB_NAME=force_focus_db
+    depends_on:
+      - mongodb
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # 2. 로컬 MongoDB 데이터베이스
+  mongodb:
+    image: mongo:latest
+    container_name: force-focus-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db # 데이터 영구 저장
+
+volumes:
+  mongo_data:

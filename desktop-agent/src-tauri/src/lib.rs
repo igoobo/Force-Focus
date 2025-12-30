@@ -19,7 +19,7 @@ use crate::storage_manager::StorageManager;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use sysinfo::System;
-use tauri::{Builder, Emitter, Manager, State, Url};
+use tauri::{Builder, Emitter, Manager, State, Url, AppHandle};
 use tauri_plugin_deep_link::DeepLinkExt; //  딥 링크 확장 트레이트
 
 // --- 3. 전역 상태 타입 정의 ---
@@ -69,6 +69,66 @@ pub type StorageManagerArcMutex = Arc<Mutex<StorageManager>>;
 // 전역 세션 상태
 pub type SessionStateArcMutex = Arc<Mutex<Option<ActiveSessionInfo>>>;
 
+
+// --- 공통 딥 링크 처리 함수 (핵심 로직 통합) ---
+// Single Instance와 on_open_url 양쪽에서 호출합니다.
+fn handle_deep_link(app: &AppHandle, url: &Url) {
+    println!("Processing Deep Link: {}", url);
+
+    // 1. URL 구조 검증 (Host='auth', Path='/callback')
+    let is_scheme_valid = url.scheme() == "force-focus";
+    let is_host_valid = url.host_str() == Some("auth");
+    let is_path_valid = url.path() == "/callback";
+
+    if is_scheme_valid && is_host_valid && is_path_valid {
+        let query_pairs: std::collections::HashMap<_, _> = url.query_pairs().into_owned().collect();
+        
+        if let (Some(access), Some(refresh), Some(email)) = (
+            query_pairs.get("access_token"),
+            query_pairs.get("refresh_token"),
+            query_pairs.get("email")
+        ) {
+            println!("Login detected for user: {}", email);
+            
+            // 2. LSN 저장 (AppHandle을 통해 State 접근)
+            if let Some(storage_state) = app.try_state::<StorageManagerArcMutex>() {
+                // Mutex Lock
+                match storage_state.lock() {
+                    Ok(storage) => {
+                        if let Err(e) = storage.save_auth_token(access, refresh, email) {
+                            eprintln!("CRITICAL: Failed to save auth token to LSN: {}", e);
+                        } else {
+                            println!("Auth token saved to LSN successfully.");
+                            
+                            // 3. 프론트엔드 알림 (화면 전환)
+                            if let Err(e) = app.emit("login-success", email) {
+                                eprintln!("Failed to emit login-success event: {}", e);
+                            }
+                            
+                            // 4. 메인 창 띄우기 (포커스)
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                                if window.is_minimized().unwrap_or(false) {
+                                    let _ = window.unminimize();
+                                }
+                            }
+                        }
+                    },
+                    Err(e) => eprintln!("CRITICAL: Failed to lock storage manager mutex: {}", e),
+                }
+            } else {
+                eprintln!("CRITICAL: StorageManager state not found in AppHandle.");
+            }
+        } else {
+            eprintln!("Deep Link Error: Missing required query parameters (access/refresh/email)");
+        }
+    } else {
+        println!("Deep Link Skipped. Mismatch structure. Host={:?}, Path={}", url.host_str(), url.path());
+    }
+}
+
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // InputStats 초기화 데이터를 먼저 생성
@@ -92,6 +152,32 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_deep_link::init()) // 딥 링크 플러그인 초기화
         .plugin(tauri_plugin_opener::init())
+
+        // 단일 인스턴스 플러그인 (Windows 딥 링크 해결사)
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            println!("Single Instance: New instance detected.");
+            // 1. URL 찾기
+            let deep_link_url = argv.iter().find(|arg| arg.starts_with("force-focus://"));
+
+            if let Some(url_str) = deep_link_url {
+                // 2. 파싱 후 공통 함수 호출
+                if let Ok(url) = Url::parse(url_str) {
+                    handle_deep_link(app, &url);
+                } else {
+                    eprintln!("Single Instance: Failed to parse URL: {}", url_str);
+                }
+            }
+            
+            // (딥 링크가 아니더라도) 창을 앞으로 띄움
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+                if window.is_minimized().unwrap_or(false) {
+                    let _ = window.unminimize();
+                }
+            }
+        }))
+
         .manage(commands::SysinfoState(
             // commands::SysinfoState로 경로 명시
             Mutex::new(System::new_all()),
@@ -129,64 +215,19 @@ pub fn run() {
 
             app.manage(session_manager_state.clone());
 
-            // --- Deep Link 리스너 등록 ---
+            // [macOS용] Deep Link 리스너 (Windows는 single-instance가 처리하지만, macOS는 이게 필요함)
             // 'storage_manager_state'를 클로저 내부로 안전하게 이동시키기 위해 clone
             let storage_manager_for_deep_link = storage_manager_state.clone();
             let app_handle_for_deep_link = app_handle.clone();
 
+            // ---  Deep Link 리스너 (공통 함수 사용) ---
+            // setup 훅 내부에서 실행되는 리스너
+            let value = app_handle.clone();
             app.deep_link().on_open_url(move |event| {
-                //  event.urls()는 소유권을 가져가므로, 한 번만 호출하여 변수에 저장
                 let urls = event.urls();
-                println!("Deep Link Received: {:?}", urls);
-
                 for url in urls {
-                    if url.scheme() == "force-focus" && url.path().contains("/auth/callback") {
-                        let query_pairs: std::collections::HashMap<_, _> =
-                            url.query_pairs().into_owned().collect();
-
-                        if let (Some(access), Some(refresh), Some(email)) = (
-                            query_pairs.get("access_token"),
-                            query_pairs.get("refresh_token"),
-                            query_pairs.get("email"),
-                        ) {
-                            println!("Login detected for user: {}", email);
-
-                            match storage_manager_for_deep_link.lock() {
-                                Ok(storage) => {
-                                    if let Err(e) = storage.save_auth_token(access, refresh, email)
-                                    {
-                                        eprintln!(
-                                            "CRITICAL: Failed to save auth token to LSN: {}",
-                                            e
-                                        );
-                                    } else {
-                                        println!("Auth token saved to LSN successfully.");
-
-                                        // 1. 프론트엔드에 로그인 성공 이벤트 전송
-                                        if let Err(e) =
-                                            app_handle_for_deep_link.emit("login-success", email)
-                                        {
-                                            eprintln!("Failed to emit login-success event: {}", e);
-                                        }
-
-                                        // 2. 메인 창 띄우기
-                                        if let Some(window) =
-                                            app_handle_for_deep_link.get_webview_window("main")
-                                        {
-                                            let _ = window.show();
-                                            let _ = window.set_focus();
-                                        }
-                                    }
-                                }
-                                Err(e) => eprintln!(
-                                    "CRITICAL: Failed to lock storage manager mutex: {}",
-                                    e
-                                ),
-                            }
-                        } else {
-                            eprintln!("Deep Link Error: Missing required query parameters");
-                        }
-                    }
+                    // url은 이미 tauri::Url 객체
+                    handle_deep_link(&value, &url);
                 }
             });
 

@@ -2,3 +2,8 @@ fastapi[all]
 uvicorn[standard]
 scikit-learn
 pandas
+python-dotenv
+authlib
+python-jose
+motor
+jinja2

@@ -1,7 +1,7 @@
 # 파일 위치: backend/app/models/user.py (또는 schemas/user.py)
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from datetime import datetime
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 
 class UserInDB(BaseModel):
     """
@@ -13,25 +13,28 @@ class UserInDB(BaseModel):
     
     # EmailStr 타입을 사용하여 이메일 형식을 자동으로 검증합니다.
     email: EmailStr
-    
-    # password_hash는 API 응답에는 절대 포함되지 않아야 합니다.
-    password_hash: str
-    
+
+    # # OAuth 로그인 정보 (비밀번호 제거, 제공자 추가)
+    # provider: str = "google" # "google", "apple", "local" 등
+    # picture: Optional[str] = None # 구글 프로필 사진 URL
+
     # 표의 'timestamp'는 Python의 'datetime' 객체로 매핑됩니다.
     created_at: datetime = Field(default_factory=datetime.now)
     last_login_at: Optional[datetime] = None
     
-    # 표의 'map'은 Python의 'dict'로, 더 구체적인 스키마를 정의할 수도 있습니다.
-    settings: Dict[str, any] = {}
+   
+    # 타입 힌트 강화: Any -> 구체적인 타입 권장하지만, 유연성을 위해 Any 유지
+    settings: Dict[str, Any] = Field(default_factory=dict)
     
-    # fcm_token은 Optional일 수 있습니다 (모바일 앱을 사용하지 않는 경우).
-    fcm_token: Optional[str] = None
+    #  다중 기기 지원을 위해 List[str]로 변경 (확장성 고려)
+    fcm_tokens: List[str] = Field(default_factory=list)
     
-    # 표의 'array<string>'은 Python의 'List[str]'로 표현됩니다.
-    blocked_apps: List[str] = []
+    # 차단된 앱 목록
+    blocked_apps: List[str] = Field(default_factory=list)
 
-    class Config:
-        # MongoDB의 "_id"를 "id"로 매핑할 수 있도록 허용합니다.
-        allow_population_by_field_name = True
-        # ORM 모델처럼 객체 속성으로 접근할 수 있게 합니다.
-        orm_mode = True
+    # [수정] Pydantic V2 설정 방식
+    model_config = ConfigDict(
+        populate_by_name=True,       # 'id'라는 이름으로 값을 넣어도 '_id' 필드에 할당 허용
+        from_attributes=True,        # ORM 객체(Dict 등)로부터 데이터 로드 허용 (구 orm_mode)
+        arbitrary_types_allowed=True # datetime 등 복잡한 타입 허용
+    )
