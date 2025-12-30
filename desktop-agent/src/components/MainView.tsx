@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { styles } from './MainView.styles';
 // --- 1. 타입 정의 ---
 // (types.ts 또는 유사 파일에서 가져오는 것이 좋으나, 여기서는 직접 정의)
 interface Task {
@@ -19,6 +20,8 @@ interface ActiveSessionInfo {
 // 부모(App.tsx)로부터 받는 Props
 interface MainViewProps {
   onLogout: () => void;
+  // App.tsx에서 전달받는 이메일 정보 (없으면 null)
+  userEmail?: string | null;
 }
 
 // '기본 태스크'를 위한 특수 식별자
@@ -28,7 +31,7 @@ const BASIC_TASK_ID = "__BASIC_TASK__";
  * 로그인 후 표시되는 메인 UI.
  * 세션 관리(시작, 종료, 타이머) 및 Task 조회를 담당합니다.
  */
-const MainView: React.FC<MainViewProps> = ({ onLogout }) => {
+const MainView: React.FC<MainViewProps> = ({ onLogout, userEmail }) => {
   // --- 2. 상태 관리 ---
   const [tasks, setTasks] = useState<Task[]>([]);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -58,15 +61,16 @@ const MainView: React.FC<MainViewProps> = ({ onLogout }) => {
         setSelectedTaskId(BASIC_TASK_ID);
         
       } catch (e: any) {
-        setError(e.message || 'Failed to load data');
+        // 오프라인이거나 서버 에러 시 조용히 처리 (로그만 남김)
+        console.warn('Failed to load tasks:', e);
+        setError(userEmail ? (e.message || 'Failed to load data') : null);
       }
     };
 
-    // 3.2 [추가] Task 3.7: 'Stale Session' (꼬인 세션) 해결
-    //      앱 로드 시 '현재 세션'을 1회 PULL하여 UI 즉시 동기화
+    // 'Stale Session' (꼬인 세션) 해결
+    // 앱 로드 시 '현재 세션'을 1회 PULL하여 UI 즉시 동기화
     const fetchCurrentSession = async () => {
        try {
-        // [수정] core.invoke 사용
         const sessionInfo: ActiveSessionInfo | null = await invoke('get_current_session_info');
         if (sessionInfo) {
           setActiveSession(sessionInfo); // [!] 꼬인 세션 복원
@@ -79,9 +83,9 @@ const MainView: React.FC<MainViewProps> = ({ onLogout }) => {
 
     fetchTasks();
     fetchCurrentSession();
-  }, []); // 마운트 시 1회 실행
+  }, [userEmail]); // 마운트 시 1회 실행, userEmail 변경 시 재호출 가능
 
-  // --- [수정] 4. 타이머 로직 (Task 4.12: Rust PUSH 수신) ---
+  // --- 4. 타이머 로직 (Task 4.12: Rust PUSH 수신) ---
   useEffect(() => {
     let unlistenTick: (() => void) | null = null;
     
@@ -98,9 +102,6 @@ const MainView: React.FC<MainViewProps> = ({ onLogout }) => {
       }
     };
     setupListener();
-
-    // [삭제] React의 타이머 로직 (setInterval) 완전 삭제
-    // useEffect(() => { ... }, [activeSession]);
 
     return () => {
       if (unlistenTick) unlistenTick();
@@ -151,64 +152,90 @@ const MainView: React.FC<MainViewProps> = ({ onLogout }) => {
   };
 
   //'기본 태스크' 선택 시 "Task 없음"을, 그 외에는 Task 이름을 표시
-  // [수정] 'activeSession' (Optimistic Update) 대신 'elapsedTime' (PUSH)을 기준으로 UI 분기
+  // 'activeSession' (Optimistic Update) 대신 'elapsedTime' (PUSH)을 기준으로 UI 분기
   const isSessionActive = elapsedTime > 0; 
   const currentTaskName = activeSession?.task_id
     ? (tasks.find(t => t.id === activeSession.task_id)?.task_name || '알 수 없는 작업')
     : '기본 집중 (Task 없음)';
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
-      <button onClick={onLogout} style={{ float: 'right' }}>로그아웃</button>
-      <h1 style={{ marginTop: 0 }}>Force-Focus</h1>
+    <div style={styles.container}>
+      
+      {/* 헤더: 로고 및 상태 */}
+      <div style={styles.header}>
+        <h1 style={styles.logo}>Force-Focus</h1>
 
-      {error && <div style={{ color: 'red', marginBottom: '10px' }}>{error}</div>}
+        <div style={styles.statusContainer}>
+          <div style={styles.statusBadge}>
+            <span style={{
+              ...styles.statusDot,
+              backgroundColor: userEmail ? '#4ade80' : '#9ca3af'
+            }} />
+            {userEmail ? 'Online' : 'Offline'}
+          </div>
+          <button onClick={onLogout} style={styles.logoutButton}>
+            {userEmail ? '로그아웃' : '나가기'}
+          </button>
+        </div>
+      </div>
 
-      {/* 세션 상태에 따라 UI 분기 */}
+      {error && <div style={styles.errorBox}>{error}</div>}
+
+      {/* 메인 컨텐츠 분기 */}
       {isSessionActive ? (
-        // --- 세션 활성 시 (Must-have 4, 5) ---
-        <div style={{ border: '2px solid green', padding: '15px', borderRadius: '8px' }}>
-          <h2 style={{ marginTop: 0 }}>집중 세션 진행 중</h2>
-          <p><strong>작업:</strong> {currentTaskName}</p>
-          <div style={{ fontSize: '32px', fontWeight: 'bold', margin: '10px 0' }}>
+        // [세션 활성 화면]
+        <div style={styles.activeCard}>
+          <h2 style={styles.cardTitle}>🔥 집중 세션 진행 중</h2>
+          <p style={styles.taskText}>
+            <span style={{color: '#9ca3af'}}>Current Task:</span><br/>
+            {currentTaskName}
+          </p>
+          <div style={styles.timerDisplay}>
             {formatTime(elapsedTime)}
           </div>
           <button 
             onClick={handleEndSession}
-            style={{ backgroundColor: 'red', color: 'white', padding: '10px 15px', border: 'none', borderRadius: '5px' }}
+            style={styles.stopButton}
+            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
+            onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#ef4444'}
           >
             세션 종료
           </button>
-          {/* (Must-have 5: 세션 시간 늘리기 버튼은 여기에 추가) */}
         </div>
       ) : (
-        // --- 세션 비활성 시 (Must-have 3) ---
-        <div style={{ border: '1px solid #ccc', padding: '15px', borderRadius: '8px' }}>
-          <h2 style={{ marginTop: 0 }}>새 세션 시작하기</h2>
-          <label htmlFor="task-select" style={{ display: 'block', marginBottom: '5px' }}>
-            작업 선택:
-          </label>
-          <select 
-            id="task-select"
-            value={selectedTaskId || ''}
-            onChange={(e) => setSelectedTaskId(e.target.value)}
-            style={{ width: '100%', padding: '8px', marginBottom: '15px' }}
-          >
+        // [세션 대기 화면]
+        <div style={styles.inactiveCard}>
+          <h2 style={styles.cardTitle}>새 세션 시작</h2>
+          
+          <div style={{marginBottom: '20px'}}>
+            <label htmlFor="task-select" style={styles.label}>
+              작업 선택
+            </label>
+            <select 
+              id="task-select"
+              value={selectedTaskId || ''} 
+              onChange={(e) => setSelectedTaskId(e.target.value)}
+              style={styles.select}
+            >
+              <option value={BASIC_TASK_ID}>-- 기본 세션 (Task 없음) --</option>
+              {tasks.map(task => (
+                <option key={task.id} value={task.id}>
+                  {task.task_name}
+                </option>
+              ))}
+            </select>
+          </div>
 
-            {/* '기본 태스크' 옵션 */}
-            <option value={BASIC_TASK_ID}>-- 기본 집중 (Task 없음) --</option>
-
-            {tasks.length === 0 && <option>작업 목록 로딩 중...</option>}
-            {tasks.map(task => (
-              <option key={task.id} value={task.id}>
-                {task.task_name}
-              </option>
-            ))}
-          </select>
           <button 
             onClick={handleStartSession}
-            disabled={!selectedTaskId}
-            style={{ backgroundColor: 'green', color: 'white', padding: '10px 15px', border: 'none', borderRadius: '5px' }}
+            disabled={!selectedTaskId} 
+            style={{
+              ...styles.startButton,
+              opacity: selectedTaskId ? 1 : 0.5,
+              cursor: selectedTaskId ? 'pointer' : 'not-allowed'
+            }}
+            onMouseOver={(e) => selectedTaskId && (e.currentTarget.style.backgroundColor = '#16a34a')}
+            onMouseOut={(e) => selectedTaskId && (e.currentTarget.style.backgroundColor = '#22c55e')}
           >
             세션 시작
           </button>

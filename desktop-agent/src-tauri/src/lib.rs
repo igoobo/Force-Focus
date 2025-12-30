@@ -270,6 +270,7 @@ pub fn run() {
             backend_communicator::get_current_session_info,
             backend_communicator::login,  //  로그인 커맨드
             backend_communicator::logout, //  로그아웃 커맨드
+            backend_communicator::check_auth_status, // 자동 로그인 커맨드 등록
             window_commands::hide_overlay
         ])
         .run(tauri::generate_context!())

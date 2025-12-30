@@ -6,10 +6,11 @@ import { open } from '@tauri-apps/plugin-shell';
 import { listen } from '@tauri-apps/api/event';
 
 interface LoginViewProps {
-  onLoginSuccess: () => void;
+  onLoginSuccess: (email: string) => void;
+  onOfflineClick: () => void;
 }
 
-const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
+const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOfflineClick }) => {
   // --- 핸들러 로직 ---
   // Rust(lib.rs)의 로그인 성공 이벤트 수신
   useEffect(() => {
@@ -20,7 +21,8 @@ const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         // lib.rs가 토큰 저장 후 "login-success" 이벤트를 보냅니다.
         const unlistenFn = await listen<string>('login-success', (event) => {
           console.log(`Login Success Event Received for: ${event.payload}`);
-          onLoginSuccess();
+          // 이메일 정보를 상위 컴포넌트로 전달
+          onLoginSuccess(event.payload);
         });
         unlisten = unlistenFn;
       } catch (e) {
@@ -52,9 +54,11 @@ const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     }
   };
 
+ // 3.오프라인 모드 핸들러
   const handleOfflineLogin = () => {
-    console.log("Offline Mode Selected - Entering MainView");
-    onLoginSuccess();
+    console.log("Offline Mode Selected");
+    // [핵심 수정] 로그인 성공이 아니라 '오프라인 클릭' 핸들러를 호출
+    onOfflineClick();
   };
 
   // --- 렌더링 ---

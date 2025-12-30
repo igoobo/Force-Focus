@@ -347,6 +347,30 @@ pub fn get_current_session_info(
     Ok(session_state.clone())
 }
 
+
+//  앱 시작 시 로그인 상태 확인 (Auto-Login)
+#[command]
+pub fn check_auth_status(
+    storage_manager_mutex: State<'_, StorageManagerArcMutex>
+) -> Result<Option<String>, String> {
+    let storage_manager = storage_manager_mutex.lock().map_err(|e| e.to_string())?;
+    
+    // LSN에서 토큰 로드 (Access, Refresh, Email)
+    let token_data = storage_manager.load_auth_token().map_err(|e| e.to_string())?;
+    
+    // 토큰이 있으면 이메일 반환, 없으면 None
+    if let Some((_, _, email)) = token_data {
+        println!("Auto-login: Found valid token for {}", email);
+        Ok(Some(email))
+    } else {
+        Ok(None)
+    }
+}
+
+
+
+
+
 // --- ['get_tasks' 커맨드 (빌드 오류 수정용) ---
 // MainView.tsx의 'fetch'를 'invoke'로 대체하기 위한 Rust 커맨드.
 // [!] (임시) handlers.ts의 'mockTasks' 데이터를 Rust에 하드코딩
@@ -384,3 +408,5 @@ pub fn get_tasks() -> Result<Vec<Task>, String> {
 
     Ok(mock_tasks)
 }
+
+
