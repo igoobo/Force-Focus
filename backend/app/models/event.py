@@ -1,8 +1,8 @@
 # 파일 위치: backend/app/models/event.py
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 
 class EventInDB(BaseModel):
     """
@@ -15,8 +15,13 @@ class EventInDB(BaseModel):
     timestamp: datetime
     app_name: str
     window_title: str
-    activity_vector: Dict[str, float] # List[float] -> Dict[str, float] # 예: [활성창 전환 빈도, 키 입력 빈도, 유휴 상태, 마우스 활동, 클립보드 활동 등]
 
-    class Config:
-        allow_population_by_field_name = True # '_id' 필드명으로도 데이터 채우기 허용
-        orm_mode = True
+    
+    # Rust에서 보내는 visible_windows(List), tokens(List) 등을 모두 수용하기 위해 Any 사용
+    activity_vector: Dict[str, Any] 
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        from_attributes=True,
+        arbitrary_types_allowed=True 
+    )
