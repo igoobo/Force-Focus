@@ -12,6 +12,7 @@ pub mod storage_manager;
 pub mod tray_manager;
 pub mod widget_manager;
 pub mod window_commands;
+pub mod sync_manager;
 
 // --- 2. 전역 use ---
 
@@ -253,6 +254,11 @@ pub fn run() {
                 app_handle.clone(),
                 session_manager_state.clone(),
             );
+
+            // --- 백그라운드 데이터 동기화 시작 ---
+            // 1분마다 LSN 데이터를 서버로 전송하는 루프를 시작
+            // (내부적으로 토큰이 없으면 건너뛰므로 안전)
+            sync_manager::start_sync_loop(app.handle().clone());
 
             Ok(())
         })

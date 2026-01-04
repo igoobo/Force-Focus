@@ -10,6 +10,8 @@ use crate::{ActiveSessionInfo, InputStatsArcMutex, SessionStateArcMutex, Storage
 use crate::Task;
 // StorageManager의 메서드를 호출하기 위해 모듈 import
 use crate::storage_manager;
+use crate::storage_manager::CachedEvent;
+
 use std::time::{SystemTime, UNIX_EPOCH}; // 세션 시작 시간 생성용
 use uuid::Uuid; // 로컬에서 임시 세션 ID 생성용
 
@@ -58,6 +60,21 @@ struct SessionEndRequest {
     user_evaluation_score: u8,
 }
 
+// 이벤트 배치 전송 요청 모델 (백엔드 스키마와 일치)
+#[derive(Debug, Serialize)]
+struct EventBatchRequest {
+    events: Vec<EventData>,
+}
+
+#[derive(Debug, Serialize)]
+struct EventData {
+    session_id: String,
+    timestamp: i64,
+    app_name: String,
+    window_title: String,
+    activity_vector: serde_json::Value, 
+}
+
 // --- 3. BackendCommunicator 상태 정의 ---
 
 /// reqwest::Client를 전역 상태로 관리하기 위한 구조체
@@ -71,6 +88,56 @@ impl BackendCommunicator {
     pub fn new() -> Self {
         Self {
             client: Client::new(),
+        }
+    }
+
+    // [핵심 추가] sync_manager가 호출할 동기화 메서드
+    pub async fn sync_events_batch(&self, events: Vec<CachedEvent>, token: &str) -> Result<(), String> {
+        let url = format!("{}/events/batch", get_api_base_url());
+        
+        // CachedEvent -> EventData 변환
+        let event_data_list: Vec<EventData> = events.into_iter().filter_map(|e| {
+            // LSN에 저장된 JSON 문자열을 serde_json::Value 객체로 파싱
+            match serde_json::from_str(&e.activity_vector) {
+                Ok(json_val) => Some(EventData {
+                    session_id: e.session_id,
+                    timestamp: e.timestamp,
+                    app_name: e.app_name,
+                    window_title: e.window_title,
+                    activity_vector: json_val,
+                }),
+                Err(err) => {
+                    eprintln!("Failed to parse activity_vector JSON for event {}: {}", e.id, err);
+                    None // 파싱 실패한 데이터는 스킵 (또는 별도 처리)
+                }
+            }
+        }).collect();
+
+        if event_data_list.is_empty() {
+            return Ok(());
+        }
+
+        let request_body = EventBatchRequest {
+            events: event_data_list,
+        };
+
+        println!("Syncing {} events to {}", request_body.events.len(), url);
+
+        let response = self.client.post(&url)
+            .bearer_auth(token)
+            .json(&request_body)
+            .send()
+            .await
+            .map_err(|e| format!("Request failed: {}", e))?;
+
+        if response.status().is_success() {
+            println!("Sync success!");
+            Ok(())
+        } else {
+            // 서버 에러 메시지 확인
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            Err(format!("Server returned error {}: {}", status, text))
         }
     }
 }
