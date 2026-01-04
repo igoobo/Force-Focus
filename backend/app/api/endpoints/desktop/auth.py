@@ -12,6 +12,7 @@ from urllib.parse import urlencode
 # mongo 모듈 자체를 import (db 변수 직접 import 시 None 문제 발생 방지)
 from app.db import mongo
 from app.models.user import UserInDB
+from app.core.security import create_access_token, create_refresh_token
 
 load_dotenv()
 
@@ -21,13 +22,8 @@ templates = Jinja2Templates(directory="app/templates")
 # --- 환경 변수 로드 ---
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "super-secret-key")
 # [유지] 127.0.0.1 강제 고정 (로컬 테스트용)
 BACKEND_PUBLIC_URL = os.getenv("BACKEND_PUBLIC_URL", "http://127.0.0.1:8000")
-
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 # 1일
-REFRESH_TOKEN_EXPIRE_DAYS = 30
 
 # --- OAuth 설정 ---
 oauth = OAuth()
@@ -39,14 +35,6 @@ oauth.register(
     client_kwargs={'scope': 'openid email profile'}
 )
 
-# --- 헬퍼 함수: JWT 생성 ---
-def create_token(data: dict, expires_delta: timedelta):
-    to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + expires_delta
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    
-    
 # --------------------------------------------------------------------------
 # 1. 로그인 시작
 # --------------------------------------------------------------------------
@@ -102,15 +90,9 @@ async def auth_google_callback(request: Request):
             user_dict = new_user.dict(by_alias=True) if hasattr(new_user, 'dict') else new_user.model_dump(by_alias=True)
             await mongo.db.users.insert_one(user_dict)
 
-        # C. 자체 JWT 발급
-        access_token = create_token(
-            data={"sub": user_id, "email": email, "type": "access"}, 
-            expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        )
-        refresh_token = create_token(
-            data={"sub": user_id, "type": "refresh"}, 
-            expires_delta=timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-        )
+        # C. 공통 모듈 사용하여 토큰 발급
+        access_token = create_access_token(user_id)
+        refresh_token = create_refresh_token(user_id)
 
         # D. 데스크톱 앱 깨우기 (Deep Link Redirect)
         # URL 파라미터 인코딩 적용 (특수문자 등으로 인한 파싱 오류 방지)

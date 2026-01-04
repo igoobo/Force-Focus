@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.endpoints.web import tasks, schedules
 from app.api.endpoints.desktop import auth as desktop_auth
 from app.db.mongo import connect_to_mongo, close_mongo_connection
+from app.api.endpoints.desktop import events as desktop_events
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -81,3 +82,5 @@ app.include_router(schedules.router, prefix="/schedules", tags=["schedules"])
 
 # 데스크톱 에이전트 API (인증)
 app.include_router(desktop_auth.router, prefix="/api/v1/auth", tags=["auth"])
+# 이벤트 동기화 라우터 등록
+app.include_router(desktop_events.router, prefix="/api/v1/events", tags=["events"])

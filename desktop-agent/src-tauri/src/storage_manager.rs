@@ -16,6 +16,17 @@ use crate::commands::InputStats;
 use crate::ActiveSessionInfo;
 use crate::LoggableEventData;
 
+// 동기화할 이벤트 데이터 구조체 (public)
+#[derive(Debug)]
+pub struct CachedEvent {
+    pub id: i64,
+    pub session_id: String,
+    pub timestamp: i64,
+    pub app_name: String,
+    pub window_title: String,
+    pub activity_vector: String, // JSON String
+}
+
 // Local Storage Manager 구조체
 pub struct StorageManager {
     conn: Mutex<Connection>,
@@ -223,6 +234,56 @@ impl StorageManager {
         )
         .map_err(|e| e.to_string())?;
 
+        Ok(())
+    }
+
+    // 동기화를 위해 전송되지 않은 이벤트 조회
+    // limit: 한 번에 가져올 개수 (예: 50개)
+    pub fn get_unsynced_events(&self, limit: u32) -> Result<Vec<CachedEvent>, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        
+        // 오래된 순서(ASC)로 조회하여 순차적 전송 보장
+        let mut stmt = conn.prepare(
+            "SELECT id, session_id, timestamp, app_name, window_title, activity_vector 
+             FROM cached_events 
+             ORDER BY timestamp ASC 
+             LIMIT ?1"
+        ).map_err(|e| e.to_string())?;
+
+        let rows = stmt.query_map([limit], |row| {
+            Ok(CachedEvent {
+                id: row.get(0)?,
+                session_id: row.get(1)?,
+                timestamp: row.get(2)?,
+                app_name: row.get(3)?,
+                window_title: row.get(4)?,
+                activity_vector: row.get(5)?,
+            })
+        }).map_err(|e| e.to_string())?;
+
+        let mut events = Vec::new();
+        for row in rows {
+            events.push(row.map_err(|e| e.to_string())?);
+        }
+        
+        Ok(events)
+    }
+
+    // 전송 완료된 이벤트 삭제 (Batch Delete)
+    // ids: 삭제할 이벤트의 ID 목록
+    pub fn delete_events_by_ids(&self, ids: &[i64]) -> Result<(), String> {
+        let mut conn = self.conn.lock().map_err(|e| e.to_string())?;
+        
+        // 트랜잭션 시작 (중간에 실패하면 롤백)
+        let tx = conn.transaction().map_err(|e| e.to_string())?;
+        
+        for id in ids {
+            tx.execute("DELETE FROM cached_events WHERE id = ?1", [id])
+                .map_err(|e| e.to_string())?;
+        }
+        
+        tx.commit().map_err(|e| e.to_string())?;
+        
         Ok(())
     }
 

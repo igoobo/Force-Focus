@@ -12,19 +12,27 @@ services:
     env_file:
       - .env # 로컬의 .env 파일 로드
     environment:
-      # 로컬 Docker 네트워크 내에서 MongoDB 접근 주소
-      - MONGO_URI=mongodb://mongodb:27017
-      - MONGO_DB_NAME=force_focus_db
+      # .env의 값을 컨테이너 내부 환경 변수로 명시적으로 매핑
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB_NAME=${MONGO_DB_NAME}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - BACKEND_PUBLIC_URL=${BACKEND_PUBLIC_URL}
     depends_on:
       - mongodb
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-  # 2. 로컬 MongoDB 데이터베이스
+  # 2. MongoDB
   mongodb:
     image: mongo:latest
     container_name: force-focus-mongo
     ports:
       - "27017:27017"
+    environment:
+      # .env의 값을 사용하여 초기 관리자 계정 생성
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
     volumes:
       - mongo_data:/data/db # 데이터 영구 저장
 
