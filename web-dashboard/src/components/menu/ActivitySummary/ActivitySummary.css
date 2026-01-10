@@ -1,14 +1,19 @@
+@keyframes summaryFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .activity-summary {
   display: flex;
   flex-direction: column;
-  /* 상단 타이틀바(64px)를 제외한 전체 높이 확보 */
   height: calc(100vh - 64px); 
   width: 100%;
   padding: 24px;
   box-sizing: border-box;
   background-color: var(--bg-main);
   transition: background-color 0.3s ease;
-  overflow: hidden; /* 전체 페이지 스크롤 방지 */
+  overflow: hidden;
+  animation: summaryFadeIn 0.4s ease-out forwards;
 }
 
 /* 상단 헤더 */

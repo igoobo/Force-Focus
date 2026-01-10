@@ -1,3 +1,8 @@
+@keyframes overviewFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 :root {
   --point-blue: #2563eb;
   --point-blue-light: #4f46e5;
@@ -14,6 +19,7 @@
   background-color: var(--bg-main);
   transition: all 0.3s ease;
   overflow-y: auto;
+  animation: overviewFadeIn 0.4s ease-out forwards;
 }
 
 .dark-theme .overview-container { background-color: var(--bg-body); }
