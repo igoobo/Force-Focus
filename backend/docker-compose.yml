@@ -5,8 +5,10 @@ services:
   backend:
     build: .
     container_name: force-focus-backend
+    # [보안 강화] 외부 포트 노출(8000:8000) 제거
+    # 이제 외부는 Caddy(443)를 통해서만 접근 가능
     ports:
-      - "8000:8000"
+      - "8000"
     volumes:
       - .:/app # 코드 변경 시 자동 반영 (Hot Reload)
     env_file:
@@ -19,6 +21,7 @@ services:
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - BACKEND_PUBLIC_URL=${BACKEND_PUBLIC_URL}
+      - ENVIRONMENT=${ENVIRONMENT}
     depends_on:
       - mongodb
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
@@ -36,5 +39,24 @@ services:
     volumes:
       - mongo_data:/data/db # 데이터 영구 저장
 
+  # 3. Caddy (Web Server & HTTPS Manager)
+  caddy:
+    image: caddy:alpine
+    container_name: force-focus-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"   # HTTP (자동으로 HTTPS로 리다이렉트됨)
+      - "443:443" # HTTPS
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile # 설정 파일 마운트
+      - caddy_data:/data # 인증서 저장소 (재시작 해도 유지)
+      - caddy_config:/config
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME} # .env의 도메인을 Caddyfile로 전달
+    depends_on:
+      - backend
+
 volumes:
   mongo_data:
+  caddy_data:
+  caddy_config:

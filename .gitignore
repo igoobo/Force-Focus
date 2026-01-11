@@ -535,3 +535,7 @@ Cargo.lock
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/android,kotlin,react,node,rust,python,visualstudiocode,jetbrains
+
+
+# caddy_data 폴더 제외
+caddy_data/
