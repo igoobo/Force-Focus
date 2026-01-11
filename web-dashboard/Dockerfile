@@ -34,12 +34,12 @@ FROM nginx:stable-alpine
 # 2. 빌드된 정적 파일 복사:
 #    이전 'builder' 스테이지에서 생성된 빌드 결과물(예: /app/build)을
 #    Nginx 웹 서버의 기본 웹 루트 디렉토리(/usr/share/nginx/html)로 복사합니다.
-COPY --from=builder /app/build /usr/share/nginx/html
+COPY --from=builder /app/dist /usr/share/nginx/html
 
 # 3. Nginx 설정 파일 복사:
 #    로컬에 준비된 커스텀 Nginx 설정 파일(nginx.conf)을 컨테이너의 Nginx 설정 경로로 복사합니다.
 #    이 설정은 주로 SPA(Single Page Application) 라우팅을 위해 필요합니다.
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/nginx.conf
 
 # 4. 포트 노출:
 #    컨테이너 내부의 80번 포트(Nginx의 기본 HTTP 포트)가 외부로 노출될 수 있음을 선언합니다.
