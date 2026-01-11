@@ -1,10 +1,10 @@
-use tauri::{AppHandle, Manager};
-use std::time::Duration;
-use tokio::time::sleep;
 use std::sync::Arc;
+use std::time::Duration;
+use tauri::{AppHandle, Manager};
+use tokio::time::sleep;
 
-use crate::StorageManagerArcMutex;
 use crate::backend_communicator::BackendCommunicator;
+use crate::StorageManagerArcMutex;
 
 /// 백그라운드 동기화 루프 시작
 pub fn start_sync_loop(app_handle: AppHandle) {
@@ -26,13 +26,15 @@ pub fn start_sync_loop(app_handle: AppHandle) {
 /// 실제 동기화 로직 (1회 실행)
 async fn process_sync(app: &AppHandle) -> Result<(), String> {
     // 1. LSN 상태 가져오기
-    let storage_state = app.try_state::<StorageManagerArcMutex>()
+    let storage_state = app
+        .try_state::<StorageManagerArcMutex>()
         .ok_or("StorageManager state not found in AppHandle")?;
 
     // 백엔드 통신 모듈 가져오기
     // (BackendCommunicator는 내부적으로 Client를 가지고 있으며, 상태로 등록됨)
     // Arc<BackendCommunicator> 타입으로 가져오기
-    let comm_state = app.try_state::<Arc<BackendCommunicator>>()
+    let comm_state = app
+        .try_state::<Arc<BackendCommunicator>>()
         .ok_or("BackendCommunicator state not found")?;
 
     // 2. 토큰 확인 (로그인 여부)
@@ -46,7 +48,7 @@ async fn process_sync(app: &AppHandle) -> Result<(), String> {
     }; // 여기서 storage Lock 해제
 
     // --- [A] Down-Sync: 서버 데이터 가져오기 (스케줄 & 태스크) ---
-     // 2-1. Task 다운로드
+    // 2-1. Task 다운로드
     let fetched_tasks = match comm_state.fetch_tasks(&token).await {
         Ok(t) => Some(t),
         Err(e) => {
@@ -67,13 +69,13 @@ async fn process_sync(app: &AppHandle) -> Result<(), String> {
     // 3. 로컬 DB 저장 (Lock 필요)
     {
         let storage = storage_state.lock().map_err(|e| e.to_string())?;
-        
+
         if let Some(tasks) = fetched_tasks {
             if let Err(e) = storage.sync_tasks(tasks) {
                 eprintln!("Sync Manager: Failed to sync tasks to DB: {}", e);
             }
         }
-        
+
         if let Some(schedules) = fetched_schedules {
             if let Err(e) = storage.sync_schedules(schedules) {
                 eprintln!("Sync Manager: Failed to sync schedules to DB: {}", e);

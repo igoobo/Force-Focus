@@ -25,7 +25,7 @@ pub fn setup_widget_listeners<R: Runtime>(
 
                 // 쿨다운 체크: 포커스를 얻은 지 200ms도 안 지났는데 잃었다면? -> 무시 (복원 노이즈)
                 let last_gain_opt = *last_focus_gain_time_clone.lock().unwrap();
-                
+
                 if let Some(last_gain) = last_gain_opt {
                     // 포커스를 얻은 기록이 있다면, 경과 시간 체크
                     if last_gain.elapsed() < Duration::from_millis(200) {

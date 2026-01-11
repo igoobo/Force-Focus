@@ -13,15 +13,11 @@ use std::env;
 
 // lib.rs에서 정의한 전역 상태 타입들
 use crate::{
-    ActiveSessionInfo,
-    SessionStateArcMutex,
-    StorageManagerArcMutex,
-    InputStatsArcMutex,
-    Task, 
+    ActiveSessionInfo, InputStatsArcMutex, SessionStateArcMutex, StorageManagerArcMutex, Task,
 };
 
 // StorageManager의 메서드를 호출하기 위해 모듈 import
-use crate::storage_manager::{self, CachedEvent, LocalTask, LocalSchedule}; // LocalTask, LocalSchedule import
+use crate::storage_manager::{self, CachedEvent, LocalSchedule, LocalTask}; // LocalTask, LocalSchedule import
 
 use std::time::{SystemTime, UNIX_EPOCH}; // 세션 시작 시간 생성용
 use uuid::Uuid; // 로컬에서 임시 세션 ID 생성용
@@ -76,9 +72,8 @@ struct EventData {
     timestamp: i64,
     app_name: String,
     window_title: String,
-    activity_vector: serde_json::Value, 
+    activity_vector: serde_json::Value,
 }
-
 
 // 백엔드 Task API 응답 모델 (Schema: TaskRead)
 #[derive(Debug, Deserialize)]
@@ -106,7 +101,6 @@ struct ApiSchedule {
     is_active: bool,
 }
 
-
 // --- 3. BackendCommunicator 상태 정의 ---
 
 /// reqwest::Client를 전역 상태로 관리하기 위한 구조체
@@ -124,26 +118,36 @@ impl BackendCommunicator {
     }
 
     // [핵심 추가] sync_manager가 호출할 동기화 메서드
-    pub async fn sync_events_batch(&self, events: Vec<CachedEvent>, token: &str) -> Result<(), String> {
+    pub async fn sync_events_batch(
+        &self,
+        events: Vec<CachedEvent>,
+        token: &str,
+    ) -> Result<(), String> {
         let url = format!("{}/events/batch", get_api_base_url());
-        
+
         // CachedEvent -> EventData 변환
-        let event_data_list: Vec<EventData> = events.into_iter().filter_map(|e| {
-            // LSN에 저장된 JSON 문자열을 serde_json::Value 객체로 파싱
-            match serde_json::from_str(&e.activity_vector) {
-                Ok(json_val) => Some(EventData {
-                    session_id: e.session_id,
-                    timestamp: e.timestamp,
-                    app_name: e.app_name,
-                    window_title: e.window_title,
-                    activity_vector: json_val,
-                }),
-                Err(err) => {
-                    eprintln!("Failed to parse activity_vector JSON for event {}: {}", e.id, err);
-                    None // 파싱 실패한 데이터는 스킵 (또는 별도 처리)
+        let event_data_list: Vec<EventData> = events
+            .into_iter()
+            .filter_map(|e| {
+                // LSN에 저장된 JSON 문자열을 serde_json::Value 객체로 파싱
+                match serde_json::from_str(&e.activity_vector) {
+                    Ok(json_val) => Some(EventData {
+                        session_id: e.session_id,
+                        timestamp: e.timestamp,
+                        app_name: e.app_name,
+                        window_title: e.window_title,
+                        activity_vector: json_val,
+                    }),
+                    Err(err) => {
+                        eprintln!(
+                            "Failed to parse activity_vector JSON for event {}: {}",
+                            e.id, err
+                        );
+                        None // 파싱 실패한 데이터는 스킵 (또는 별도 처리)
+                    }
                 }
-            }
-        }).collect();
+            })
+            .collect();
 
         if event_data_list.is_empty() {
             return Ok(());
@@ -155,7 +159,9 @@ impl BackendCommunicator {
 
         println!("Syncing {} events to {}", request_body.events.len(), url);
 
-        let response = self.client.post(&url)
+        let response = self
+            .client
+            .post(&url)
             .bearer_auth(token)
             .json(&request_body)
             .send()
@@ -178,26 +184,34 @@ impl BackendCommunicator {
 
     /// 서버에서 Task 목록을 받아옴 (저장은 호출자가 수행)
     pub async fn fetch_tasks(&self, token: &str) -> Result<Vec<LocalTask>, String> {
-        let url = format!("{}/tasks", get_api_base_url()); 
-        
-        let response = self.client.get(&url)
+        let url = format!("{}/tasks", get_api_base_url());
+
+        let response = self
+            .client
+            .get(&url)
             .bearer_auth(token)
             .send()
             .await
             .map_err(|e| format!("Failed to fetch tasks: {}", e))?;
 
         if response.status().is_success() {
-            let api_tasks: Vec<ApiTask> = response.json().await.map_err(|e| format!("JSON parse error: {}", e))?;
-            
-            let local_tasks: Vec<LocalTask> = api_tasks.into_iter().map(|t| LocalTask {
-                id: t.id,
-                user_id: t.user_id,
-                task_name: t.name,
-                description: t.description,
-                target_executable: t.target_executable,
-                target_arguments: t.target_arguments,
-                status: t.status,
-            }).collect();
+            let api_tasks: Vec<ApiTask> = response
+                .json()
+                .await
+                .map_err(|e| format!("JSON parse error: {}", e))?;
+
+            let local_tasks: Vec<LocalTask> = api_tasks
+                .into_iter()
+                .map(|t| LocalTask {
+                    id: t.id,
+                    user_id: t.user_id,
+                    task_name: t.name,
+                    description: t.description,
+                    target_executable: t.target_executable,
+                    target_arguments: t.target_arguments,
+                    status: t.status,
+                })
+                .collect();
 
             Ok(local_tasks)
         } else {
@@ -208,33 +222,40 @@ impl BackendCommunicator {
     /// 서버에서 Schedule 목록을 받아옴 (저장은 호출자가 수행)
     pub async fn fetch_schedules(&self, token: &str) -> Result<Vec<LocalSchedule>, String> {
         let url = format!("{}/schedules", get_api_base_url());
-        
-        let response = self.client.get(&url)
+
+        let response = self
+            .client
+            .get(&url)
             .bearer_auth(token)
             .send()
             .await
             .map_err(|e| format!("Failed to fetch schedules: {}", e))?;
 
         if response.status().is_success() {
-            let api_schedules: Vec<ApiSchedule> = response.json().await.map_err(|e| format!("JSON parse error: {}", e))?;
-            
-            let local_schedules: Vec<LocalSchedule> = api_schedules.into_iter().map(|s| LocalSchedule {
-                id: s.id,
-                user_id: s.user_id,
-                task_id: s.task_id,
-                name: s.name,
-                start_time: s.start_time,
-                end_time: s.end_time,
-                days_of_week: s.days_of_week,
-                is_active: s.is_active,
-            }).collect();
+            let api_schedules: Vec<ApiSchedule> = response
+                .json()
+                .await
+                .map_err(|e| format!("JSON parse error: {}", e))?;
+
+            let local_schedules: Vec<LocalSchedule> = api_schedules
+                .into_iter()
+                .map(|s| LocalSchedule {
+                    id: s.id,
+                    user_id: s.user_id,
+                    task_id: s.task_id,
+                    name: s.name,
+                    start_time: s.start_time,
+                    end_time: s.end_time,
+                    days_of_week: s.days_of_week,
+                    is_active: s.is_active,
+                })
+                .collect();
 
             Ok(local_schedules)
         } else {
             Err(format!("Server error (Schedules): {}", response.status()))
         }
     }
-
 }
 
 // --- 4. 이 모듈에 속한 Tauri 커맨드 정의 ---
@@ -252,7 +273,7 @@ pub fn login(
 
     // LSN에 토큰 저장
     storage_manager.save_auth_token(&access_token, &refresh_token, &user_email, &user_id)?;
-    
+
     println!("User logged in: {}", user_email);
     Ok(())
 }
@@ -510,17 +531,18 @@ pub fn get_current_session_info(
     Ok(session_state.clone())
 }
 
-
 //  앱 시작 시 로그인 상태 확인 (Auto-Login)
 #[command]
 pub fn check_auth_status(
-    storage_manager_mutex: State<'_, StorageManagerArcMutex>
+    storage_manager_mutex: State<'_, StorageManagerArcMutex>,
 ) -> Result<Option<String>, String> {
     let storage_manager = storage_manager_mutex.lock().map_err(|e| e.to_string())?;
-    
+
     // LSN에서 토큰 로드 (Access, Refresh, Email)
-    let token_data = storage_manager.load_auth_token().map_err(|e| e.to_string())?;
-    
+    let token_data = storage_manager
+        .load_auth_token()
+        .map_err(|e| e.to_string())?;
+
     // 토큰이 있으면 이메일 반환, 없으면 None
     if let Some((_, _, email, _)) = token_data {
         println!("Auto-login: Found valid token for {}", email);
@@ -530,10 +552,6 @@ pub fn check_auth_status(
     }
 }
 
-
-
-
-
 //  Task / LSN 데이터 연동
 #[command]
 pub fn get_tasks(
@@ -542,33 +560,46 @@ pub fn get_tasks(
     let storage_manager = storage_manager_mutex.lock().map_err(|e| e.to_string())?;
 
     // 1. 현재 로그인한 사용자 ID 확인 (격리)
-    let user_id = match storage_manager.load_auth_token().map_err(|e| e.to_string())? {
+    let user_id = match storage_manager
+        .load_auth_token()
+        .map_err(|e| e.to_string())?
+    {
         Some((_, _, _, uid)) => uid,
         None => return Ok(vec![]), // 로그인 안 했으면 빈 목록 반환 (오프라인/게스트 정책에 따라 다름)
     };
 
     // 2. LSN에서 해당 유저의 Task 조회
-    let local_tasks = storage_manager.get_tasks_by_user(&user_id).map_err(|e| e.to_string())?;
+    let local_tasks = storage_manager
+        .get_tasks_by_user(&user_id)
+        .map_err(|e| e.to_string())?;
 
-    println!("get_tasks: Found {} tasks for user {}", local_tasks.len(), user_id);
+    println!(
+        "get_tasks: Found {} tasks for user {}",
+        local_tasks.len(),
+        user_id
+    );
 
     // 3. LocalTask -> Task (프론트엔드용) 변환
-    let tasks: Vec<Task> = local_tasks.into_iter().map(|t| Task {
-        id: t.id,
-        user_id: t.user_id,
-        task_name: t.task_name,
-        description: t.description.unwrap_or_default(),
-        // DB에는 날짜 필드가 없으므로 일단 빈 값 처리 (추후 필요하면 DB 마이그레이션)
-        due_date: "".to_string(), 
-        status: t.status,
-        target_executable: t.target_executable.unwrap_or_default(),
-        // "arg1 arg2" (String) -> ["arg1", "arg2"] (Vec<String>)
-        target_arguments: t.target_arguments
-            .map(|s| s.split_whitespace().map(|s| s.to_string()).collect())
-            .unwrap_or_default(),
-        created_at: "".to_string(),
-        updated_at: "".to_string(),
-    }).collect();
+    let tasks: Vec<Task> = local_tasks
+        .into_iter()
+        .map(|t| Task {
+            id: t.id,
+            user_id: t.user_id,
+            task_name: t.task_name,
+            description: t.description.unwrap_or_default(),
+            // DB에는 날짜 필드가 없으므로 일단 빈 값 처리 (추후 필요하면 DB 마이그레이션)
+            due_date: "".to_string(),
+            status: t.status,
+            target_executable: t.target_executable.unwrap_or_default(),
+            // "arg1 arg2" (String) -> ["arg1", "arg2"] (Vec<String>)
+            target_arguments: t
+                .target_arguments
+                .map(|s| s.split_whitespace().map(|s| s.to_string()).collect())
+                .unwrap_or_default(),
+            created_at: "".to_string(),
+            updated_at: "".to_string(),
+        })
+        .collect();
 
     Ok(tasks)
 }

@@ -7,11 +7,18 @@ use tauri::{
 ///  트레이 메뉴 생성 및 이벤트 핸들러 설정
 pub fn setup_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     // 1. 메뉴 아이템 생성
-    let show_hide_i = MenuItem::with_id(app, "toggle", "열기/숨기기 (Show/Hide)", true, None::<&str>)?;
+    let show_hide_i =
+        MenuItem::with_id(app, "toggle", "열기/숨기기 (Show/Hide)", true, None::<&str>)?;
     // [추가] 세션 종료 메뉴 (옵션)
-    let end_session_i = MenuItem::with_id(app, "end_session", "세션 강제 종료 (End Session)", true, None::<&str>)?;
+    let end_session_i = MenuItem::with_id(
+        app,
+        "end_session",
+        "세션 강제 종료 (End Session)",
+        true,
+        None::<&str>,
+    )?;
     let quit_i = MenuItem::with_id(app, "quit", "앱 완전 종료 (Quit)", true, None::<&str>)?;
-    
+
     // 2. 메뉴 구성
     let menu = Menu::with_items(app, &[&show_hide_i, &end_session_i, &quit_i])?;
 
@@ -47,18 +54,22 @@ pub fn setup_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
             }
         })
         .on_tray_icon_event(|tray, event| {
-             // (선택) 트레이 아이콘 좌클릭 시 메인 창 토글
-             if let TrayIconEvent::Click { button: tauri::tray::MouseButton::Left, .. } = event {
-                 let app = tray.app_handle();
-                 if let Some(window) = app.get_webview_window("main") {
-                     if window.is_visible().unwrap_or(false) {
-                         let _ = window.hide();
-                     } else {
-                         let _ = window.show();
-                         let _ = window.set_focus();
-                     }
-                 }
-             }
+            // (선택) 트레이 아이콘 좌클릭 시 메인 창 토글
+            if let TrayIconEvent::Click {
+                button: tauri::tray::MouseButton::Left,
+                ..
+            } = event
+            {
+                let app = tray.app_handle();
+                if let Some(window) = app.get_webview_window("main") {
+                    if window.is_visible().unwrap_or(false) {
+                        let _ = window.hide();
+                    } else {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+                }
+            }
         })
         .build(app)?;
 

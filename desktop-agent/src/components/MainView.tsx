@@ -20,6 +20,7 @@ interface ActiveSessionInfo {
 // 부모(App.tsx)로부터 받는 Props
 interface MainViewProps {
   onLogout: () => void;
+  onOpenSettings: () => void;
   // App.tsx에서 전달받는 이메일 정보 (없으면 null)
   userEmail?: string | null;
 }
@@ -31,7 +32,7 @@ const BASIC_TASK_ID = "__BASIC_TASK__";
  * 로그인 후 표시되는 메인 UI.
  * 세션 관리(시작, 종료, 타이머) 및 Task 조회를 담당합니다.
  */
-const MainView: React.FC<MainViewProps> = ({ onLogout, userEmail }) => {
+const MainView: React.FC<MainViewProps> = ({ onLogout, onOpenSettings, userEmail }) => {
   // --- 2. 상태 관리 ---
   const [tasks, setTasks] = useState<Task[]>([]);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -164,8 +165,9 @@ const MainView: React.FC<MainViewProps> = ({ onLogout, userEmail }) => {
       {/* 헤더: 로고 및 상태 */}
       <div style={styles.header}>
         <h1 style={styles.logo}>Force-Focus</h1>
-
+        
         <div style={styles.statusContainer}>
+          {/* 상태 배지 */}
           <div style={styles.statusBadge}>
             <span style={{
               ...styles.statusDot,
@@ -173,8 +175,29 @@ const MainView: React.FC<MainViewProps> = ({ onLogout, userEmail }) => {
             }} />
             {userEmail ? 'Online' : 'Offline'}
           </div>
-          <button onClick={onLogout} style={styles.logoutButton}>
+
+          {/* 로그아웃 버튼 */}
+          <button 
+            onClick={onLogout} 
+            style={styles.logoutButton}
+            onMouseOver={(e) => { e.currentTarget.style.color = 'white'; e.currentTarget.style.borderColor = 'white'; }}
+            onMouseOut={(e) => { e.currentTarget.style.color = '#9ca3af'; e.currentTarget.style.borderColor = '#4b5563'; }}
+          >
             {userEmail ? '로그아웃' : '나가기'}
+          </button>
+
+          {/* 설정 버튼 */}
+          <button 
+            onClick={onOpenSettings} 
+            title="설정"
+            style={styles.iconButton}
+            onMouseOver={(e) => e.currentTarget.style.color = 'white'}
+            onMouseOut={(e) => e.currentTarget.style.color = '#9ca3af'}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
           </button>
         </div>
       </div>

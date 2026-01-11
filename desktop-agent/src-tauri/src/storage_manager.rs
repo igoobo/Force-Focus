@@ -5,12 +5,12 @@ Table에 새로운 데이터 추가는 commands.rs에서 이루어짐
 */
 
 use rusqlite::{Connection, OptionalExtension, Result};
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager, Runtime}; // cache_event 함수에 필요한 use 문
-use serde::{Deserialize, Serialize};
 
 // lib.rs
 use crate::commands::InputStats;
@@ -22,8 +22,8 @@ use crate::LoggableEventData;
 pub struct LocalTask {
     pub id: String,
     pub user_id: String,
-    pub task_name: String,            // Backend: name
-    pub description: Option<String>,  // Backend: Optional[str]
+    pub task_name: String,                 // Backend: name
+    pub description: Option<String>,       // Backend: Optional[str]
     pub target_executable: Option<String>, // Backend: Optional[str]
     pub target_arguments: Option<String>,  // Backend: Optional[str] (단일 문자열)
     pub status: String,
@@ -35,12 +35,11 @@ pub struct LocalSchedule {
     pub user_id: String,
     pub task_id: Option<String>,
     pub name: String,
-    pub start_time: String, // "HH:MM:SS"
-    pub end_time: String,   // "HH:MM:SS"
+    pub start_time: String,    // "HH:MM:SS"
+    pub end_time: String,      // "HH:MM:SS"
     pub days_of_week: Vec<u8>, // JSON Array [0, 1, ..]
     pub is_active: bool,
 }
-
 
 // 동기화할 이벤트 데이터 구조체 (public)
 #[derive(Debug)]
@@ -160,7 +159,6 @@ impl StorageManager {
         )
         .map_err(|e| format!("Failed to create auth_token table: {}", e))?;
 
-
         // 5. Schedules 테이블
         conn.execute(
             "CREATE TABLE IF NOT EXISTS schedules (
@@ -174,7 +172,8 @@ impl StorageManager {
                 is_active INTEGER NOT NULL
             )",
             [],
-        ).map_err(|e| format!("Failed to create schedules table: {}", e))?;
+        )
+        .map_err(|e| format!("Failed to create schedules table: {}", e))?;
 
         // 6. Tasks 테이블
         // target_arguments는 이제 단순 TEXT (NULL 허용)입니다.
@@ -189,7 +188,8 @@ impl StorageManager {
                 status TEXT NOT NULL
             )",
             [],
-        ).map_err(|e| format!("Failed to create tasks table: {}", e))?;
+        )
+        .map_err(|e| format!("Failed to create tasks table: {}", e))?;
 
         Ok(())
     }
@@ -299,31 +299,35 @@ impl StorageManager {
     // limit: 한 번에 가져올 개수 (예: 50개)
     pub fn get_unsynced_events(&self, limit: u32) -> Result<Vec<CachedEvent>, String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
-        
+
         // 오래된 순서(ASC)로 조회하여 순차적 전송 보장
-        let mut stmt = conn.prepare(
-            "SELECT id, session_id, timestamp, app_name, window_title, activity_vector 
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, session_id, timestamp, app_name, window_title, activity_vector 
              FROM cached_events 
              ORDER BY timestamp ASC 
-             LIMIT ?1"
-        ).map_err(|e| e.to_string())?;
+             LIMIT ?1",
+            )
+            .map_err(|e| e.to_string())?;
 
-        let rows = stmt.query_map([limit], |row| {
-            Ok(CachedEvent {
-                id: row.get(0)?,
-                session_id: row.get(1)?,
-                timestamp: row.get(2)?,
-                app_name: row.get(3)?,
-                window_title: row.get(4)?,
-                activity_vector: row.get(5)?,
+        let rows = stmt
+            .query_map([limit], |row| {
+                Ok(CachedEvent {
+                    id: row.get(0)?,
+                    session_id: row.get(1)?,
+                    timestamp: row.get(2)?,
+                    app_name: row.get(3)?,
+                    window_title: row.get(4)?,
+                    activity_vector: row.get(5)?,
+                })
             })
-        }).map_err(|e| e.to_string())?;
+            .map_err(|e| e.to_string())?;
 
         let mut events = Vec::new();
         for row in rows {
             events.push(row.map_err(|e| e.to_string())?);
         }
-        
+
         Ok(events)
     }
 
@@ -331,21 +335,27 @@ impl StorageManager {
     // ids: 삭제할 이벤트의 ID 목록
     pub fn delete_events_by_ids(&self, ids: &[i64]) -> Result<(), String> {
         let mut conn = self.conn.lock().map_err(|e| e.to_string())?;
-        
+
         // 트랜잭션 시작 (중간에 실패하면 롤백)
         let tx = conn.transaction().map_err(|e| e.to_string())?;
-        
+
         for id in ids {
             tx.execute("DELETE FROM cached_events WHERE id = ?1", [id])
                 .map_err(|e| e.to_string())?;
         }
-        
+
         tx.commit().map_err(|e| e.to_string())?;
-        
+
         Ok(())
     }
 
-    pub fn save_auth_token(&self, access: &str, refresh: &str, email: &str, user_id: &str) -> Result<(), String> {
+    pub fn save_auth_token(
+        &self,
+        access: &str,
+        refresh: &str,
+        email: &str,
+        user_id: &str,
+    ) -> Result<(), String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -366,12 +376,17 @@ impl StorageManager {
             .prepare("SELECT access_token, refresh_token, user_email, user_id FROM auth_token WHERE id = 1")
             .map_err(|e| e.to_string())?;
 
-        let result = stmt.query_row([], |row| Ok((
-            row.get(0)?, 
-            row.get(1)?, 
-            row.get(2)?,
-            row.get(3)? // user_id
-        ))).optional().map_err(|e| e.to_string())?;
+        let result = stmt
+            .query_row([], |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?, // user_id
+                ))
+            })
+            .optional()
+            .map_err(|e| e.to_string())?;
         Ok(result)
     }
 
@@ -388,12 +403,13 @@ impl StorageManager {
         let mut conn = self.conn.lock().map_err(|e| e.to_string())?;
         let tx = conn.transaction().map_err(|e| e.to_string())?;
 
-        tx.execute("DELETE FROM schedules", []).map_err(|e| e.to_string())?;
+        tx.execute("DELETE FROM schedules", [])
+            .map_err(|e| e.to_string())?;
 
         for s in schedules {
             let days_json = serde_json::to_string(&s.days_of_week)
                 .map_err(|e| format!("Failed to serialize days: {}", e))?;
-            
+
             tx.execute(
                 "INSERT INTO schedules (id, user_id, task_id, name, start_time, end_time, days_of_week, is_active)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
@@ -408,24 +424,36 @@ impl StorageManager {
 
     pub fn get_active_schedules(&self, user_id: &str) -> Result<Vec<LocalSchedule>, String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
-        let mut stmt = conn.prepare(
-            "SELECT id, user_id, task_id, name, start_time, end_time, days_of_week, is_active 
-             FROM schedules WHERE is_active = 1"
-        ).map_err(|e| e.to_string())?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, user_id, task_id, name, start_time, end_time, days_of_week, is_active 
+             FROM schedules WHERE is_active = 1",
+            )
+            .map_err(|e| e.to_string())?;
 
-        let rows = stmt.query_map([], |row| {
-            let days_str: String = row.get(6)?;
-            let days_vec: Vec<u8> = serde_json::from_str(&days_str).unwrap_or_default();
-            let is_active_int: i32 = row.get(7)?;
+        let rows = stmt
+            .query_map([], |row| {
+                let days_str: String = row.get(6)?;
+                let days_vec: Vec<u8> = serde_json::from_str(&days_str).unwrap_or_default();
+                let is_active_int: i32 = row.get(7)?;
 
-            Ok(LocalSchedule {
-                id: row.get(0)?, user_id: row.get(1)?, task_id: row.get(2)?, name: row.get(3)?,
-                start_time: row.get(4)?, end_time: row.get(5)?, days_of_week: days_vec, is_active: is_active_int == 1,
+                Ok(LocalSchedule {
+                    id: row.get(0)?,
+                    user_id: row.get(1)?,
+                    task_id: row.get(2)?,
+                    name: row.get(3)?,
+                    start_time: row.get(4)?,
+                    end_time: row.get(5)?,
+                    days_of_week: days_vec,
+                    is_active: is_active_int == 1,
+                })
             })
-        }).map_err(|e| e.to_string())?;
+            .map_err(|e| e.to_string())?;
 
         let mut schedules = Vec::new();
-        for row in rows { schedules.push(row.map_err(|e| e.to_string())?); }
+        for row in rows {
+            schedules.push(row.map_err(|e| e.to_string())?);
+        }
         Ok(schedules)
     }
 
@@ -435,7 +463,8 @@ impl StorageManager {
         let mut conn = self.conn.lock().map_err(|e| e.to_string())?;
         let tx = conn.transaction().map_err(|e| e.to_string())?;
 
-        tx.execute("DELETE FROM tasks", []).map_err(|e| e.to_string())?;
+        tx.execute("DELETE FROM tasks", [])
+            .map_err(|e| e.to_string())?;
 
         for t in tasks {
             //  JSON 직렬화 제거, Option<String> 그대로 저장
@@ -458,17 +487,20 @@ impl StorageManager {
              FROM tasks WHERE id = ?1"
         ).map_err(|e| e.to_string())?;
 
-        let result = stmt.query_row([task_id], |row| {
-            Ok(LocalTask {
-                id: row.get(0)?,
-                user_id: row.get(1)?,
-                task_name: row.get(2)?,
-                description: row.get(3)?,
-                target_executable: row.get(4)?,
-                target_arguments: row.get(5)?, // String으로 바로 읽음
-                status: row.get(6)?,
+        let result = stmt
+            .query_row([task_id], |row| {
+                Ok(LocalTask {
+                    id: row.get(0)?,
+                    user_id: row.get(1)?,
+                    task_name: row.get(2)?,
+                    description: row.get(3)?,
+                    target_executable: row.get(4)?,
+                    target_arguments: row.get(5)?, // String으로 바로 읽음
+                    status: row.get(6)?,
+                })
             })
-        }).optional().map_err(|e| e.to_string())?;
+            .optional()
+            .map_err(|e| e.to_string())?;
 
         Ok(result)
     }
@@ -481,15 +513,24 @@ impl StorageManager {
              FROM tasks WHERE user_id = ?1"
         ).map_err(|e| e.to_string())?;
 
-        let rows = stmt.query_map([user_id], |row| {
-            Ok(LocalTask {
-                id: row.get(0)?, user_id: row.get(1)?, task_name: row.get(2)?, description: row.get(3)?,
-                target_executable: row.get(4)?, target_arguments: row.get(5)?, status: row.get(6)?,
+        let rows = stmt
+            .query_map([user_id], |row| {
+                Ok(LocalTask {
+                    id: row.get(0)?,
+                    user_id: row.get(1)?,
+                    task_name: row.get(2)?,
+                    description: row.get(3)?,
+                    target_executable: row.get(4)?,
+                    target_arguments: row.get(5)?,
+                    status: row.get(6)?,
+                })
             })
-        }).map_err(|e| e.to_string())?;
+            .map_err(|e| e.to_string())?;
 
         let mut tasks = Vec::new();
-        for row in rows { tasks.push(row.map_err(|e| e.to_string())?); }
+        for row in rows {
+            tasks.push(row.map_err(|e| e.to_string())?);
+        }
         Ok(tasks)
     }
 }
@@ -567,6 +608,7 @@ mod tests {
             last_meaningful_input_timestamp_ms: 1234567890,
             last_mouse_move_timestamp_ms: 1234567899,
             start_monitoring_timestamp_ms: 0,
+            visible_windows: Vec::new(),
         };
         // commands.rs의 헬퍼 함수를 직접 테스트
         let json_1 = mock_stats_1.to_activity_vector_json();
@@ -576,6 +618,7 @@ mod tests {
             last_meaningful_input_timestamp_ms: 1234567999,
             last_mouse_move_timestamp_ms: 1234567990,
             start_monitoring_timestamp_ms: 0,
+            visible_windows: Vec::new(),
         };
         let json_2 = mock_stats_2.to_activity_vector_json();
 

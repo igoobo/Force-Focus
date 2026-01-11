@@ -6,14 +6,14 @@ pub mod backend_communicator;
 mod commands;
 pub mod input_monitor;
 mod logging;
+pub mod schedule_monitor;
 pub mod state_engine;
 #[allow(dead_code)]
 pub mod storage_manager;
+pub mod sync_manager;
 pub mod tray_manager;
 pub mod widget_manager;
 pub mod window_commands;
-pub mod sync_manager;
-pub mod schedule_monitor;
 
 // --- 2. 전역 use ---
 
@@ -21,8 +21,10 @@ use crate::storage_manager::StorageManager;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use sysinfo::System;
-use tauri::{Builder, Emitter, Manager, State, Url, AppHandle};
+use tauri::{AppHandle, Builder, Emitter, Manager, State, Url};
 use tauri_plugin_deep_link::DeepLinkExt; //  딥 링크 확장 트레이트
+use tauri_plugin_autostart::MacosLauncher;
+use std::env; //  환경 변수 및 인자 수집용
 
 // --- 3. 전역 상태 타입 정의 ---
 
@@ -71,7 +73,6 @@ pub type StorageManagerArcMutex = Arc<Mutex<StorageManager>>;
 // 전역 세션 상태
 pub type SessionStateArcMutex = Arc<Mutex<Option<ActiveSessionInfo>>>;
 
-
 // --- 공통 딥 링크 처리 함수 (핵심 로직 통합) ---
 // Single Instance와 on_open_url 양쪽에서 호출합니다.
 fn handle_deep_link(app: &AppHandle, url: &Url) {
@@ -84,15 +85,15 @@ fn handle_deep_link(app: &AppHandle, url: &Url) {
 
     if is_scheme_valid && is_host_valid && is_path_valid {
         let query_pairs: std::collections::HashMap<_, _> = url.query_pairs().into_owned().collect();
-        
+
         if let (Some(access), Some(refresh), Some(email), Some(user_id)) = (
             query_pairs.get("access_token"),
             query_pairs.get("refresh_token"),
             query_pairs.get("email"),
-            query_pairs.get("user_id")
+            query_pairs.get("user_id"),
         ) {
             println!("Login detected for user: {}", email);
-            
+
             // 2. LSN 저장 (AppHandle을 통해 State 접근)
             if let Some(storage_state) = app.try_state::<StorageManagerArcMutex>() {
                 // Mutex Lock
@@ -102,12 +103,12 @@ fn handle_deep_link(app: &AppHandle, url: &Url) {
                             eprintln!("CRITICAL: Failed to save auth token to LSN: {}", e);
                         } else {
                             println!("Auth token saved to LSN successfully.");
-                            
+
                             // 3. 프론트엔드 알림 (화면 전환)
                             if let Err(e) = app.emit("login-success", email) {
                                 eprintln!("Failed to emit login-success event: {}", e);
                             }
-                            
+
                             // 4. 메인 창 띄우기 (포커스)
                             if let Some(window) = app.get_webview_window("main") {
                                 let _ = window.show();
@@ -117,7 +118,7 @@ fn handle_deep_link(app: &AppHandle, url: &Url) {
                                 }
                             }
                         }
-                    },
+                    }
                     Err(e) => eprintln!("CRITICAL: Failed to lock storage manager mutex: {}", e),
                 }
             } else {
@@ -127,10 +128,13 @@ fn handle_deep_link(app: &AppHandle, url: &Url) {
             eprintln!("Deep Link Error: Missing required query parameters (access/refresh/email)");
         }
     } else {
-        println!("Deep Link Skipped. Mismatch structure. Host={:?}, Path={}", url.host_str(), url.path());
+        println!(
+            "Deep Link Skipped. Mismatch structure. Host={:?}, Path={}",
+            url.host_str(),
+            url.path()
+        );
     }
 }
-
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -151,11 +155,14 @@ pub fn run() {
     let backend_communicator_state = Arc::new(backend_communicator::BackendCommunicator::new());
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent, 
+            Some(vec!["--silent"]) // Windows 레지스트리에 "앱경로 --silent"로 등록됨
+        ))
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_deep_link::init()) // 딥 링크 플러그인 초기화
         .plugin(tauri_plugin_opener::init())
-
         // 단일 인스턴스 플러그인 (Windows 딥 링크 해결사)
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             println!("Single Instance: New instance detected.");
@@ -170,7 +177,7 @@ pub fn run() {
                     eprintln!("Single Instance: Failed to parse URL: {}", url_str);
                 }
             }
-            
+
             // (딥 링크가 아니더라도) 창을 앞으로 띄움
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
@@ -180,7 +187,6 @@ pub fn run() {
                 }
             }
         }))
-
         .manage(commands::SysinfoState(
             // commands::SysinfoState로 경로 명시
             Mutex::new(System::new_all()),
@@ -222,6 +228,31 @@ pub fn run() {
             // 'storage_manager_state'를 클로저 내부로 안전하게 이동시키기 위해 clone
             let storage_manager_for_deep_link = storage_manager_state.clone();
             let app_handle_for_deep_link = app_handle.clone();
+            
+
+            // Silent Start 로직 구현
+            // 1. 실행 인자 수집
+            let args: Vec<String> = env::args().collect();
+            println!("Startup Args: {:?}", args);
+
+            // 2. "--silent" 인자가 있는지 확인
+            let is_silent = args.iter().any(|arg| arg == "--silent");
+
+            // 3. 메인 창 가져오기
+            if let Some(window) = app.get_webview_window("main") {
+                if is_silent {
+                    // [케이스 A] 자동 시작 (Silent)
+                    println!("App started in silent mode (Tray only).");
+                    // 창을 띄우지 않음 (visible: false 상태 유지)
+                    // 트레이 아이콘은 tray_manager::setup_tray_menu에 의해 생성됨
+                } else {
+                    // [케이스 B] 사용자가 직접 실행 (Double Click)
+                    println!("App started normally. Showing main window.");
+                    window.show().unwrap();
+                    window.set_focus().unwrap();
+                }
+            }
+
 
             // ---  Deep Link 리스너 (공통 함수 사용) ---
             // setup 훅 내부에서 실행되는 리스너
@@ -280,8 +311,8 @@ pub fn run() {
             backend_communicator::end_session,
             backend_communicator::get_tasks,
             backend_communicator::get_current_session_info,
-            backend_communicator::login,  //  로그인 커맨드
-            backend_communicator::logout, //  로그아웃 커맨드
+            backend_communicator::login,             //  로그인 커맨드
+            backend_communicator::logout,            //  로그아웃 커맨드
             backend_communicator::check_auth_status, // 자동 로그인 커맨드 등록
             window_commands::hide_overlay
         ])

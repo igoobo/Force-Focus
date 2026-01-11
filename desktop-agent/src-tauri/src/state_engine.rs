@@ -225,6 +225,7 @@ mod tests {
             last_meaningful_input_timestamp_ms: now_ms.saturating_sub(last_input_ago_s * 1000),
             last_mouse_move_timestamp_ms: now_ms,
             start_monitoring_timestamp_ms: 0,
+            visible_windows: Vec::new(),
         }
     }
     #[test]
