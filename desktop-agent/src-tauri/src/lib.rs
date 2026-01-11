@@ -23,6 +23,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use sysinfo::System;
 use tauri::{AppHandle, Builder, Emitter, Manager, State, Url};
 use tauri_plugin_deep_link::DeepLinkExt; //  딥 링크 확장 트레이트
+use tauri_plugin_autostart::MacosLauncher;
+use std::env; //  환경 변수 및 인자 수집용
 
 // --- 3. 전역 상태 타입 정의 ---
 
@@ -153,7 +155,10 @@ pub fn run() {
     let backend_communicator_state = Arc::new(backend_communicator::BackendCommunicator::new());
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_autostart::Builder::new().build())
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent, 
+            Some(vec!["--silent"]) // Windows 레지스트리에 "앱경로 --silent"로 등록됨
+        ))
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_deep_link::init()) // 딥 링크 플러그인 초기화
@@ -223,6 +228,31 @@ pub fn run() {
             // 'storage_manager_state'를 클로저 내부로 안전하게 이동시키기 위해 clone
             let storage_manager_for_deep_link = storage_manager_state.clone();
             let app_handle_for_deep_link = app_handle.clone();
+            
+
+            // Silent Start 로직 구현
+            // 1. 실행 인자 수집
+            let args: Vec<String> = env::args().collect();
+            println!("Startup Args: {:?}", args);
+
+            // 2. "--silent" 인자가 있는지 확인
+            let is_silent = args.iter().any(|arg| arg == "--silent");
+
+            // 3. 메인 창 가져오기
+            if let Some(window) = app.get_webview_window("main") {
+                if is_silent {
+                    // [케이스 A] 자동 시작 (Silent)
+                    println!("App started in silent mode (Tray only).");
+                    // 창을 띄우지 않음 (visible: false 상태 유지)
+                    // 트레이 아이콘은 tray_manager::setup_tray_menu에 의해 생성됨
+                } else {
+                    // [케이스 B] 사용자가 직접 실행 (Double Click)
+                    println!("App started normally. Showing main window.");
+                    window.show().unwrap();
+                    window.set_focus().unwrap();
+                }
+            }
+
 
             // ---  Deep Link 리스너 (공통 함수 사용) ---
             // setup 훅 내부에서 실행되는 리스너

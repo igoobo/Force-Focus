@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { useState, useEffect  } from 'react';
+import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { styles } from './SettingsView.styles';
 
 interface SettingsViewProps {
@@ -8,14 +9,37 @@ interface SettingsViewProps {
 }
 
 const SettingsView: React.FC<SettingsViewProps> = ({ userEmail, onLogout, onBack }) => {
-  // 자동 시작 상태 (추후 Rust 플러그인과 연동 예정)
+  // 자동 시작 상태
   const [autoStartEnabled, setAutoStartEnabled] = useState(false);
 
+  // 컴포넌트 마운트 시 현재 자동 시작 상태 확인
+  useEffect(() => {
+    const checkAutoStart = async () => {
+      try {
+        const enabled = await isEnabled();
+        setAutoStartEnabled(enabled);
+      } catch (e) {
+        console.warn('Failed to check autostart status (plugin may not be configured):', e);
+      }
+    };
+    checkAutoStart();
+  }, []);
+
   const handleAutoStartToggle = async () => {
-    // TODO: tauri-plugin-autostart 연동
-    const newState = !autoStartEnabled;
-    setAutoStartEnabled(newState);
-    console.log(`Auto-start toggled: ${newState}`);
+    try {
+      if (autoStartEnabled) {
+        await disable();
+        setAutoStartEnabled(false);
+        console.log('Auto-start disabled');
+      } else {
+        await enable();
+        setAutoStartEnabled(true);
+        console.log('Auto-start enabled');
+      }
+    } catch (e) {
+      console.error('Failed to toggle autostart:', e);
+      alert('자동 시작 설정을 변경하는 데 실패했습니다. 권한이나 설정을 확인해주세요.');
+    }
   };
 
   // 오프라인/온라인 색상 결정
