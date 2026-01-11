@@ -25,8 +25,17 @@ use uuid::Uuid; // 로컬에서 임시 세션 ID 생성용
 // --- 1. 상수 정의 ---
 
 fn get_api_base_url() -> String {
-    dotenv().ok(); // .env 파일 로드 (없어도 패닉 안 남)
-                   // .env에 값이 없으면 로컬호스트를 기본값으로 사용 (개발 편의성)
+    // 컴파일 타임에 환경 변수 'API_BASE_URL'을 읽어 바이너리에 박제
+    // 배포 빌드 시 이 값이 고정 ($env:VITE_API_BASE_URL="http://YOUR_GCP_IP.nip.io:8000/api/v1"
+    const BUILD_TIME_URL: Option<&str> = option_env!("API_BASE_URL");
+    
+    // 1순위: 빌드 시 주입된 URL (배포용)
+    if let Some(url) = BUILD_TIME_URL {
+        return url.to_string();
+    }
+
+    // 2순위: 런타임 .env 파일 (로컬 개발용)
+    dotenv().ok();
     env::var("API_BASE_URL").unwrap_or_else(|_| "http://127.0.0.1:8000/api/v1".to_string())
 }
 
