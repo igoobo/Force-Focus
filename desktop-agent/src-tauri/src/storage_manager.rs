@@ -567,6 +567,7 @@ mod tests {
             last_meaningful_input_timestamp_ms: 1234567890,
             last_mouse_move_timestamp_ms: 1234567899,
             start_monitoring_timestamp_ms: 0,
+            visible_windows: Vec::new(),
         };
         // commands.rs의 헬퍼 함수를 직접 테스트
         let json_1 = mock_stats_1.to_activity_vector_json();
@@ -576,6 +577,7 @@ mod tests {
             last_meaningful_input_timestamp_ms: 1234567999,
             last_mouse_move_timestamp_ms: 1234567990,
             start_monitoring_timestamp_ms: 0,
+            visible_windows: Vec::new(),
         };
         let json_2 = mock_stats_2.to_activity_vector_json();
 
