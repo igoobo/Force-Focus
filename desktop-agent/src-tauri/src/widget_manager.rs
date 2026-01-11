@@ -12,9 +12,9 @@ pub fn setup_widget_listeners<R: Runtime>(
     let main_window = app_handle.get_webview_window("main").unwrap();
     let app_handle_clone = app_handle.clone(); // 스레드간 이동
 
-    // [추가] 마지막으로 포커스를 '얻은(True)' 시점을 기록하는 상태
-    // (초기값은 아주 오래전으로 설정)
-    let last_focus_gain_time = Arc::new(Mutex::new(Instant::now() - Duration::from_secs(3600)));
+    // 패닉 방지: 억지로 시간을 빼지 않고 Option으로 '초기 상태'를 표현
+    // None = 아직 한 번도 포커스를 얻은 적 없음
+    let last_focus_gain_time: Arc<Mutex<Option<Instant>>> = Arc::new(Mutex::new(None));
     let last_focus_gain_time_clone = last_focus_gain_time.clone();
 
     main_window.on_window_event(move |event| {
@@ -23,12 +23,17 @@ pub fn setup_widget_listeners<R: Runtime>(
             WindowEvent::Focused(false) => {
                 let session_state = session_state_mutex.lock().unwrap();
 
-                // [추가] 쿨다운 체크: 포커스를 얻은 지 200ms도 안 지났는데 잃었다면? -> 무시 (복원 노이즈)
-                let last_gain = *last_focus_gain_time_clone.lock().unwrap();
-                if last_gain.elapsed() < Duration::from_millis(200) {
-                    println!("Ignored Focused(false) due to cooldown (restore noise).");
-                    return;
+                // 쿨다운 체크: 포커스를 얻은 지 200ms도 안 지났는데 잃었다면? -> 무시 (복원 노이즈)
+                let last_gain_opt = *last_focus_gain_time_clone.lock().unwrap();
+                
+                if let Some(last_gain) = last_gain_opt {
+                    // 포커스를 얻은 기록이 있다면, 경과 시간 체크
+                    if last_gain.elapsed() < Duration::from_millis(200) {
+                        println!("Ignored Focused(false) due to cooldown (restore noise).");
+                        return;
+                    }
                 }
+                // None인 경우(앱 켜고 처음)는 쿨다운 없이 통과 (즉시 위젯 표시 가능)
 
                 if session_state.is_some() {
                     // 세션이 '활성' 상태일 때만 '위젯'을 띄움
@@ -39,9 +44,9 @@ pub fn setup_widget_listeners<R: Runtime>(
 
             // [유지] v2 API: '메인 창'이 '포커스를 얻음'
             WindowEvent::Focused(true) => {
-                // [추가] 포커스 획득 시점 기록
+                // 포커스 획득 시점 기록 (Some으로 감싸서 저장)
                 let mut last_gain = last_focus_gain_time_clone.lock().unwrap();
-                *last_gain = Instant::now();
+                *last_gain = Some(Instant::now());
 
                 // '메인 창'이 보이므로 '위젯'을 숨김
                 if let Some(widget) = app_handle_clone.get_webview_window("widget") {
