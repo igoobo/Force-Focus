@@ -104,7 +104,8 @@ async def auth_google_callback(request: Request):
         query_params = {
             "access_token": access_token,
             "refresh_token": refresh_token,
-            "email": email
+            "email": email,
+            "user_id": user_id_str 
         }
         query_string = urlencode(query_params)
         

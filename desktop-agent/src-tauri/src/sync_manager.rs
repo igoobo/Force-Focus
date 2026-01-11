@@ -29,49 +29,79 @@ async fn process_sync(app: &AppHandle) -> Result<(), String> {
     let storage_state = app.try_state::<StorageManagerArcMutex>()
         .ok_or("StorageManager state not found in AppHandle")?;
 
-    // 2. 토큰 및 데이터 조회 (Mutex Lock 최소화)
-    // - Lock을 잡고 데이터를 복사해온 뒤 즉시 해제하여 UI 블로킹 방지
-    let (token, events) = {
-        let storage = storage_state.lock().map_err(|e| e.to_string())?;
-
-        // 로그인 여부 확인
-        let token_data = storage.load_auth_token()?;
-        let token = match token_data {
-            Some((access, _, _)) => access,
-            None => return Ok(()), // 토큰 없음 = 오프라인 모드 (조용히 리턴)
-        };
-
-        // 전송할 이벤트 조회 (최대 50개씩 끊어서 전송)
-        let events = storage.get_unsynced_events(50)?;
-
-        if events.is_empty() {
-            return Ok(()); // 보낼 데이터 없음
-        }
-
-        (token, events)
-    }; // 여기서 storage Lock 해제됨
-
-    // 삭제를 위해 ID 목록 미리 백업
-    let event_ids: Vec<i64> = events.iter().map(|e| e.id).collect();
-    let count = event_ids.len();
-
-    // 3. 백엔드 통신 모듈 가져오기
+    // 백엔드 통신 모듈 가져오기
     // (BackendCommunicator는 내부적으로 Client를 가지고 있으며, 상태로 등록됨)
+    // Arc<BackendCommunicator> 타입으로 가져오기
     let comm_state = app.try_state::<Arc<BackendCommunicator>>()
         .ok_or("BackendCommunicator state not found")?;
 
-    // 4. 서버로 전송 (비동기)
-    // (events 벡터의 소유권이 넘어감)
-    // backend_communicator.rs에 구현된 sync_events_batch 메서드 호출
-    comm_state.sync_events_batch(events, &token).await?;
+    // 2. 토큰 확인 (로그인 여부)
+    // 이벤트를 조회하기 전에 토큰부터 확인
+    let token = {
+        let storage = storage_state.lock().map_err(|e| e.to_string())?;
+        match storage.load_auth_token()? {
+            Some((access, _, _, _)) => access,
+            None => return Ok(()), // 토큰 없음 = 오프라인 모드 (동기화 전체 스킵)
+        }
+    }; // 여기서 storage Lock 해제
 
-    // 5. 전송 성공 시 로컬 데이터 삭제
+    // --- [A] Down-Sync: 서버 데이터 가져오기 (스케줄 & 태스크) ---
+     // 2-1. Task 다운로드
+    let fetched_tasks = match comm_state.fetch_tasks(&token).await {
+        Ok(t) => Some(t),
+        Err(e) => {
+            eprintln!("Sync Manager: Failed to fetch tasks: {}", e);
+            None
+        }
+    };
+
+    // 2-2. Schedule 다운로드
+    let fetched_schedules = match comm_state.fetch_schedules(&token).await {
+        Ok(s) => Some(s),
+        Err(e) => {
+            eprintln!("Sync Manager: Failed to fetch schedules: {}", e);
+            None
+        }
+    };
+
+    // 3. 로컬 DB 저장 (Lock 필요)
     {
         let storage = storage_state.lock().map_err(|e| e.to_string())?;
-        storage.delete_events_by_ids(&event_ids)?;
-    }
+        
+        if let Some(tasks) = fetched_tasks {
+            if let Err(e) = storage.sync_tasks(tasks) {
+                eprintln!("Sync Manager: Failed to sync tasks to DB: {}", e);
+            }
+        }
+        
+        if let Some(schedules) = fetched_schedules {
+            if let Err(e) = storage.sync_schedules(schedules) {
+                eprintln!("Sync Manager: Failed to sync schedules to DB: {}", e);
+            }
+        }
+    } // lock 해제
 
-    println!("Sync Manager: Successfully synced {} events to server.", count);
+    // --- [B] Up-Sync: 로컬 데이터 올리기 (이벤트) ---
+    // 4. 전송할 데이터 조회 (Lock)
+    let events = {
+        let storage = storage_state.lock().map_err(|e| e.to_string())?;
+        storage.get_unsynced_events(50)?
+    };
+
+    if !events.is_empty() {
+        let event_ids: Vec<i64> = events.iter().map(|e| e.id).collect();
+        let count = event_ids.len();
+
+        // 5. 서버 전송 (Async, No Lock)
+        comm_state.sync_events_batch(events, &token).await?;
+
+        // 6. 전송 성공 시 삭제 (Lock)
+        {
+            let storage = storage_state.lock().map_err(|e| e.to_string())?;
+            storage.delete_events_by_ids(&event_ids)?;
+        }
+        println!("Sync Manager: Successfully uploaded {} events.", count);
+    }
 
     Ok(())
 }

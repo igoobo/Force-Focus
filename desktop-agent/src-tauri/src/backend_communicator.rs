@@ -4,23 +4,27 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tauri::{command, State};
 
-// lib.rs에서 정의한 전역 상태 타입들
-use crate::{ActiveSessionInfo, InputStatsArcMutex, SessionStateArcMutex, StorageManagerArcMutex};
-
-use crate::Task;
-// StorageManager의 메서드를 호출하기 위해 모듈 import
-use crate::storage_manager;
-use crate::storage_manager::CachedEvent;
-
-use std::time::{SystemTime, UNIX_EPOCH}; // 세션 시작 시간 생성용
-use uuid::Uuid; // 로컬에서 임시 세션 ID 생성용
-
 // 백그라운드 동기화를 위해 tokio::spawn과 Arc, Mutex를 사용
 use std::sync::{Arc, Mutex};
 use tokio::spawn;
 
 use dotenv::dotenv;
 use std::env;
+
+// lib.rs에서 정의한 전역 상태 타입들
+use crate::{
+    ActiveSessionInfo,
+    SessionStateArcMutex,
+    StorageManagerArcMutex,
+    InputStatsArcMutex,
+    Task, 
+};
+
+// StorageManager의 메서드를 호출하기 위해 모듈 import
+use crate::storage_manager::{self, CachedEvent, LocalTask, LocalSchedule}; // LocalTask, LocalSchedule import
+
+use std::time::{SystemTime, UNIX_EPOCH}; // 세션 시작 시간 생성용
+use uuid::Uuid; // 로컬에서 임시 세션 ID 생성용
 
 // --- 1. 상수 정의 ---
 
@@ -74,6 +78,34 @@ struct EventData {
     window_title: String,
     activity_vector: serde_json::Value, 
 }
+
+
+// 백엔드 Task API 응답 모델 (Schema: TaskRead)
+#[derive(Debug, Deserialize)]
+struct ApiTask {
+    id: String,
+    user_id: String,
+    name: String,
+    description: Option<String>,
+    status: String,
+    target_executable: Option<String>,
+    target_arguments: Option<String>,
+    // created_at, due_date 등은 필요 시 추가
+}
+
+// 백엔드 Schedule API 응답 모델 (Schema: ScheduleRead)
+#[derive(Debug, Deserialize)]
+struct ApiSchedule {
+    id: String,
+    user_id: String,
+    task_id: Option<String>,
+    name: String,
+    start_time: String, // "HH:MM:SS" (Time 객체는 문자열로 옴)
+    end_time: String,
+    days_of_week: Vec<u8>,
+    is_active: bool,
+}
+
 
 // --- 3. BackendCommunicator 상태 정의 ---
 
@@ -140,6 +172,69 @@ impl BackendCommunicator {
             Err(format!("Server returned error {}: {}", status, text))
         }
     }
+
+    // ---  데이터 다운로드 (Fetch Only) ---
+    // StorageManager 의존성을 제거하고 데이터를 반환
+
+    /// 서버에서 Task 목록을 받아옴 (저장은 호출자가 수행)
+    pub async fn fetch_tasks(&self, token: &str) -> Result<Vec<LocalTask>, String> {
+        let url = format!("{}/tasks", get_api_base_url()); 
+        
+        let response = self.client.get(&url)
+            .bearer_auth(token)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to fetch tasks: {}", e))?;
+
+        if response.status().is_success() {
+            let api_tasks: Vec<ApiTask> = response.json().await.map_err(|e| format!("JSON parse error: {}", e))?;
+            
+            let local_tasks: Vec<LocalTask> = api_tasks.into_iter().map(|t| LocalTask {
+                id: t.id,
+                user_id: t.user_id,
+                task_name: t.name,
+                description: t.description,
+                target_executable: t.target_executable,
+                target_arguments: t.target_arguments,
+                status: t.status,
+            }).collect();
+
+            Ok(local_tasks)
+        } else {
+            Err(format!("Server error (Tasks): {}", response.status()))
+        }
+    }
+
+    /// 서버에서 Schedule 목록을 받아옴 (저장은 호출자가 수행)
+    pub async fn fetch_schedules(&self, token: &str) -> Result<Vec<LocalSchedule>, String> {
+        let url = format!("{}/schedules", get_api_base_url());
+        
+        let response = self.client.get(&url)
+            .bearer_auth(token)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to fetch schedules: {}", e))?;
+
+        if response.status().is_success() {
+            let api_schedules: Vec<ApiSchedule> = response.json().await.map_err(|e| format!("JSON parse error: {}", e))?;
+            
+            let local_schedules: Vec<LocalSchedule> = api_schedules.into_iter().map(|s| LocalSchedule {
+                id: s.id,
+                user_id: s.user_id,
+                task_id: s.task_id,
+                name: s.name,
+                start_time: s.start_time,
+                end_time: s.end_time,
+                days_of_week: s.days_of_week,
+                is_active: s.is_active,
+            }).collect();
+
+            Ok(local_schedules)
+        } else {
+            Err(format!("Server error (Schedules): {}", response.status()))
+        }
+    }
+
 }
 
 // --- 4. 이 모듈에 속한 Tauri 커맨드 정의 ---
@@ -150,13 +245,14 @@ pub fn login(
     access_token: String,
     refresh_token: String,
     user_email: String,
+    user_id: String,
     storage_manager_mutex: State<'_, StorageManagerArcMutex>,
 ) -> Result<(), String> {
     let storage_manager = storage_manager_mutex.lock().map_err(|e| e.to_string())?;
 
     // LSN에 토큰 저장
-    storage_manager.save_auth_token(&access_token, &refresh_token, &user_email)?;
-
+    storage_manager.save_auth_token(&access_token, &refresh_token, &user_email, &user_id)?;
+    
     println!("User logged in: {}", user_email);
     Ok(())
 }
@@ -236,7 +332,7 @@ pub async fn start_session(
         let token = storage_manager
             .load_auth_token()
             .unwrap_or(None) // 에러나면 무시 (오프라인/미로그인으로 간주)
-            .map(|t| t.0); // (access_token, refresh_token, email) 중 access_token만 추출
+            .map(|t| t.0); // (access_token, refresh_token, email, user_id) 중 access_token만 추출
 
         // 서버 응답을 기다리지 않고, 로컬에서 즉시 세션 정보를 생성
         let session_id = format!("local-{}", Uuid::new_v4());
@@ -426,7 +522,7 @@ pub fn check_auth_status(
     let token_data = storage_manager.load_auth_token().map_err(|e| e.to_string())?;
     
     // 토큰이 있으면 이메일 반환, 없으면 None
-    if let Some((_, _, email)) = token_data {
+    if let Some((_, _, email, _)) = token_data {
         println!("Auto-login: Found valid token for {}", email);
         Ok(Some(email))
     } else {
@@ -438,42 +534,41 @@ pub fn check_auth_status(
 
 
 
-// --- ['get_tasks' 커맨드 (빌드 오류 수정용) ---
-// MainView.tsx의 'fetch'를 'invoke'로 대체하기 위한 Rust 커맨드.
-// [!] (임시) handlers.ts의 'mockTasks' 데이터를 Rust에 하드코딩
+//  Task / LSN 데이터 연동
 #[command]
-pub fn get_tasks() -> Result<Vec<Task>, String> {
-    println!("Rust command 'get_tasks' invoked (returning mock data)");
+pub fn get_tasks(
+    storage_manager_mutex: State<'_, StorageManagerArcMutex>,
+) -> Result<Vec<Task>, String> {
+    let storage_manager = storage_manager_mutex.lock().map_err(|e| e.to_string())?;
 
-    // handlers.ts의 mockTasks 데이터를 Rust로 변환
-    let mock_tasks = vec![
-        Task {
-            id: "task-coding-session".to_string(),
-            user_id: "desktop-user-123".to_string(),
-            task_name: "코딩 세션 진행".to_string(),
-            description: "Force-Focus 데스크톱 앱 프런트엔드 개발".to_string(),
-            due_date: "2023-12-31T23:59:59Z".to_string(),
-            status: "active".to_string(),
-            target_executable: "vscode.exe".to_string(),
-            target_arguments: vec![],
-            created_at: "2023-10-26T10:00:00Z".to_string(),
-            updated_at: "2023-10-26T10:00:00Z".to_string(),
-        },
-        Task {
-            id: "task-report-writing".to_string(),
-            user_id: "desktop-user-123".to_string(),
-            task_name: "주간 보고서 작성".to_string(),
-            description: "지난 주 작업 내용 정리 및 보고서 초안 작성".to_string(),
-            due_date: "2023-11-03T18:00:00Z".to_string(),
-            status: "pending".to_string(),
-            target_executable: "word.exe".to_string(),
-            target_arguments: vec![],
-            created_at: "2023-10-25T09:00:00Z".to_string(),
-            updated_at: "2023-10-25T09:00:00Z".to_string(),
-        },
-    ];
+    // 1. 현재 로그인한 사용자 ID 확인 (격리)
+    let user_id = match storage_manager.load_auth_token().map_err(|e| e.to_string())? {
+        Some((_, _, _, uid)) => uid,
+        None => return Ok(vec![]), // 로그인 안 했으면 빈 목록 반환 (오프라인/게스트 정책에 따라 다름)
+    };
 
-    Ok(mock_tasks)
+    // 2. LSN에서 해당 유저의 Task 조회
+    let local_tasks = storage_manager.get_tasks_by_user(&user_id).map_err(|e| e.to_string())?;
+
+    println!("get_tasks: Found {} tasks for user {}", local_tasks.len(), user_id);
+
+    // 3. LocalTask -> Task (프론트엔드용) 변환
+    let tasks: Vec<Task> = local_tasks.into_iter().map(|t| Task {
+        id: t.id,
+        user_id: t.user_id,
+        task_name: t.task_name,
+        description: t.description.unwrap_or_default(),
+        // DB에는 날짜 필드가 없으므로 일단 빈 값 처리 (추후 필요하면 DB 마이그레이션)
+        due_date: "".to_string(), 
+        status: t.status,
+        target_executable: t.target_executable.unwrap_or_default(),
+        // "arg1 arg2" (String) -> ["arg1", "arg2"] (Vec<String>)
+        target_arguments: t.target_arguments
+            .map(|s| s.split_whitespace().map(|s| s.to_string()).collect())
+            .unwrap_or_default(),
+        created_at: "".to_string(),
+        updated_at: "".to_string(),
+    }).collect();
+
+    Ok(tasks)
 }
-
-

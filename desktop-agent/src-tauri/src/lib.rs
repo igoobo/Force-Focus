@@ -13,6 +13,7 @@ pub mod tray_manager;
 pub mod widget_manager;
 pub mod window_commands;
 pub mod sync_manager;
+pub mod schedule_monitor;
 
 // --- 2. 전역 use ---
 
@@ -84,10 +85,11 @@ fn handle_deep_link(app: &AppHandle, url: &Url) {
     if is_scheme_valid && is_host_valid && is_path_valid {
         let query_pairs: std::collections::HashMap<_, _> = url.query_pairs().into_owned().collect();
         
-        if let (Some(access), Some(refresh), Some(email)) = (
+        if let (Some(access), Some(refresh), Some(email), Some(user_id)) = (
             query_pairs.get("access_token"),
             query_pairs.get("refresh_token"),
-            query_pairs.get("email")
+            query_pairs.get("email"),
+            query_pairs.get("user_id")
         ) {
             println!("Login detected for user: {}", email);
             
@@ -96,7 +98,7 @@ fn handle_deep_link(app: &AppHandle, url: &Url) {
                 // Mutex Lock
                 match storage_state.lock() {
                     Ok(storage) => {
-                        if let Err(e) = storage.save_auth_token(access, refresh, email) {
+                        if let Err(e) = storage.save_auth_token(access, refresh, email, user_id) {
                             eprintln!("CRITICAL: Failed to save auth token to LSN: {}", e);
                         } else {
                             println!("Auth token saved to LSN successfully.");
@@ -259,6 +261,10 @@ pub fn run() {
             // 1분마다 LSN 데이터를 서버로 전송하는 루프를 시작
             // (내부적으로 토큰이 없으면 건너뛰므로 안전)
             sync_manager::start_sync_loop(app.handle().clone());
+
+            // --- 스케줄 모니터링 시작 ---
+            // 1분마다 로컬 DB를 확인하여 스케줄을 실행
+            schedule_monitor::start_monitor_loop(app.handle().clone());
 
             Ok(())
         })

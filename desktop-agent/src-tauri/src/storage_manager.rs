@@ -10,11 +10,37 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager, Runtime}; // cache_event 함수에 필요한 use 문
+use serde::{Deserialize, Serialize};
 
 // lib.rs
 use crate::commands::InputStats;
 use crate::ActiveSessionInfo;
 use crate::LoggableEventData;
+
+// 로컬 작업 및 스케줄 구조체 (public)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LocalTask {
+    pub id: String,
+    pub user_id: String,
+    pub task_name: String,            // Backend: name
+    pub description: Option<String>,  // Backend: Optional[str]
+    pub target_executable: Option<String>, // Backend: Optional[str]
+    pub target_arguments: Option<String>,  // Backend: Optional[str] (단일 문자열)
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LocalSchedule {
+    pub id: String,
+    pub user_id: String,
+    pub task_id: Option<String>,
+    pub name: String,
+    pub start_time: String, // "HH:MM:SS"
+    pub end_time: String,   // "HH:MM:SS"
+    pub days_of_week: Vec<u8>, // JSON Array [0, 1, ..]
+    pub is_active: bool,
+}
+
 
 // 동기화할 이벤트 데이터 구조체 (public)
 #[derive(Debug)]
@@ -126,12 +152,44 @@ impl StorageManager {
                 id INTEGER PRIMARY KEY CHECK (id = 1), 
                 access_token TEXT NOT NULL,
                 refresh_token TEXT NOT NULL,
+                user_id TEXT NOT NULL,
                 user_email TEXT NOT NULL,
                 updated_at INTEGER NOT NULL
             )",
             [],
         )
         .map_err(|e| format!("Failed to create auth_token table: {}", e))?;
+
+
+        // 5. Schedules 테이블
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS schedules (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                task_id TEXT,
+                name TEXT NOT NULL,
+                start_time TEXT NOT NULL,
+                end_time TEXT NOT NULL,
+                days_of_week TEXT NOT NULL, 
+                is_active INTEGER NOT NULL
+            )",
+            [],
+        ).map_err(|e| format!("Failed to create schedules table: {}", e))?;
+
+        // 6. Tasks 테이블
+        // target_arguments는 이제 단순 TEXT (NULL 허용)입니다.
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS tasks (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                task_name TEXT NOT NULL,
+                description TEXT,
+                target_executable TEXT,
+                target_arguments TEXT,
+                status TEXT NOT NULL
+            )",
+            [],
+        ).map_err(|e| format!("Failed to create tasks table: {}", e))?;
 
         Ok(())
     }
@@ -287,7 +345,7 @@ impl StorageManager {
         Ok(())
     }
 
-    pub fn save_auth_token(&self, access: &str, refresh: &str, email: &str) -> Result<(), String> {
+    pub fn save_auth_token(&self, access: &str, refresh: &str, email: &str, user_id: &str) -> Result<(), String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -295,24 +353,25 @@ impl StorageManager {
             .as_secs();
 
         conn.execute(
-            "INSERT OR REPLACE INTO auth_token (id, access_token, refresh_token, user_email, updated_at) 
-             VALUES (1, ?1, ?2, ?3, ?4)",
-            rusqlite::params![access, refresh, email, now],
+            "INSERT OR REPLACE INTO auth_token (id, access_token, refresh_token, user_email, user_id, updated_at)
+             VALUES (1, ?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params![access, refresh, email, user_id, now],
         ).map_err(|e| e.to_string())?;
         Ok(())
     }
 
-    pub fn load_auth_token(&self) -> Result<Option<(String, String, String)>, String> {
+    pub fn load_auth_token(&self) -> Result<Option<(String, String, String, String)>, String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         let mut stmt = conn
-            .prepare("SELECT access_token, refresh_token, user_email FROM auth_token WHERE id = 1")
+            .prepare("SELECT access_token, refresh_token, user_email, user_id FROM auth_token WHERE id = 1")
             .map_err(|e| e.to_string())?;
 
-        let result = stmt
-            .query_row([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
-            .optional()
-            .map_err(|e| e.to_string())?;
-
+        let result = stmt.query_row([], |row| Ok((
+            row.get(0)?, 
+            row.get(1)?, 
+            row.get(2)?,
+            row.get(3)? // user_id
+        ))).optional().map_err(|e| e.to_string())?;
         Ok(result)
     }
 
@@ -321,6 +380,117 @@ impl StorageManager {
         conn.execute("DELETE FROM auth_token WHERE id = 1", [])
             .map_err(|e| e.to_string())?;
         Ok(())
+    }
+
+    // --- 스케줄 관리 함수 ---
+
+    pub fn sync_schedules(&self, schedules: Vec<LocalSchedule>) -> Result<(), String> {
+        let mut conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+        tx.execute("DELETE FROM schedules", []).map_err(|e| e.to_string())?;
+
+        for s in schedules {
+            let days_json = serde_json::to_string(&s.days_of_week)
+                .map_err(|e| format!("Failed to serialize days: {}", e))?;
+            
+            tx.execute(
+                "INSERT INTO schedules (id, user_id, task_id, name, start_time, end_time, days_of_week, is_active)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                rusqlite::params![
+                    s.id, s.user_id, s.task_id, s.name, s.start_time, s.end_time, days_json, s.is_active as i32
+                ],
+            ).map_err(|e| e.to_string())?;
+        }
+        tx.commit().map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn get_active_schedules(&self, user_id: &str) -> Result<Vec<LocalSchedule>, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let mut stmt = conn.prepare(
+            "SELECT id, user_id, task_id, name, start_time, end_time, days_of_week, is_active 
+             FROM schedules WHERE is_active = 1"
+        ).map_err(|e| e.to_string())?;
+
+        let rows = stmt.query_map([], |row| {
+            let days_str: String = row.get(6)?;
+            let days_vec: Vec<u8> = serde_json::from_str(&days_str).unwrap_or_default();
+            let is_active_int: i32 = row.get(7)?;
+
+            Ok(LocalSchedule {
+                id: row.get(0)?, user_id: row.get(1)?, task_id: row.get(2)?, name: row.get(3)?,
+                start_time: row.get(4)?, end_time: row.get(5)?, days_of_week: days_vec, is_active: is_active_int == 1,
+            })
+        }).map_err(|e| e.to_string())?;
+
+        let mut schedules = Vec::new();
+        for row in rows { schedules.push(row.map_err(|e| e.to_string())?); }
+        Ok(schedules)
+    }
+
+    // --- Task 관리 함수  ---
+
+    pub fn sync_tasks(&self, tasks: Vec<LocalTask>) -> Result<(), String> {
+        let mut conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+        tx.execute("DELETE FROM tasks", []).map_err(|e| e.to_string())?;
+
+        for t in tasks {
+            //  JSON 직렬화 제거, Option<String> 그대로 저장
+            tx.execute(
+                "INSERT INTO tasks (id, user_id, task_name, description, target_executable, target_arguments, status)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                rusqlite::params![
+                    t.id, t.user_id, t.task_name, t.description, t.target_executable, t.target_arguments, t.status
+                ],
+            ).map_err(|e| e.to_string())?;
+        }
+        tx.commit().map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn get_task_by_id(&self, task_id: &str) -> Result<Option<LocalTask>, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let mut stmt = conn.prepare(
+            "SELECT id, user_id, task_name, description, target_executable, target_arguments, status 
+             FROM tasks WHERE id = ?1"
+        ).map_err(|e| e.to_string())?;
+
+        let result = stmt.query_row([task_id], |row| {
+            Ok(LocalTask {
+                id: row.get(0)?,
+                user_id: row.get(1)?,
+                task_name: row.get(2)?,
+                description: row.get(3)?,
+                target_executable: row.get(4)?,
+                target_arguments: row.get(5)?, // String으로 바로 읽음
+                status: row.get(6)?,
+            })
+        }).optional().map_err(|e| e.to_string())?;
+
+        Ok(result)
+    }
+
+    //  유저별 Task 목록 조회
+    pub fn get_tasks_by_user(&self, user_id: &str) -> Result<Vec<LocalTask>, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let mut stmt = conn.prepare(
+            "SELECT id, user_id, task_name, description, target_executable, target_arguments, status 
+             FROM tasks WHERE user_id = ?1"
+        ).map_err(|e| e.to_string())?;
+
+        let rows = stmt.query_map([user_id], |row| {
+            Ok(LocalTask {
+                id: row.get(0)?, user_id: row.get(1)?, task_name: row.get(2)?, description: row.get(3)?,
+                target_executable: row.get(4)?, target_arguments: row.get(5)?, status: row.get(6)?,
+            })
+        }).map_err(|e| e.to_string())?;
+
+        let mut tasks = Vec::new();
+        for row in rows { tasks.push(row.map_err(|e| e.to_string())?); }
+        Ok(tasks)
     }
 }
 // --- 유닛 테스트 모듈 ---
