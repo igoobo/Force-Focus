@@ -3,73 +3,74 @@ use tauri::{
     tray::{TrayIconBuilder, TrayIconEvent},
     AppHandle, Manager, Runtime,
 };
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 ///  트레이 메뉴 생성 및 이벤트 핸들러 설정
 pub fn setup_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
-    // 1. 메뉴 아이템 생성
-    let show_hide_i =
-        MenuItem::with_id(app, "toggle", "열기/숨기기 (Show/Hide)", true, None::<&str>)?;
-    // [추가] 세션 종료 메뉴 (옵션)
-    let end_session_i = MenuItem::with_id(
-        app,
-        "end_session",
-        "세션 강제 종료 (End Session)",
-        true,
-        None::<&str>,
-    )?;
-    let quit_i = MenuItem::with_id(app, "quit", "앱 완전 종료 (Quit)", true, None::<&str>)?;
-
+    // 1. 메뉴 아이템
+    let toggle_i = MenuItem::with_id(app, "toggle", "열기 / 숨기기 (Toggle)", true, None::<&str>)?;
+    let quit_i = MenuItem::with_id(app, "quit", "종료 (Quit)", true, None::<&str>)?;
+    
     // 2. 메뉴 구성
-    let menu = Menu::with_items(app, &[&show_hide_i, &end_session_i, &quit_i])?;
+    let menu = Menu::with_items(app, &[&toggle_i, &quit_i])?;
+
+    // 클릭 쿨다운(Term) 관리를 위한 상태
+    // 초기값은 과거 시간으로 설정하여 첫 클릭이 바로 되도록 함
+    let last_click = Arc::new(Mutex::new(Instant::now() - Duration::from_secs(1)));
+    let last_click_clone = last_click.clone();
 
     // 3. 트레이 아이콘 생성
     let _tray = TrayIconBuilder::with_id("tray")
-        .icon(app.default_window_icon().unwrap().clone()) // 앱 기본 아이콘 사용
+        .icon(app.default_window_icon().unwrap().clone())
         .menu(&menu)
+        .menu_on_left_click(false) // 왼쪽 클릭 시 메뉴가 뜨지 않도록 설정 (우클릭에만 반응)
         .on_menu_event(move |app, event| {
             match event.id.as_ref() {
                 "quit" => {
                     println!("Tray: Quit clicked");
-                    app.exit(0); // 앱 완전 종료
+                    app.exit(0);
                 }
                 "toggle" => {
-                    println!("Tray: Toggle clicked");
+                    // 메뉴에서 클릭했을 때의 동작
                     if let Some(window) = app.get_webview_window("main") {
-                        if window.is_visible().unwrap_or(false) {
-                            window.hide().unwrap();
+                        let is_visible = window.is_visible().unwrap_or(false);
+                        if is_visible {
+                            let _ = window.hide();
                         } else {
-                            window.show().unwrap();
-                            window.set_focus().unwrap();
+                            let _ = window.unminimize();
+                            let _ = window.show();
+                            let _ = window.set_focus();
                         }
                     }
-                }
-                "end_session" => {
-                    println!("Tray: End Session clicked");
-                    // [참고] Rust 내부에서 커맨드를 직접 호출하는 것은 복잡할 수 있음.
-                    // 여기서는 단순히 이벤트를 보내 프론트엔드가 처리하게 하거나,
-                    // backend_communicator의 로직을 직접 호출하는 별도 함수를 만들어야 함.
-                    // (임시로 로그만 출력)
                 }
                 _ => {}
             }
         })
-        .on_tray_icon_event(|tray, event| {
-            // (선택) 트레이 아이콘 좌클릭 시 메인 창 토글
-            if let TrayIconEvent::Click {
-                button: tauri::tray::MouseButton::Left,
-                ..
-            } = event
-            {
-                let app = tray.app_handle();
-                if let Some(window) = app.get_webview_window("main") {
-                    if window.is_visible().unwrap_or(false) {
-                        let _ = window.hide();
-                    } else {
-                        let _ = window.show();
-                        let _ = window.set_focus();
-                    }
-                }
-            }
+        .on_tray_icon_event(move |tray, event| {
+             // 아이콘 좌클릭 시 토글 로직
+             if let TrayIconEvent::Click { button: tauri::tray::MouseButton::Left, .. } = event {
+                 let app = tray.app_handle();
+                 
+                 // 쿨다운 체크
+                 let mut last = last_click_clone.lock().unwrap();
+                 if last.elapsed() < Duration::from_millis(200) {
+                     return; 
+                 }
+                 *last = Instant::now();
+
+                 if let Some(window) = app.get_webview_window("main") {
+                     let is_visible = window.is_visible().unwrap_or(false);
+                     
+                     if is_visible {
+                         let _ = window.hide();
+                     } else {
+                         let _ = window.unminimize();
+                         let _ = window.show();
+                         let _ = window.set_focus();
+                     }
+                 }
+             }
         })
         .build(app)?;
 

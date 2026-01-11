@@ -21,7 +21,7 @@ use crate::storage_manager::StorageManager;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use sysinfo::System;
-use tauri::{AppHandle, Builder, Emitter, Manager, State, Url};
+use tauri::{AppHandle, Builder, Emitter, Manager, State, Url, WindowEvent};
 use tauri_plugin_deep_link::DeepLinkExt; //  딥 링크 확장 트레이트
 use tauri_plugin_autostart::MacosLauncher;
 use std::env; //  환경 변수 및 인자 수집용
@@ -187,6 +187,21 @@ pub fn run() {
                 }
             }
         }))
+
+
+        // 사용자가 'X'를 눌러도 앱은 종료되지 않고 트레이로 숨김
+        // 앱을 완전히 끄려면 트레이 메뉴의 'Quit'을 사용
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                // 메인 창인 경우에만 닫기를 막고 숨김 처리
+                if window.label() == "main" {
+                    println!("Window Close Requested: Hiding window to system tray.");
+                    api.prevent_close(); 
+                    let _ = window.hide();
+                }
+            }
+        })
+
         .manage(commands::SysinfoState(
             // commands::SysinfoState로 경로 명시
             Mutex::new(System::new_all()),
