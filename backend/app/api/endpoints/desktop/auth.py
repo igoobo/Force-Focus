@@ -2,10 +2,9 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.templating import Jinja2Templates 
 from authlib.integrations.starlette_client import OAuth, OAuthError
 from fastapi.responses import HTMLResponse
-from jose import jwt
 from datetime import datetime, timedelta, timezone
+
 import os
-import uuid
 from dotenv import load_dotenv
 from urllib.parse import urlencode
 
@@ -41,7 +40,7 @@ oauth.register(
 @router.get("/google/login")
 async def login_via_google(request: Request):
 
-    redirect_uri = f"{BACKEND_PUBLIC_URL}/api/v1/auth/google/callback"
+    redirect_uri = f"{BACKEND_PUBLIC_URL}/api/v1/auth/desktop/google/callback"
     response = await oauth.google.authorize_redirect(request, redirect_uri)
     
     return response
@@ -53,6 +52,8 @@ async def login_via_google(request: Request):
 async def auth_google_callback(request: Request):
     try:
         # A. 구글 토큰 및 정보 획득
+        # authlib가 세션에서 자동으로 redirect_uri를 가져오도록
+        # (수동으로 넘기면 'multiple values' 에러 발생)
         token = await oauth.google.authorize_access_token(request)
         
         user_info = token.get('userinfo')
@@ -60,39 +61,43 @@ async def auth_google_callback(request: Request):
             raise HTTPException(status_code=400, detail="Failed to get user info")
         
         email = user_info.get("email")
+        google_sub = user_info.get("sub")
 
         # B. DB 연동 (mongo.db 사용)
         if mongo.db is None:
             raise HTTPException(status_code=500, detail="Database connection failed")
 
         user = await mongo.db.users.find_one({"email": email})
-        
+        # 변수 초기화 (스코프 문제 방지)
+        user_id_str = ""
+    
         if user:
             # 기존 유저: 로그인 시간 업데이트
-            user_id = user["_id"]
+            user_id_obj = user["_id"]
             await mongo.db.users.update_one(
-                {"_id": user_id},
+                {"_id": user_id_obj},
                 {"$set": {"last_login_at": datetime.now(timezone.utc)}}
             )
+            # JWT 생성을 위해 ObjectId -> str 변환 (변수 할당)
+            user_id_str = str(user_id_obj)
         else:
-            user_id = str(uuid.uuid4())
-            # 신규 유저: 생성
-            #  모델 생성 시 누락된 필드(password_hash) 추가 및 ID 명시
+            # [신규 유저] 생성
             new_user = UserInDB(
-                id=user_id,         # ConfigDict.populate_by_name = True 덕분에 id로 넣어도 됨
                 email=email,
+                google_id=google_sub,
                 created_at=datetime.now(timezone.utc),
-                last_login_at=datetime.now(timezone.utc),
-                settings={},
-                blocked_apps=[]
+                last_login_at=datetime.now(timezone.utc)
+                # settings, fcm_tokens, blocked_apps는 default_factory로 자동 생성
             )
-            # Pydantic v2 호환 (model_dump) 또는 v1 (dict)
-            user_dict = new_user.dict(by_alias=True) if hasattr(new_user, 'dict') else new_user.model_dump(by_alias=True)
-            await mongo.db.users.insert_one(user_dict)
+            result = await mongo.db.users.insert_one(new_user.model_dump(by_alias=True))
+            user_id_str = str(result.inserted_id)
 
         # C. 공통 모듈 사용하여 토큰 발급
-        access_token = create_access_token(user_id)
-        refresh_token = create_refresh_token(user_id)
+        if not user_id_str:
+             raise HTTPException(status_code=500, detail="User ID generation failed")
+        
+        access_token = create_access_token(user_id_str)
+        refresh_token = create_refresh_token(user_id_str)
 
         # D. 데스크톱 앱 깨우기 (Deep Link Redirect)
         # URL 파라미터 인코딩 적용 (특수문자 등으로 인한 파싱 오류 방지)

@@ -42,7 +42,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOfflineClick })
     try {
       // 환경 변수(.env)에서 API 주소 로드
       const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1';
-      const targetUrl = `${apiBaseUrl}/auth/google/login`;
+      const targetUrl = `${apiBaseUrl}/auth/desktop/google/login`;
 
       console.log(`Opening Google Login page: ${targetUrl}`);
       

@@ -112,5 +112,5 @@ app.include_router(web_events.router)
 app.include_router(feedback.router)
 
 # Desktop APIs
-app.include_router(desktop_auth.router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(desktop_auth.router, prefix="/api/v1/auth/desktop", tags=["auth-desktop"])
 app.include_router(desktop_events.router, prefix="/api/v1/events", tags=["events"])
