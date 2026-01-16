@@ -1,7 +1,7 @@
 # .env에서 넘겨받은 도메인 (예: 34.xx.xx.xx.nip.io)
 {$DOMAIN_NAME} {
     # API 요청은 기존 백엔드로 전달
-    handle_path /api/* {
+    handle /api/* {
         reverse_proxy backend:8000
     }
 
