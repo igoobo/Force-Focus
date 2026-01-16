@@ -193,7 +193,7 @@ impl BackendCommunicator {
 
     /// 서버에서 Task 목록을 받아옴 (저장은 호출자가 수행)
     pub async fn fetch_tasks(&self, token: &str) -> Result<Vec<LocalTask>, String> {
-        let url = format!("{}/tasks", get_api_base_url());
+        let url = format!("{}/desktop/data/tasks", get_api_base_url());
 
         let response = self
             .client
@@ -230,7 +230,7 @@ impl BackendCommunicator {
 
     /// 서버에서 Schedule 목록을 받아옴 (저장은 호출자가 수행)
     pub async fn fetch_schedules(&self, token: &str) -> Result<Vec<LocalSchedule>, String> {
-        let url = format!("{}/schedules", get_api_base_url());
+        let url = format!("{}/desktop/data/schedules", get_api_base_url());
 
         let response = self
             .client

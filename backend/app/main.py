@@ -96,6 +96,7 @@ from app.api.endpoints.user import me
 from app.api.endpoints.desktop import (
     auth as desktop_auth,
     events as desktop_events,
+    data as desktop_data,
 )
 
 # Web Auth
@@ -114,3 +115,4 @@ app.include_router(feedback.router)
 # Desktop APIs
 app.include_router(desktop_auth.router, prefix="/api/v1/auth/desktop", tags=["auth-desktop"])
 app.include_router(desktop_events.router, prefix="/api/v1/events", tags=["events"])
+app.include_router(desktop_data.router, prefix="/api/v1/desktop/data", tags=["desktop-data"])
