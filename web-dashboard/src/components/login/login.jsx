@@ -7,9 +7,36 @@ import logoIcon from '../layout/TitleBar/ForceFocus_icon.png';
 const Login = ({ onLoginSuccess }) => {
     const isDarkMode = useMainStore((state) => state.isDarkMode);
     
-    const handleGoogleSuccess = (credentialResponse) => {
-        localStorage.setItem('accessToken', credentialResponse.credential);
-        onLoginSuccess();
+    const handleGoogleSuccess = async (credentialResponse) => {
+        try {
+            // 1. 백엔드의 새로운 검증 엔드포인트로 ID 토큰 전송
+            const response = await fetch('/api/v1/auth/google/verify', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    token: credentialResponse.credential // 구글에서 발행한 ID 토큰
+                }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+            
+                // 2. 백엔드에서 자체적으로 생성하여 보낸 서비스 전용 토큰 저장
+                localStorage.setItem('accessToken', data.access_token);
+                localStorage.setItem('refreshToken', data.refresh_token);
+            
+                // 3. 메인 스토어 또는 상태 업데이트를 통한 로그인 처리
+                onLoginSuccess(); 
+            } else {
+                const errorData = await response.json();
+                alert(`로그인 실패: ${errorData.detail || '검증 오류'}`);
+            }
+        } catch (error) {
+            console.error("Auth Error:", error);
+            alert("서버와 통신 중 오류가 발생했습니다.");
+        }
     };
 
     const handleGoogleError = () => {

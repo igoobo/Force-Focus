@@ -34,9 +34,11 @@ function App() {
   // 로그아웃 로직
   const handleLogout = () => {
     if (window.confirm("로그아웃 하시겠습니까?")) {
+      // 보안을 위해 모든 인증 관련 정보 삭제
       localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('userEmail');
       
-      // 로그아웃 시에도 메뉴 상태를 'Overview'로 초기화
       if (setActiveMenu) {
         setActiveMenu('Overview'); 
       }
