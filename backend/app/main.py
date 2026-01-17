@@ -106,8 +106,8 @@ app.include_router(web_auth.router)
 app.include_router(me.router)
 
 # Web Core
-app.include_router(tasks.router)
-app.include_router(schedules.router)
+app.include_router(tasks.router, prefix="/api/v1", tags=["tasks"])
+app.include_router(schedules.router, prefix="/api/v1", tags=["schedules"])
 app.include_router(sessions.router)
 app.include_router(web_events.router)
 app.include_router(feedback.router)
