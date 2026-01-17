@@ -76,7 +76,7 @@ export default function ScheduleDay({ schedules = [], onScheduleClick }) {
 
   // 일정 필터링
   const daySchedules = schedules.filter(
-    (s) => s.start_date === currentDisplayDateStr || s.due_date === currentDisplayDateStr
+    (s) => s.start_date === currentDisplayDateStr || s.end_date === currentDisplayDateStr
   );
 
   return (
@@ -143,7 +143,7 @@ export default function ScheduleDay({ schedules = [], onScheduleClick }) {
           {/* 일정 */}
           {daySchedules.map((s) => {
             const [sh, sm] = s.start_time.split(":").map((v) => parseInt(v, 10));
-            const [eh, em] = s.due_time.split(":").map((v) => parseInt(v, 10));
+            const [eh, em] = s.end_time.split(":").map((v) => parseInt(v, 10));
             const totalStart = sh * 60 + sm;
             const totalEnd = eh * 60 + em;
             const top = (totalStart / 60) * HOUR_HEIGHT;
@@ -158,7 +158,7 @@ export default function ScheduleDay({ schedules = [], onScheduleClick }) {
               >
                 <div className="task-title">{s.name}</div>
                 <div className="task-time">
-                  {s.start_time} ~ {s.due_time}
+                  {s.start_time} ~ {s.end_time}
                 </div>
                 <div className="task-desc">{s.description}</div>
               </div>

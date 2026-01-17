@@ -3,7 +3,7 @@ import "./ScheduleEditModal.css";
 import { useScheduleStore } from "../ScheduleStore";
 
 export default function ScheduleEditModal({ schedule, onClose }) {
-  const { addSchedule, deleteSchedule } = useScheduleStore();
+  const { updateSchedule } = useScheduleStore();
   const [taskSessions, setTaskSessions] = useState([]);
 
   useEffect(() => {
@@ -12,19 +12,19 @@ export default function ScheduleEditModal({ schedule, onClose }) {
       const parsedSessions = JSON.parse(savedSessions);
       setTaskSessions(parsedSessions);
 
-      const taskExists = parsedSessions.some(task => task.id === schedule.taskId);
-      if (!taskExists && schedule.taskId) {
-        setFormData(prev => ({ ...prev, taskId: "" }));
+      const taskExists = parsedSessions.some(task => task.id === schedule.task_id);
+      if (!taskExists && schedule.task_id) {
+        setFormData(prev => ({ ...prev, task_id: "" }));
       }
     } else {
       setTaskSessions([]);
-      setFormData(prev => ({ ...prev, taskId: "" }));
+      setFormData(prev => ({ ...prev, task_id: "" }));
     }
   }, [schedule]);
 
   const [formData, setFormData] = useState({
     ...schedule,
-    taskId: schedule.taskId || "" // 기존 연결된 작업이 있으면 로드
+    task_id: schedule.task_id || "" // 기존 연결된 작업이 있으면 로드
   });
 
   const handleChange = (e) => {
@@ -34,8 +34,9 @@ export default function ScheduleEditModal({ schedule, onClose }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    deleteSchedule(schedule.id);
-    addSchedule(formData);
+  
+    updateSchedule(formData); 
+  
     alert("일정이 수정되었습니다.");
     onClose();
   };
@@ -62,8 +63,8 @@ export default function ScheduleEditModal({ schedule, onClose }) {
           <div className="form-group">
             <label>작업 종류</label>
             <select 
-              name="taskId" 
-              value={formData.taskId} 
+              name="task_id" 
+              value={formData.task_id} 
               onChange={handleChange} 
               required
             >
@@ -97,11 +98,11 @@ export default function ScheduleEditModal({ schedule, onClose }) {
           <div className="form-row">
             <div className="form-group">
               <label>종료 날짜</label>
-              <input type="date" name="due_date" value={formData.due_date} onChange={handleChange} required />
+              <input type="date" name="end_date" value={formData.end_date} onChange={handleChange} required />
             </div>
             <div className="form-group">
               <label>종료 시간</label>
-              <input type="time" name="due_time" value={formData.due_time} onChange={handleChange} required />
+              <input type="time" name="end_time" value={formData.end_time} onChange={handleChange} required />
             </div>
           </div>
 

@@ -15,10 +15,10 @@ export default function ScheduleDeleteModal({ onClose }) {
     }
   }, []);
 
-  // taskId를 통해 작업 라벨을 찾는 함수
-  const getTaskLabel = (taskId) => {
-    const task = taskSessions.find(t => t.id === taskId);
-    return task ? task.label : "연결된 작업 없음";
+  // task_id를 통해 작업 라벨을 찾는 함수
+  const getTaskLabel = (task_id) => {
+  const task = taskSessions.find(t => t.id === task_id);
+  return task ? task.label : "연결된 작업 없음";
   };
 
   const handleDelete = () => {
@@ -61,10 +61,10 @@ export default function ScheduleDeleteModal({ onClose }) {
                     <div className="delete-title-row">
                       <h3 className="delete-schedule-name">{s.name}</h3>
                       {/* 작업 종류 배지 추가 */}
-                      <span className="delete-task-badge">{getTaskLabel(s.taskId)}</span>
+                      <span className="delete-task-badge">{getTaskLabel(s.task_id)}</span>
                     </div>
                     <p className="delete-schedule-time">
-                      {s.start_date} {s.start_time} ~ {s.due_time}
+                      {s.start_date} {s.start_time} ~ {s.end_time}
                     </p>
                     {s.description && (
                       <p className="delete-schedule-desc">{s.description}</p>

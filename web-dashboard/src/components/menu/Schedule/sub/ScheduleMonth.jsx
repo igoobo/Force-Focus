@@ -153,7 +153,7 @@ export default function ScheduleMonth({ schedules, onScheduleClick }) {
                 >
                   <strong>{s.name}</strong>
                   <div className="task-time">
-                    {s.start_time} ~ {s.due_time}
+                    {s.start_time} ~ {s.end_time}
                   </div>
                 </div>
               ))}

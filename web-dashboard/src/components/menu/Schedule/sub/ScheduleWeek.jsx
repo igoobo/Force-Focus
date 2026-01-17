@@ -64,8 +64,8 @@ export default function ScheduleWeek({ schedules, onScheduleClick }) {
                 {daySchedules.map((s) => {
                   const startHour = parseInt(s.start_time.split(":")[0]) + 1;
                   const startMin = parseInt(s.start_time.split(":")[1]);
-                  const endHour = parseInt(s.due_time.split(":")[0]) + 1;
-                  const endMin = parseInt(s.due_time.split(":")[1]);
+                  const endHour = parseInt(s.end_time.split(":")[0]) + 1;
+                  const endMin = parseInt(s.end_time.split(":")[1]);
 
                   const startTotal = startHour * 60 + startMin;
                   const endTotal = endHour * 60 + endMin;
@@ -82,7 +82,7 @@ export default function ScheduleWeek({ schedules, onScheduleClick }) {
                     >
                       <div className="task-title">{s.name}</div>
                       <div className="task-time">
-                        {s.start_time} ~ {s.due_time}
+                        {s.start_time} ~ {s.end_time}
                       </div>
                     </div>
                   );
