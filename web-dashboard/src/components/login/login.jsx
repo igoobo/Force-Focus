@@ -9,51 +9,51 @@ const Login = ({ onLoginSuccess }) => {
     
     const handleGoogleSuccess = async (credentialResponse) => {
         try {
-            // 1. 백엔드의 새로운 검증 엔드포인트로 ID 토큰 전송
+            // 백엔드 검증 엔드포인트 호출
             const response = await fetch('/api/v1/auth/google/verify', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
+                    'Content-Type': 'application/json', // 명시적 지정 필수
+                    'Accept': 'application/json'
                 },
                 body: JSON.stringify({
-                    token: credentialResponse.credential // 구글에서 발행한 ID 토큰
+                    token: credentialResponse.credential 
                 }),
             });
 
             if (response.ok) {
                 const data = await response.json();
             
-                // 2. 백엔드에서 자체적으로 생성하여 보낸 서비스 전용 토큰 저장
+                // 서비스 전용 토큰 저장
                 localStorage.setItem('accessToken', data.access_token);
                 localStorage.setItem('refreshToken', data.refresh_token);
             
-                // 3. 메인 스토어 또는 상태 업데이트를 통한 로그인 처리
+                // 로그인 처리 트리거
                 onLoginSuccess(); 
             } else {
                 const errorData = await response.json();
+                // 상세 에러 메시지 표시
+                console.error("Login Error Details:", errorData);
                 alert(`로그인 실패: ${errorData.detail || '검증 오류'}`);
             }
         } catch (error) {
-            console.error("Auth Error:", error);
-            alert("서버와 통신 중 오류가 발생했습니다.");
+            console.error("Auth Network Error:", error);
+            alert("서버와 통신 중 오류가 발생했습니다. 네트워크 상태를 확인해 주세요.");
         }
     };
 
     const handleGoogleError = () => {
-        alert("구글 로그인에 실패했습니다. 다시 시도해 주세요.");
+        alert("구글 로그인 세션이 만료되었거나 취소되었습니다. 다시 시도해 주세요.");
     };
 
     return (
         <div className={`login-container ${isDarkMode ? 'dark-theme' : ''}`}>
-            <div className="login-wrapper"> {/* 두 카드를 세로로 정렬할 래퍼 */}
-                
-                {/* 첫 번째 행: 브랜드 카드 */}
+            <div className="login-wrapper">
                 <div className="brand-card">
                     <img src={logoIcon} alt="ForceFocus Logo" className="login-brand-logo" />
-                    <h1 className="brand-name"><br></br>Force-Focus <br></br> Web Dashboard</h1>
+                    <h1 className="brand-name"><br />Force-Focus <br /> Web Dashboard</h1>
                 </div>
 
-                {/* 두 번째 행: 로그인 폼 카드 */}
                 <div className="login-form-card">
                     <div className="login-header">
                         <h2>Dashboard Login</h2>
@@ -78,7 +78,6 @@ const Login = ({ onLoginSuccess }) => {
                         </p>
                     </div>
                 </div>
-                
             </div>
         </div>
     );
