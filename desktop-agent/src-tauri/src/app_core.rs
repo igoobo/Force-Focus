@@ -173,17 +173,18 @@ pub fn start_core_loop<R: Runtime>(
                     // lib.rs에서 등록이 안 되었을 수도 있으므로 try_state 사용
                     if let Some(inference_mutex) = app_handle.try_state::<Mutex<InferenceEngine>>() {
                         match inference_mutex.lock() {
-                            Ok(mut inference_engine) => {
-                                // &mut self를 위해 mut으로 락 획득
+                            Ok(mut inference_engine) => { 
                                 match inference_engine.infer(ml_input_vector) {
-                                    Ok((score, is_anomaly, threshold)) => {
+                                    Ok((score, judgment)) => {
+                                        // [수정] InferenceResult 열거형을 로그로 출력
                                         println!(
-                                            "🧠 [ML] Score: {:.4} | Thr: {:.4} | Anomaly: {}", 
-                                            score, threshold, is_anomaly
+                                            "🧠 [ML] Evt:{} | Sil:{:.1}s | Score:{:.4} | Judg:{:?}", 
+                                            delta_events, silence_sec, score, judgment
                                         );
                                         
-                                        // TODO: 추후 이 결과를 DB에 저장하거나,
-                                        // trigger 변수와 결합하여 개입 여부를 결정할 수 있음.
+                                        // [미래 구현 가이드]
+                                        // 여기서 judgment 결과(StrongOutlier 등)를 FSM에 전달해야 함
+                                        // 예: fsm.update(judgment);
                                     }
                                     Err(e) => eprintln!("⚠️ ML Inference Failed: {}", e),
                                 }
