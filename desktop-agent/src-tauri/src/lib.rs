@@ -14,6 +14,7 @@ pub mod sync_manager;
 pub mod tray_manager;
 pub mod widget_manager;
 pub mod window_commands;
+pub mod inference;
 
 // --- 2. 전역 use ---
 

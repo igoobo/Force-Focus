@@ -92,3 +92,7 @@ features = ["std"]
 tauri-plugin-autostart = "2"
 tauri-plugin-single-instance = "2"
 
+# [ML Inference]
+# ort: ONNX Runtime의 Rust 바인딩. 'load-dynamic'은 시스템 라이브러리 의존성을 줄여줌.
+ort = { version = "2.0.0-rc.11", features = ["load-dynamic", "ndarray"] }
+ndarray = "0.17.2" # 행렬 연산용
