@@ -539,3 +539,13 @@ Cargo.lock
 
 # caddy_data 폴더 제외
 caddy_data/
+
+# [ML Model]
+# 원칙적으로 모델 파일은 무시 (로컬 실험용 모델이 섞이지 않게)
+*.onnx
+*.pkl
+scaler_params.json
+
+# 단, 배포용(Production) 모델 폴더는 예외적으로 허용
+!desktop-agent/src-tauri/resources/models/*.onnx
+!desktop-agent/src-tauri/resources/models/scaler_params.json
