@@ -19,6 +19,7 @@ pub mod inference;
 // --- 2. 전역 use ---
 
 use crate::storage_manager::StorageManager;
+use crate::inference::InferenceEngine;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use sysinfo::System;
@@ -155,6 +156,23 @@ pub fn run() {
     // Offline-First를 위한 상태 생성
     let backend_communicator_state = Arc::new(backend_communicator::BackendCommunicator::new());
 
+    // ML 추론 엔진 초기화
+    let model_path = "resources/models/personal_model.onnx";
+    let scaler_path = "resources/models/scaler_params.json";
+
+    // (주의: Tauri Resource 경로 해결은 setup 훅 안에서 path_resolver로 하는 게 정석이나,
+    // 일단 상대 경로로 시도하고 실패 시 로그만 남깁니다.)
+    let inference_engine_opt = match InferenceEngine::new(model_path, scaler_path) {
+        Ok(engine) => {
+            println!("✅ ML Inference Engine Loaded.");
+            Some(Mutex::new(engine))
+        },
+        Err(e) => {
+            eprintln!("⚠️ Failed to load ML Engine (Run will continue without ML): {}", e);
+            None
+        }
+    };
+
     tauri::Builder::default()
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent, 
@@ -214,6 +232,11 @@ pub fn run() {
         // BackendCommunicator를 전역 상태로 등록
         .manage(backend_communicator_state)
         .setup(move |app| {
+            //  추론 엔진이 있으면 여기서 등록
+            if let Some(engine) = inference_engine_opt {
+                app.manage(engine); // AppHandle을 통해 동적 등록
+            }
+
             let app_handle = app.handle().clone();
 
             // --- LSN 초기화 및 등록 ---
