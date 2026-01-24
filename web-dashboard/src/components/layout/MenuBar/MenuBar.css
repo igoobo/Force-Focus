@@ -136,15 +136,25 @@
   opacity: 0.8;
 }
 
+.menu-bar__user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  overflow: hidden;
+  transition: opacity var(--transition-speed) ease;
+}
+
 .menu-bar__label {
   font-size: 0.9rem;
   font-weight: 600;
+  text-align: left;
 }
 
 .menu-bar__email {
   font-size: 0.7rem;
   color: #888;
   margin-top: 2px;
+  text-align: left;
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;

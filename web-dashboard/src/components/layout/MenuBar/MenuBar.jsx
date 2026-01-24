@@ -25,7 +25,7 @@ export default function MenuBar() {
       try {
         const token = localStorage.getItem('accessToken');
         if (token) {
-          const response = await axios.get('/api/v1/users', {
+          const response = await axios.get('/users/me', {
             headers: { Authorization: `Bearer ${token}` }
           });
           setUserEmail(response.data.email);
