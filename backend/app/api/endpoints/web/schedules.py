@@ -33,9 +33,8 @@ async def read_schedule(schedule_id: str):
 @router.put("/{schedule_id}", response_model=ScheduleRead)
 async def update_schedule(
     schedule_id: str, 
-    schedule: ScheduleUpdate,
-    user_id: str = Depends(get_current_user_id)):
-    updated = await schedule_crud.update_schedule(schedule_id, schedule, user_id=user_id)
+    schedule: ScheduleUpdate):
+    updated = await schedule_crud.update_schedule(schedule_id, schedule)
     if not updated:
         raise HTTPException(status_code=404, detail="Schedule not found")
     return updated

@@ -33,9 +33,8 @@ async def read_task(task_id: str):
 @router.put("/{task_id}", response_model=TaskRead)
 async def update_task(
     task_id: str, 
-    task: TaskUpdate,
-    user_id: str = Depends(get_current_user_id)):
-    updated = await task_crud.update_task(task_id, task, user_id=user_id)
+    task: TaskUpdate):
+    updated = await task_crud.update_task(task_id, task)
     if not updated:
         raise HTTPException(status_code=404, detail="Task not found or no changes")
     return updated
