@@ -1,12 +1,15 @@
 import './MenuBar.css'
 import useMainStore from '../../../MainStore.jsx'
+import { useState, useEffect } from 'react'
+import axios from 'axios'
 
 export default function MenuBar() {
-  // Store에서 다크모드 상태와 토글 함수를 함께 가져옵니다.
   const { 
     isOpen, toggleMenu, activeMenu, setActiveMenu, 
     isDarkMode, toggleDarkMode, isDirty, setIsDirty 
   } = useMainStore();
+
+  const [userEmail, setUserEmail] = useState('');
 
   const menus = [
     { icon: '🏠', label: 'Overview' },
@@ -16,6 +19,25 @@ export default function MenuBar() {
     { icon: '🚨', label: '피드백' },
     { icon: '⚙️', label: '설정' },
   ]
+
+  useEffect(() => {
+    const getEmail = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        if (token) {
+          const response = await axios.get('/api/v1/users', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          setUserEmail(response.data.email);
+        }
+      } catch (err) {
+        console.error("이메일 조회 실패:", err);
+        setUserEmail("정보를 불러올 수 없음");
+      }
+    };
+
+    getEmail();
+  }, []);
 
   const handleMenuClick = (menuLabel) => {
     if (activeMenu === '작업' && menuLabel !== '작업' && isDirty) {
@@ -56,6 +78,7 @@ export default function MenuBar() {
             <span className="menu-bar__icon">👤</span>
             <div className="menu-bar__user-info">
               <span className="menu-bar__label">사용자 정보</span>
+              <span className="menu-bar__email">{userEmail || "불러오는 중..."}</span>
             </div>
           </li>
 

@@ -37,7 +37,7 @@ export default function TaskView() {
   const fileInputRef = useRef(null);
 
   // 스토어 연결
-  const { tasks: storeTasks, loading, fetchTasks, addTask, updateTaskApps, deleteTask } = useTaskStore();
+  const { tasks: storeTasks, loading, resetTasks, fetchTasks, addTask, updateTaskApps, deleteTask } = useTaskStore();
   
   // 로컬 상태 (저장 전까지 임시 보관)
   const [localTasks, setLocalTasks] = useState([]);

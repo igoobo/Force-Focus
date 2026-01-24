@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from "react";
 import { GoogleLogin } from '@react-oauth/google';
 import './login.css';
 import useMainStore from '../../MainStore.jsx';
@@ -6,8 +6,10 @@ import logoIcon from '../layout/TitleBar/ForceFocus_icon.png';
 
 const Login = ({ onLoginSuccess }) => {
     const isDarkMode = useMainStore((state) => state.isDarkMode);
+    const [isLoading, setIsLoading] = useState(false);
     
     const handleGoogleSuccess = async (credentialResponse) => {
+        setIsLoading(true);
         try {
             // 백엔드 검증 엔드포인트 호출
             const response = await fetch('/api/v1/auth/google/verify', {
@@ -35,10 +37,12 @@ const Login = ({ onLoginSuccess }) => {
                 // 상세 에러 메시지 표시
                 console.error("Login Error Details:", errorData);
                 alert(`로그인 실패: ${errorData.detail || '검증 오류'}`);
+                setIsLoading(false);
             }
         } catch (error) {
             console.error("Auth Network Error:", error);
             alert("서버와 통신 중 오류가 발생했습니다. 네트워크 상태를 확인해 주세요.");
+            setIsLoading(false);
         }
     };
 
@@ -61,15 +65,23 @@ const Login = ({ onLoginSuccess }) => {
                     </div>
 
                     <div className="google-login-wrapper">
-                        <GoogleLogin
-                            onSuccess={handleGoogleSuccess}
-                            onError={handleGoogleError}
-                            theme={isDarkMode ? "filled_black" : "outline"}
-                            shape="pill"
-                            size="large"
-                            width="360px"
-                            useOneTap
-                        />
+                        {isLoading ? (
+                            // 로딩 중 표시될 UI
+                            <div className="login-loading">
+                                <div className="spinner"></div>
+                                <p>로그인 정보를 확인 중입니다...</p>
+                            </div>
+                        ) : (
+                            <GoogleLogin
+                                onSuccess={handleGoogleSuccess}
+                                onError={handleGoogleError}
+                                theme={isDarkMode ? "filled_black" : "outline"}
+                                shape="pill"
+                                size="large"
+                                width="360px"
+                                useOneTap
+                            />
+                        )}
                     </div>
 
                     <div className="login-footer">

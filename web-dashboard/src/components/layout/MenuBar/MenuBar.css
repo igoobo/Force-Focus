@@ -137,8 +137,18 @@
 }
 
 .menu-bar__label {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 600;
+}
+
+.menu-bar__email {
+  font-size: 0.7rem;
+  color: #888;
+  margin-top: 2px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 140px;
 }
 
 .menu-bar__item:hover {
@@ -203,6 +213,10 @@
 .dark-theme .theme-toggle-item:hover {
   background-color: #334155;
   color: #ffffff;
+}
+
+.dark-theme .menu-bar__email {
+  color: #94a3b8;
 }
 
 .theme-toggle-item {
