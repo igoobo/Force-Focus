@@ -13,7 +13,7 @@ import ScheduleEditModal from "./sub/ScheduleEditModal";
 
 // 스케줄 메뉴 컴포넌트
 export default function Schedule() {
-  const { schedules } = useScheduleStore(); // 현재 저장된 일정 가져오기
+  const { schedules, fetchSchedules, clearSchedules } = useScheduleStore(); // 현재 저장된 일정 가져오기
   const [isAddOpen, setIsAddOpen] = useState(false); // 일정 추가 모달 상태 (초기값 : 닫힘)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false); // 일정 삭제 모달 상태 (초기값 : 닫힘)
   const [isEditOpen, setIsEditOpen] = useState(false); // 일정 수정 모달 상태 (초기값 : 닫힘)
@@ -23,6 +23,8 @@ export default function Schedule() {
 
   const viewMode = useMainStore((state) => state.scheduleViewMode); // 현재 뷰 모드 상태
   const setViewMode = useMainStore((state) => state.setScheduleViewMode); // 뷰 모드 설정 함수
+
+  const currentUser = localStorage.getItem('userEmail'); // 현재 사용자 식별자
 
   // 일정 추가 모달 열기/닫기 함수
   const openAddModal = () => setIsAddOpen(true);
@@ -41,6 +43,14 @@ export default function Schedule() {
     setSelectedSchedule(null);
     setIsEditOpen(false);
   };
+
+  useEffect(() => {
+    fetchSchedules();
+
+    return () => {
+      clearSchedules();
+    };
+  }, [fetchSchedules, clearSchedules, currentUser]); // currentUser가 바뀌면 다시 실행됨
 
   useEffect(() => {
     if (scheduleInitialView) {    // Overview에서 넘어온 예약된 뷰 모드가 있다면 즉시 반영
