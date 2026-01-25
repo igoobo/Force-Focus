@@ -13,7 +13,7 @@ import ScheduleEditModal from "./sub/ScheduleEditModal";
 
 // 스케줄 메뉴 컴포넌트
 export default function Schedule() {
-  const { schedules, fetchSchedules, clearSchedules } = useScheduleStore(); // 현재 저장된 일정 가져오기
+  const { schedules, loading, fetchSchedules, clearSchedules } = useScheduleStore(); // 현재 저장된 일정 가져오기
   const [isAddOpen, setIsAddOpen] = useState(false); // 일정 추가 모달 상태 (초기값 : 닫힘)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false); // 일정 삭제 모달 상태 (초기값 : 닫힘)
   const [isEditOpen, setIsEditOpen] = useState(false); // 일정 수정 모달 상태 (초기값 : 닫힘)
@@ -46,10 +46,7 @@ export default function Schedule() {
 
   useEffect(() => {
     fetchSchedules();
-
-    return () => {
-      clearSchedules();
-    };
+    return () => clearSchedules();
   }, [fetchSchedules, clearSchedules, currentUser]); // currentUser가 바뀌면 다시 실행됨
 
   useEffect(() => {
@@ -58,6 +55,16 @@ export default function Schedule() {
       clearScheduleInitialView(); // 적용 후 예약 정보 초기화
     }
   }, [scheduleInitialView, clearScheduleInitialView]);
+
+  // 로딩 중일 때 표시할 화면
+  if (loading) {
+    return (
+      <div className="schedule-loading-container">
+        <div className="loader"></div>
+        <p>일정 정보를 불러오는 중입니다...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="schedule-container">
