@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: Optional[str] = None
 
     class Config:
-        env_file = ".env"
+        # env_file = ".env"
         # .env에 정의되지 않은 변수가 있어도 무시하도록 설정 (오류 방지)
         extra = "ignore"
 
