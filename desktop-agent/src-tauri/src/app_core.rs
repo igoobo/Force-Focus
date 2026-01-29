@@ -162,7 +162,8 @@ pub fn start_core_loop<R: Runtime>(
                     let engine_state: State<'_, StateEngineArcMutex> = app_handle.state();
                     let mut engine = engine_state.lock().unwrap(); // Mutex 잠금 (변경을 위해 mut)
 
-                    let trigger = engine.process_activity(&window_info, &input_stats);
+                    // let trigger = engine.process_activity(&window_info, &input_stats); // TODO: Re-connect
+                    let trigger = crate::state_engine::InterventionTrigger::DoNothing;
 
                     drop(engine); // StateEngine 락 즉시 해제
                     drop(input_stats); // InputStats 락 즉시 해제
