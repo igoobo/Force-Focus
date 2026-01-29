@@ -153,3 +153,33 @@
   font-size: 12px;
   color: var(--notice-color);
 }
+
+.login-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  height: 40px; /* GoogleLogin 버튼과 유사한 높이 유지 */
+  padding: 20px 0;
+}
+
+.login-loading p {
+  font-size: 0.9rem;
+  color: var(--subtitle-color);
+  margin: 0;
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--border-color);
+  border-top: 3px solid var(--brand-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

@@ -5,21 +5,21 @@ from typing import List
 
 from app.schemas.schedule import ScheduleCreate, ScheduleUpdate, ScheduleRead
 from app.crud import schedules as schedule_crud
+from app.api.deps import get_current_user_id
 
 router = APIRouter(prefix="/schedules", tags=["Schedules"])
 
-# TODO: JWT 인증 붙이면 교체 예정
-USER_ID = "test_user_123"
-
 # CREATE
 @router.post("/", response_model=ScheduleRead, status_code=status.HTTP_201_CREATED)
-async def create_schedule(schedule: ScheduleCreate):
-    return await schedule_crud.create_schedule(USER_ID, schedule)
+async def create_schedule(
+    schedule: ScheduleCreate,
+    user_id: str = Depends(get_current_user_id)):
+    return await schedule_crud.create_schedule(user_id, schedule)
 
 # READ ALL
 @router.get("/", response_model=List[ScheduleRead])
-async def read_schedules():
-    return await schedule_crud.get_schedules(USER_ID)
+async def read_schedules(user_id: str = Depends(get_current_user_id)):
+    return await schedule_crud.get_schedules(user_id)
 
 # READ ONE
 @router.get("/{schedule_id}", response_model=ScheduleRead)
@@ -31,7 +31,9 @@ async def read_schedule(schedule_id: str):
 
 # UPDATE
 @router.put("/{schedule_id}", response_model=ScheduleRead)
-async def update_schedule(schedule_id: str, schedule: ScheduleUpdate):
+async def update_schedule(
+    schedule_id: str, 
+    schedule: ScheduleUpdate):
     updated = await schedule_crud.update_schedule(schedule_id, schedule)
     if not updated:
         raise HTTPException(status_code=404, detail="Schedule not found")

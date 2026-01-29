@@ -1,24 +1,25 @@
 # backend/app/api/endpoints/web/tasks.py
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from typing import List
 
 from app.schemas.task import TaskCreate, TaskUpdate, TaskRead
 from app.crud import tasks as task_crud
+from app.api.deps import get_current_user_id
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
-USER_ID = "test_user_123"
-
 # CREATE
 @router.post("/", response_model=TaskRead, status_code=status.HTTP_201_CREATED)
-async def create_task(task: TaskCreate):
-    return await task_crud.create_task(USER_ID, task)
+async def create_task(
+    task: TaskCreate, 
+    user_id: str = Depends(get_current_user_id)):
+    return await task_crud.create_task(user_id, task)
 
 # READ ALL
 @router.get("/", response_model=List[TaskRead])
-async def read_tasks():
-    return await task_crud.get_tasks(USER_ID)
+async def read_tasks(user_id: str = Depends(get_current_user_id)):
+    return await task_crud.get_tasks(user_id)
 
 # READ ONE
 @router.get("/{task_id}", response_model=TaskRead)
@@ -30,7 +31,9 @@ async def read_task(task_id: str):
 
 # UPDATE
 @router.put("/{task_id}", response_model=TaskRead)
-async def update_task(task_id: str, task: TaskUpdate):
+async def update_task(
+    task_id: str, 
+    task: TaskUpdate):
     updated = await task_crud.update_task(task_id, task)
     if not updated:
         raise HTTPException(status_code=404, detail="Task not found or no changes")

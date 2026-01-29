@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './TaskView.css';
 import useMainStore from '../../../MainStore.jsx';
+import { useTaskStore } from "./TaskStore.jsx";
 import { createPortal } from 'react-dom';
 
-// 1. 대표 프로그램 프리셋 정의
+// 대표 프로그램 프리셋 정의
 const PROGRAM_PRESETS = [
   // 개발 / 코딩
   { name: 'VS Code', path: 'Code.exe', icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m10 16 1.5-1.5"/><path d="m14 8-1.5 1.5"/><path d="M15 6 9 18"/><path d="M16 18h4V6h-4"/><path d="M8 6H4v12h4"/></svg> },
@@ -33,57 +34,51 @@ const PROGRAM_PRESETS = [
 
 export default function TaskView() {
   const { isDarkMode, isDirty, setIsDirty } = useMainStore();
-  const fileInputRef = useRef(null); // 파일 선택창 제어를 위한 Ref
+  const fileInputRef = useRef(null);
+
+  // 스토어 연결
+  const { tasks: storeTasks, loading, resetTasks, fetchTasks, addTask, updateTaskApps, deleteTask } = useTaskStore();
   
-  // 모달 제어 상태
+  // 로컬 상태 (저장 전까지 임시 보관)
+  const [localTasks, setLocalTasks] = useState([]);
+  const [deletedIds, setDeletedIds] = useState([]); // 삭제할 ID들 추적
+  
+  // 모달 및 UI 제어 상태
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProgramModalOpen, setIsProgramModalOpen] = useState(false);
   const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0, isBottom: true });
-  
-  // 입력 필드 상태
   const [newSessionName, setNewSessionName] = useState('');
-  
-  // 현재 수정 중인 위치 추적
-  const [activeSelection, setActiveSelection] = useState({ sessionId: null, index: null });
+  const [activeSelection, setActiveSelection] = useState({ taskId: null, index: null });
 
-  // 세션 데이터 상태
-  const [sessions, setSessions] = useState(() => {
-    const saved = localStorage.getItem('task-db-sessions');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return parsed.map(s => ({
-        ...s,
-        appPaths: Array.isArray(s.appPaths) ? s.appPaths : []
-      }));
+  // 1. 초기 데이터 로드 및 로컬 상태 초기화
+  useEffect(() => {
+    resetTasks();
+    fetchTasks();
+    return () => {resetTasks();};
+  }, []);
+
+  useEffect(() => {
+    // 스토어 데이터가 로드되면 로컬 상태로 복사
+    if (storeTasks && storeTasks.length > 0 && !isDirty) {
+      setLocalTasks(JSON.parse(JSON.stringify(storeTasks)));
     }
-    return [
-      { id: 'coding', label: '코딩 작업', appPaths: ['Code.exe'], isCustom: false },
-      { id: 'research', label: '자료 조사', appPaths: ['chrome.exe'], isCustom: false },
-      { id: 'document', label: '문서 작성', appPaths: ['winword.exe'], isCustom: false },
-      { id: 'presentation', label: '발표 자료 작성', appPaths: ['powerpnt.exe'], isCustom: false },
-      { id: 'study', label: '학습 및 공부', appPaths: [], isCustom: false },
-    ];
-  });
+  }, [storeTasks, isDirty]);
 
   const markAsDirty = () => { if (!isDirty) setIsDirty(true); };
 
-  // 파일 탐색기 열기
   const triggerFilePicker = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
+    if (fileInputRef.current) fileInputRef.current.click();
   };
 
-  // 탐색기에서 파일 선택 시 처리
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      handleSelectProgram(file.name); // 파일명만 추출하여 입력
-      e.target.value = ''; // 같은 파일을 다시 선택할 수 있도록 초기화
+      handleSelectProgram(file.name);
+      e.target.value = '';
     }
   };
 
-  const handleOpenProgramModal = (e, sessionId, index) => {
+  const handleOpenProgramModal = (e, taskId, index) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const popoverWidth = 400;
     const popoverHeight = 340;
@@ -108,109 +103,135 @@ export default function TaskView() {
     } 
 
     setPopoverPos({ top, left, isBottom });
-    setActiveSelection({ sessionId, index });
+    setActiveSelection({ taskId, index });
     setIsProgramModalOpen(true);
   };
 
+  // 프로그램 선택 (로컬 상태만 업데이트)
   const handleSelectProgram = (path) => {
     if (!path.trim()) return;
+    const { taskId, index } = activeSelection;
     
-    const { sessionId, index } = activeSelection;
-    setSessions(prev => prev.map(s => {
-      if (s.id === sessionId) {
-        const newPaths = [...(s.appPaths || [])];
+    // [에러 해결] task 존재 여부 확인 로직 추가
+    const task = localTasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    const newTasks = localTasks.map(t => {
+      if (t.id === taskId) {
+        const newPaths = [...(t.appPaths || [])];
         newPaths[index] = path;
-        return { ...s, appPaths: newPaths };
+        return { ...t, appPaths: newPaths };
       }
-      return s;
-    }));
+      return t;
+    });
+    
+    setLocalTasks(newTasks);
     markAsDirty();
     setIsProgramModalOpen(false);
   };
 
-  const handleSave = () => {
-    const hasEmptyPath = sessions.some(session => 
-      session.appPaths.some(path => path.trim() === "")
+  // 일괄 저장 (DB 반영)
+  const handleSave = async () => {
+    const hasEmptyPath = localTasks.some(task => 
+      task.appPaths.some(path => !path || path.trim() === "")
     );
     if (hasEmptyPath) {
       alert("입력되지 않은 프로그램이 있습니다. 모든 빈 칸을 완성해 주세요.");
       return;
     }
-    localStorage.setItem('task-db-sessions', JSON.stringify(sessions));
-    alert("설정된 프로그램 목록이 성공적으로 저장되었습니다.");
-    setIsDirty(false);
-  };
 
-  const addPathInput = (sessionId) => {
-    const session = sessions.find(s => s.id === sessionId);
-    if ((session.appPaths || []).length >= 5) {
-      alert("프로그램은 작업당 최대 5개까지만 추가할 수 있습니다.");
-      return;
-    }
-    markAsDirty();
-    setSessions(sessions.map(s => 
-      s.id === sessionId ? { ...s, appPaths: [...(s.appPaths || []), ''] } : s
-    ));
-  };
-
-  const removePathInput = (sessionId, index) => {
-    markAsDirty();
-    setSessions(sessions.map(s => {
-      if (s.id === sessionId) {
-        const newPaths = (s.appPaths || []).filter((_, i) => i !== index);
-        return { ...s, appPaths: newPaths };
+    try {
+      // 1. 삭제 예정인 것들 처리
+      if (deletedIds.length > 0) {
+        await Promise.all(deletedIds.map(id => deleteTask(id)));
       }
-      return s;
-    }));
+
+      // 2. 추가 및 수정 처리
+      await Promise.all(localTasks.map(async (t) => {
+        if (t.isNew) {
+          await addTask(t.label); 
+        } else {
+          await updateTaskApps(t.id, t.appPaths);
+        }
+      }));
+
+      alert("모든 설정이 서버에 성공적으로 저장되었습니다.");
+      setIsDirty(false);
+      setDeletedIds([]);
+      fetchTasks(); // 최종 싱크
+    } catch (err) {
+      alert("데이터 저장 중 오류가 발생했습니다.");
+    }
   };
 
+  // 입력 칸 추가 (로컬 상태만 업데이트)
+  const addPathInput = (taskId) => {
+    const task = localTasks.find(t => t.id === taskId);
+    if (!task) return;
+    if (task.appPaths.length >= 5) return alert("작업당 최대 5개까지만 가능합니다.");
+    
+    setLocalTasks(localTasks.map(t => 
+      t.id === taskId ? { ...t, appPaths: [...t.appPaths, ''] } : t
+    ));
+    markAsDirty();
+  };
+
+  // 입력 칸 제거 (로컬 상태만 업데이트)
+  const removePathInput = (taskId, index) => {
+    setLocalTasks(localTasks.map(t => 
+      t.id === taskId ? { ...t, appPaths: t.appPaths.filter((_, i) => i !== index) } : t
+    ));
+    markAsDirty();
+  };
+
+  // 새 작업 추가 (로컬 상태만 업데이트)
   const handleAddSession = () => {
     if (!newSessionName.trim()) return;
-    markAsDirty();
-    setSessions([...sessions, { id: `custom_${Date.now()}`, label: newSessionName, appPaths: [''], isCustom: true }]);
+    const tempId = `new_${Date.now()}`;
+    const newTask = {
+      id: tempId,
+      label: newSessionName,
+      appPaths: [''],
+      isCustom: true,
+      isNew: true // 저장을 위해 플래그 표시
+    };
+    setLocalTasks([...localTasks, newTask]);
     setNewSessionName('');
     setIsModalOpen(false);
+    markAsDirty();
   };
 
+  // 작업 삭제 (로컬 상태에서 제거하고 삭제 목록에 추가)
   const handleDeleteSession = (id) => {
     if (window.confirm("이 작업 유형을 삭제하시겠습니까?")) {
+      if (!id.startsWith('new_')) {
+        setDeletedIds([...deletedIds, id]);
+      }
+      setLocalTasks(localTasks.filter(t => t.id !== id));
       markAsDirty();
-      setSessions(sessions.filter(s => s.id !== id));
     }
   };
 
+  // 기존 이벤트 리스너들 유지
   useEffect(() => {
     const handleBeforeUnload = (e) => {
-      if (isDirty) {
-        e.preventDefault();
-        e.returnValue = ""; 
-      }
+      if (isDirty) { e.preventDefault(); e.returnValue = ""; }
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isDirty]);
 
   useEffect(() => {
-    const handleScrollClose = () => {
-      if (isProgramModalOpen) setIsProgramModalOpen(false);
-    };
-
-    if (isProgramModalOpen) {
-      window.addEventListener('scroll', handleScrollClose, { passive: true });
-    }
+    const handleScrollClose = () => { if (isProgramModalOpen) setIsProgramModalOpen(false); };
+    if (isProgramModalOpen) window.addEventListener('scroll', handleScrollClose, { passive: true });
     return () => window.removeEventListener('scroll', handleScrollClose);
   }, [isProgramModalOpen]);
 
+  if (loading && storeTasks.length === 0) return <div className="loading-area">데이터를 불러오는 중...</div>;
+
   return (
     <div className={`task-container ${isDarkMode ? 'dark-theme' : ''}`}>
-      {/* 숨겨진 파일 인풋 필드 */}
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        style={{ display: 'none' }} 
-        accept=".exe"
-        onChange={handleFileChange} 
-      />
+      <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept=".exe" onChange={handleFileChange} />
 
       <header className="task-header">
         <div className="header-text">
@@ -221,20 +242,20 @@ export default function TaskView() {
         </div>
         <div className="header-actions">
           <button className="add-task-btn" onClick={() => setIsModalOpen(true)}>+ 새 작업 추가</button>
-          <button className="save-db-btn" onClick={handleSave}>저장하기</button>
+          <button className="save-db-btn" onClick={handleSave} disabled={!isDirty}>저장하기</button>
         </div>
       </header>
 
       <div className="task-grid">
-        {sessions.map((session) => (
-          <div key={session.id} className="session-card">
+        {localTasks.map((task) => (
+          <div key={task.id} className="session-card">
             <div className="session-card-header">
               <div className="session-info">
-                <span className="session-dot"></span>
-                {session.label}
+                <span className={`session-dot ${task.isCustom ? 'custom' : 'default'}`}></span>
+                {task.label}
               </div>
-              {session.isCustom && (
-                <button className="delete-session-btn" onClick={() => handleDeleteSession(session.id)}>
+              {task.isCustom && (
+                <button className="delete-session-btn" onClick={() => handleDeleteSession(task.id)}>
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
                 </button>
               )}
@@ -244,9 +265,9 @@ export default function TaskView() {
 
             <div className="path-input-list">
               <label className="section-label">실행 앱 리스트</label>
-              {session.appPaths?.length > 0 ? (
+              {task.appPaths?.length > 0 ? (
                 <div className="scrollable-path-area">
-                  {session.appPaths.map((path, idx) => (
+                  {task.appPaths.map((path, idx) => (
                     <div key={idx} className="path-input-row">
                       <div className="input-wrapper">
                         <input 
@@ -254,20 +275,14 @@ export default function TaskView() {
                           value={path} 
                           readOnly 
                           placeholder="프로그램 선택"
-                          onClick={(e) => handleOpenProgramModal(e, session.id, idx)}
+                          onClick={(e) => handleOpenProgramModal(e, task.id, idx)}
                           style={{ cursor: 'pointer' }}
                         />
-                        <button 
-                          className="inline-browse-btn" 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenProgramModal(e, session.id, idx);
-                          }}
-                        >
+                        <button className="inline-browse-btn" onClick={(e) => handleOpenProgramModal(e, task.id, idx)}>
                           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
                         </button>
                       </div>
-                      <button className="remove-path-btn-styled" onClick={() => removePathInput(session.id, idx)}>
+                      <button className="remove-path-btn-styled" onClick={() => removePathInput(task.id, idx)}>
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
                       </button>
                     </div>
@@ -278,34 +293,20 @@ export default function TaskView() {
               )}
             </div>
 
-            <button 
-              className="add-path-row-btn" 
-              onClick={() => addPathInput(session.id)}
-              disabled={session.appPaths.length >= 5}
-            >
-              {session.appPaths.length >= 5 ? "한도 초과 (최대 5개)" : "+ 프로그램 추가"}
+            <button className="add-path-row-btn" onClick={() => addPathInput(task.id)} disabled={task.appPaths.length >= 5}>
+              {task.appPaths.length >= 5 ? "한도 초과" : "+ 프로그램 추가"}
             </button>
           </div>
         ))}
       </div>
 
-      {/* 새 작업 추가 모달 */}
       {isModalOpen && createPortal(
         <div className={`modal-overlay ${isDarkMode ? 'dark-theme' : ''}`}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>새 작업 추가</h3>
-              <p>작업 유형 명칭을 입력하세요.</p>
-            </div>
+            <div className="modal-header"><h3>새 작업 추가</h3><p>작업 유형 명칭을 입력하세요.</p></div>
             <div className="modal-body">
               <div className="path-input-group">
-                <input 
-                  autoFocus
-                  type="text" 
-                  value={newSessionName} 
-                  onChange={(e) => setNewSessionName(e.target.value)}
-                  placeholder="예: 영상 편집"
-                />
+                <input autoFocus type="text" value={newSessionName} onChange={(e) => setNewSessionName(e.target.value)} placeholder="예: 영상 편집" onKeyDown={(e) => e.key === 'Enter' && handleAddSession()}/>
               </div>
             </div>
             <div className="modal-footer">
@@ -317,32 +318,18 @@ export default function TaskView() {
         document.body
       )}
 
-      {/* 프로그램 선택 팝오버 */}
       {isProgramModalOpen && createPortal(
         <div className={`popover-overlay ${isDarkMode ? 'dark-theme' : ''}`} onClick={() => setIsProgramModalOpen(false)}>
-          <div 
-            className="program-popover" 
-            style={{ 
-              top: popoverPos.top, 
-              left: popoverPos.left,
-              transformOrigin: popoverPos.isBottom ? 'top center' : 'bottom center' 
-            }} 
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="program-popover" style={{ top: popoverPos.top, left: popoverPos.left, transformOrigin: popoverPos.isBottom ? 'top center' : 'bottom center' }} onClick={(e) => e.stopPropagation()}>
             <div className="popover-body">
               <div className="mini-program-grid">
                 {PROGRAM_PRESETS.map((prog) => (
                   <button key={prog.name} className="mini-prog-item" onClick={() => handleSelectProgram(prog.path)}>
-                    <span className="mini-icon">{prog.icon}</span>
-                    <span className="mini-name">{prog.name}</span>
+                    <span className="mini-icon">{prog.icon}</span><span className="mini-name">{prog.name}</span>
                   </button>
                 ))}
-                
-                {/* 직접 입력 대신 파일 찾기 버튼 */}
                 <button className="mini-prog-item add-custom-mini" onClick={triggerFilePicker}>
-                  <span className="mini-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                  </span>
+                  <span className="mini-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
                   <span className="mini-name">파일 찾기</span>
                 </button>
               </div>

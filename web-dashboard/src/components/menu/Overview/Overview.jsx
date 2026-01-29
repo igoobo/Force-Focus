@@ -15,6 +15,7 @@ export default function Overview() {
   const setActiveMenu = useMainStore((state) => state.setActiveMenu);
   const schedules = useScheduleStore((state) => state.schedules);
   const [viewMode, setViewMode] = useState("주");
+  const { fetchSchedules } = useScheduleStore();
   
   const scrollRef = useRef(null);
 
@@ -59,6 +60,10 @@ export default function Overview() {
     const timer = setTimeout(scrollToCurrentTime, 100);
     return () => clearTimeout(timer);
   }, [viewMode]);
+
+  useEffect(() => {
+    fetchSchedules();
+  }, [fetchSchedules]); // 스케줄 정보를 가져옴
 
   const renderSchedulePreview = () => {
     switch (viewMode) {

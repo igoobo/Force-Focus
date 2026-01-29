@@ -1,11 +1,16 @@
 # .env에서 넘겨받은 도메인 (예: 34.xx.xx.xx.nip.io)
 {$DOMAIN_NAME} {
-    # API 요청은 기존 백엔드로 전달
-    handle /api/* {
+    # 백엔드로 보내야 할 경로들을 정의 (Matcher)
+    @backend_routes {
+        path /users/* /api/* /events/* /sessions/* /feedback/* /docs/*
+    }
+
+    # 백엔드 경로인 경우 백엔드 컨테이너로 전달
+    handle @backend_routes {
         reverse_proxy backend:8000
     }
 
-    # 그 외 모든 요청은 새로 띄운 프론트엔드 컨테이너로 전달
+    # 그 외의 모든 요청(루트 포함 정적 파일 전체)은 프론트엔드로 전달
     handle {
         reverse_proxy force-focus-frontend-manual:80
     }

@@ -71,7 +71,39 @@ button:active { transform: scale(0.97); }
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
 }
 
-/* 탭 전환 애니메이션 정의 및 적용 [수정/추가 부분] */
+.schedule-loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 400px;
+  gap: 1.5rem;
+  color: var(--menu-text);
+}
+
+.loader {
+  width: 48px;
+  height: 48px;
+  border: 5px solid var(--menu-border);
+  border-bottom-color: var(--menu-active-text);
+  border-radius: 50%;
+  display: inline-block;
+  box-sizing: border-box;
+  animation: rotation 1s linear infinite;
+}
+
+@keyframes rotation {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.schedule-loading-container p {
+  font-size: 1.1rem;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
 @keyframes schedulesFadeIn {
   from {
     opacity: 0;

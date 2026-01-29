@@ -6,8 +6,8 @@ const normalizeSchedule = (s) => ({
   ...s,
   name: s.name || "새 일정",
   description: s.description || "등록된 설명이 없습니다.",
-  start_date: s.start_date || "2026-01-17",
-  end_date: s.end_date || "2026-01-17",
+  start_date: s.start_date || "2026-01-25",
+  end_date: s.end_date || "2026-01-25",
   start_time: s.start_time || "00:00:00",
   end_time: s.end_time || "00:00:00",
   task_id: s.task_id || "미분류 작업"
@@ -29,6 +29,14 @@ export const useScheduleStore = create((set, get) => ({
       console.error("Fetch Error:", err);
       set({ error: err.message, loading: false });
     }
+  },
+
+  clearSchedules: () => {
+    set({ 
+      schedules: [], 
+      loading: false, 
+      error: null 
+    });
   },
 
   // 2. 일정 추가 (Create)
