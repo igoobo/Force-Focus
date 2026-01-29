@@ -82,6 +82,9 @@ impl StateEngine {
 
         // 3. 상태 전이 (Threshold Check)
         self.update_state();
+        
+        // [디버깅용 로그 추가] 현재 게이지 상태 출력
+        println!("🔥 Gauge: {:.1} / 60.0 (State: {:?})", self.drift_gauge, self.current_state);
 
         // 4. 행동 결정 (Snooze Logic)
         self.decide_intervention(now_sec)
@@ -155,10 +158,23 @@ impl StateEngine {
             _ => InterventionTrigger::DoNothing,
         }
     }
+
+    /// 사용자 피드백 시 강제로 상태를 초기화하는 메서드
+    pub fn manual_reset(&mut self) {
+        self.drift_gauge = 0.0;
+        self.current_state = FSMState::FOCUS;
+        println!("✨ State Manually Reset by User Feedback");
+    }
     
     // UI 표시용 Getter
     pub fn get_gauge_ratio(&self) -> f64 {
         (self.drift_gauge / THRESHOLD_BLOCK_SEC).min(1.0)
+    }
+
+    // commands.rs 에서 호출하는 헬퍼 메서드 추가
+    pub fn get_state_string(&self) -> String {
+        // Enum 상태를 문자열로 변환 (Debug 트레이트 활용)
+        format!("{:?}", self.current_state)
     }
 }
 

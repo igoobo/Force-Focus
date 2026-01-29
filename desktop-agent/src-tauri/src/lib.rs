@@ -311,13 +311,19 @@ pub fn run() {
             // // 데이터 수집 및 로깅 기능 시작
             // let input_stats_arc_mutex_for_logging = Arc::clone(app_handle.state::<InputStatsArcMutex>().inner());
             // logging::start_data_collection_and_logging(input_stats_arc_mutex_for_logging, 10); // 10초마다 로깅
+            
+            // AppCore 등록 (이게 있어야 commands.rs가 접근 가능)
+            use crate::app_core::AppCore;
+            app.manage(std::sync::Mutex::new(AppCore::new()));
 
             // app_core의 '메인 루프'를 시작
             // app_handle을 복제하여 넘겨주어 스레드가 AppHandle을 소유
+            // Core Loop 시작
             app_core::start_core_loop(
-                app_handle.clone(),
-                session_manager_state.clone(), // 세션 상태 전달
-                storage_manager_state.clone(), // LSN 전달
+                app.handle().clone(),
+                app.state::<SessionStateArcMutex>().inner().clone(),
+                app.state::<StorageManagerArcMutex>().inner().clone(),
+                app.state::<InputStatsArcMutex>().inner().clone(),
             );
 
             tray_manager::setup_tray_menu(app.handle())?;

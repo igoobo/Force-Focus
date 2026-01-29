@@ -42,6 +42,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     EnumWindows, GetForegroundWindow, GetWindow, GetWindowRect, GetWindowTextLengthW,
     GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindowVisible, GW_OWNER,
 };
+use crate::app_core::AppCore;
 
 #[cfg(target_os = "windows")]
 use std::ffi::OsString;
@@ -486,6 +487,21 @@ pub fn _get_all_visible_windows_internal() -> Vec<WindowInfo> {
     {
         vec![("Unsupported OS".to_string(), false)]
     }
+}
+
+#[tauri::command]
+pub fn get_system_stats(state: State<Mutex<AppCore>>) -> Result<serde_json::Value, String> {
+    let app = state.lock().map_err(|_| "Failed to lock AppCore")?;
+
+    let stats = serde_json::json!({
+        "current_state": format!("{:?}", app.state_engine.get_state_string()), 
+        "gauge_ratio": app.state_engine.get_gauge_ratio(),
+        // 게이지가 꽉 찼으면 오버레이 활성화
+        // (Threshold 값은 state_engine 상수를 참고하거나 1.0 기준)
+        "is_overlay_active": app.state_engine.get_gauge_ratio() >= 1.0 
+    });
+
+    Ok(stats)
 }
 
 /// [Tauri 커맨드] 프론트엔드나 app_core에서 호출 가능한 래퍼

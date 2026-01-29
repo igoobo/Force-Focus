@@ -18,6 +18,7 @@ use crate::{
 
 // StorageManager의 메서드를 호출하기 위해 모듈 import
 use crate::storage_manager::{self, CachedEvent, LocalSchedule, LocalTask}; // LocalTask, LocalSchedule import
+use crate::app_core::AppCore;
 
 use std::time::{SystemTime, UNIX_EPOCH}; // 세션 시작 시간 생성용
 use uuid::Uuid; // 로컬에서 임시 세션 ID 생성용
@@ -299,28 +300,48 @@ pub fn logout(storage_manager_mutex: State<'_, StorageManagerArcMutex>) -> Resul
     Ok(())
 }
 
-/// '개입'에 대한 사용자 피드백을 서버로 전송하는 비동기(async) 커맨드
-///
-/// # Arguments
-/// * `feedback_type` - 프론트엔드에서 받은 피드백 (예: "is_work")
+/// '개입'에 대한 사용자 피드백을 서버로 전송하고, 즉시 로컬 상태를 리셋하는 커맨드
 #[command]
 pub async fn submit_feedback(
     feedback_type: String,
-    // [수정] 네트워크 클라이언트(BackendCommunicator) 대신 LSN(StorageManager) 주입
+    // LSN 저장용
     storage_manager_mutex: State<'_, StorageManagerArcMutex>,
+    // FSM 리셋용 AppCore 상태 추가
+    app_core_state: State<'_, Mutex<AppCore>>, 
 ) -> Result<(), String> {
+    
     // 1. 고유 이벤트 ID 생성
     let event_id = format!("event-{}", Uuid::new_v4());
+    println!("Submitting feedback: type={}, id={}", feedback_type, event_id);
 
-    println!("Submitting feedback (to LSN): type={}", feedback_type);
+    // 2. LSN(로컬 DB)에 저장 (기존 로직 유지)
+    {
+        let storage_manager = storage_manager_mutex.lock().map_err(|e| e.to_string())?;
+        storage_manager.cache_feedback(&event_id, &feedback_type)?;
+        println!("Feedback cached to LSN successfully.");
+    }
 
-    // 2. LSN 락 획득
-    let storage_manager = storage_manager_mutex.lock().map_err(|e| e.to_string())?;
-
-    // 3. 로컬 DB에 저장
-    storage_manager.cache_feedback(&event_id, &feedback_type)?;
-
-    println!("Feedback cached successfully: {}", event_id);
+    // 3. FSM 즉시 리셋 (오버레이 해제)
+    // 사용자 경험(UX)을 위해 UI를 즉시 평화 상태로 복구
+    {
+        // lock 범위를 최소화하기 위해 별도 블록 사용
+        let mut app = app_core_state.lock().map_err(|_| "Failed to lock AppCore")?;
+        
+        if feedback_type == "is_work" {
+            // 현재 활성 창 이름 가져오기 (AppCore 내부 메서드 활용 권장)
+            // 임시로 "Unknown" 처리하거나, commands.rs의 헬퍼 함수 활용 가능
+            // 여기서는 단순 리셋에 집중
+            app.state_engine.manual_reset();
+            println!("🔄 FSM State Reset by User Feedback");
+            
+            // (선택 사항) Local Cache 업데이트 로직도 여기에 추가 가능
+            // app.inference_engine.update_local_cache(...);
+        } else {
+            // "distraction_ignored" 등 다른 피드백일 경우에도
+            // 일단 오버레이는 꺼주는 게 UX상 좋음 (또는 유지 정책에 따라 결정)
+            app.state_engine.manual_reset();
+        }
+    }
 
     Ok(())
 }
