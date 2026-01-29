@@ -15,6 +15,7 @@ pub mod tray_manager;
 pub mod widget_manager;
 pub mod window_commands;
 pub mod inference;
+pub mod feature_extractor;
 
 // --- 2. 전역 use ---
 
