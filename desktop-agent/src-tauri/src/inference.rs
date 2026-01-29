@@ -4,7 +4,9 @@ use ort::value::Value;
 use serde::Deserialize;
 use std::fs::File;
 use std::io::BufReader;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::collections::HashMap;
+use std::time::{Instant, Duration};
 
 
 // 1. JSON 스케일러 파라미터 구조체
@@ -26,56 +28,105 @@ pub enum InferenceResult {
 
 // 3. 메인 추론 엔진
 pub struct InferenceEngine {
-    session: Session,            
-    scaler: ScalerParams,        
+    // ONNX Runtime 세션 (Thread-safe하지 않으므로 &mut 접근 필요)
+    session: Session,
+    scaler: ScalerParams,
+    
+    // Hot-Swap을 위해 경로 기억
+    model_path: PathBuf,
+    scaler_path: PathBuf,
+
+    // Local Cache: 사용자 피드백(False Positive 신고) 기억 장소
+    // Key: App/Title Token, Value: 만료 시간(TTL)
+    local_cache: HashMap<String, Instant>,
 }
 
 impl InferenceEngine {
     /// 모델과 스케일러를 파일에서 로드하여 엔진 초기화
     pub fn new<P: AsRef<Path>>(model_path: P, scaler_path: P) -> Result<Self, Box<dyn std::error::Error>> {
+        let (session, scaler) = Self::load_resources(&model_path, &scaler_path)?;
+
+        Ok(Self {
+            session,
+            scaler,
+            model_path: model_path.as_ref().to_path_buf(),
+            scaler_path: scaler_path.as_ref().to_path_buf(),
+            local_cache: HashMap::new(), // 초기엔 기억 없음
+        })
+    }
+
+    /// [Internal] 파일 로드 헬퍼 (초기화 및 리로드 공용)
+    fn load_resources<P: AsRef<Path>>(model_path: P, scaler_path: P) -> Result<(Session, ScalerParams), Box<dyn std::error::Error>> {
         // A. 스케일러 로드
         let file = File::open(scaler_path)?;
         let reader = BufReader::new(file);
         let scaler: ScalerParams = serde_json::from_reader(reader)?;
 
-        // B. ONNX 모델 로드 (ort 2.0 API)
+        // B. ONNX 모델 로드
         let session = Session::builder()?
             .with_optimization_level(GraphOptimizationLevel::Level3)?
-            .with_intra_threads(1)? // 백그라운드 앱이므로 스레드 최소화
+            .with_intra_threads(1)? 
             .commit_from_file(model_path)?;
-
-        Ok(Self {
-            session,
-            scaler,
-        })
+        
+        Ok((session, scaler))
     }
 
-    /// 6차원 벡터를 받아 문서에 정의된 3단계 상태를 반환
-    /// 반환값: (Score, InferenceResult)
-    pub fn infer(&mut self, input_vector: [f64; 6]) -> Result<(f64, InferenceResult), Box<dyn std::error::Error>> {
-        // 1. Preprocessing (Standard Scaling)
-        // 수식: z = (x - mean) / scale
+    /// Hot-Swap: 실행 중 모델 파일이 바뀌면 다시 로드
+    pub fn reload(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        println!("🔄 Reloading AI Model...");
+        let (new_session, new_scaler) = Self::load_resources(&self.model_path, &self.scaler_path)?;
+        
+        self.session = new_session;
+        self.scaler = new_scaler;
+        println!("✅ AI Model Reloaded Successfully.");
+        Ok(())
+    }
+
+    /// Feedback: 사용자가 "나 일하는 중이야"라고 신고하면 캐시에 등록
+    /// token: 현재 활성 창의 식별자 (예: "Figma")
+    /// ttl_hours: 기억 유지 시간 (보통 24시간)
+    pub fn update_local_cache(&mut self, token: String, ttl_hours: u64) {
+        let expiration = Instant::now() + Duration::from_secs(ttl_hours * 3600);
+        self.local_cache.insert(token.clone(), expiration);
+        println!("🧠 Local Cache Updated: '{}' is now trusted until {:?}", token, expiration);
+    }
+
+    /// 메인 추론 함수
+    /// input_vector: FeatureExtractor가 만든 6차원 벡터
+    /// active_token: 현재 활성 창의 토큰 (Cache 확인용)
+    pub fn infer(&mut self, mut input_vector: [f64; 6], active_token: Option<String>) -> Result<(f64, InferenceResult), Box<dyn std::error::Error>> {
+        
+        // 1. Local Cache Check & Override (문서 Phase 5)
+        // 사용자가 피드백을 준 토큰(예: "YouTube"로 강의 듣기)이라면
+        // 문맥 점수(0번 인덱스)를 강제로 1.0(만점)으로 수정
+        if let Some(token) = active_token {
+            if let Some(expire_time) = self.local_cache.get(&token) {
+                if Instant::now() < *expire_time {
+                    // 캐시 히트! 문맥 점수 강제 상향
+                    input_vector[0] = 1.0; 
+                } else {
+                    // 만료된 기억 삭제
+                    self.local_cache.remove(&token);
+                }
+            }
+        }
+
+        // 2. Preprocessing (Standard Scaling)
         let mut scaled_input = Array2::<f32>::zeros((1, 6));
         for i in 0..6 {
             let val = (input_vector[i] - self.scaler.mean[i]) / self.scaler.scale[i];
             scaled_input[[0, i]] = val as f32;
         }
 
-        // 2. ONNX Inference
-        // "float_input"은 train.py에서 지정한 입력 노드 이름
+        // 3. Inference
         let input_tensor = Value::from_array(scaled_input)?;
-        let inputs = ort::inputs![ "float_input" => input_tensor ];
-
+        let inputs = ort::inputs![ "float_input" => input_tensor ]; 
         let outputs = self.session.run(inputs)?;
 
-        // Output extraction
-        // sklearn OneClassSVM outputs:
-        // scores.0은 모양, scores.1은 데이터입니다.
         let scores = outputs["scores"].try_extract_tensor::<f32>()?;
-        // 튜플의 두 번째 요소(데이터)에서 첫 번째 값(0번 인덱스)을 가져옵니다.
         let current_score = scores.1[0] as f64;
 
-        // 3. Rule-based Decision
+        // 4. Rule-based Decision
         let judgment = if current_score > 0.0 {
             InferenceResult::Inlier
         } else if current_score > -0.5 {

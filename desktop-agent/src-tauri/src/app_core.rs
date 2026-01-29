@@ -174,7 +174,7 @@ pub fn start_core_loop<R: Runtime>(
                     if let Some(inference_mutex) = app_handle.try_state::<Mutex<InferenceEngine>>() {
                         match inference_mutex.lock() {
                             Ok(mut inference_engine) => { 
-                                match inference_engine.infer(ml_input_vector) {
+                                match inference_engine.infer(ml_input_vector, None) {
                                     Ok((score, judgment)) => {
                                         // [수정] InferenceResult 열거형을 로그로 출력
                                         println!(
