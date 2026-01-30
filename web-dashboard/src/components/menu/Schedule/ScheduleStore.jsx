@@ -46,9 +46,9 @@ export const useScheduleStore = create((set, get) => ({
       const rawEndTime = newSchedule.end_time || "10:00";
 
       const scheduleDataForBackend = {
-        name: newSchedule.name || "새 일정",
-        task_id: newSchedule.task_id || null,
-        description: newSchedule.description || "임시 데이터입니다. 추후 연동 예정입니다.",
+        name: newSchedule.name,
+        task_id: newSchedule.task_id,
+        description: newSchedule.description,
         start_time: rawStartTime.length === 5 ? `${rawStartTime}:00` : rawStartTime,
         end_time: rawEndTime.length === 5 ? `${rawEndTime}:00` : rawEndTime,
         days_of_week: [0, 1, 2, 3, 4, 5, 6], 

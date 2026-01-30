@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from "react";
 import "./ScheduleList.css";
+import { useTaskStore } from "../../Task/TaskStore";
 
 const ScheduleList = ({ schedules = [], onScheduleClick }) => {
   // 작업 목록을 가져와서 task_id에 해당하는 작업 이름을 매핑하기 위함
-  const [taskSessions, setTaskSessions] = useState([]);
+  const { tasks, fetchTasks } = useTaskStore(); // 서버 DB의 작업 목록 가져오기
 
   useEffect(() => {
-    const savedSessions = localStorage.getItem('task-db-sessions');
-    if (savedSessions) {
-      setTaskSessions(JSON.parse(savedSessions));
-    }
-  }, []);
+    fetchTasks(); // 최신 작업 정보를 DB에서 조회
+  }, [fetchTasks]);
 
   const sortedSchedules = [...schedules].sort(
     (a, b) => new Date(b.start_date + " " + b.start_time) - new Date(a.start_date + " " + a.start_time)
@@ -18,7 +16,7 @@ const ScheduleList = ({ schedules = [], onScheduleClick }) => {
 
   // task_id를 통해 작업 라벨을 찾는 함수
   const getTaskLabel = (task_id) => {
-    const task = taskSessions.find(t => t.id === task_id);
+    const task = tasks.find(t => String(t.id) === String(task_id));
     return task ? task.label : "연결된 작업 없음";
   };
 

@@ -1,24 +1,21 @@
 import React, { useState, useEffect } from "react";
 import "./ScheduleDeleteModal.css";
 import { useScheduleStore } from "../ScheduleStore";
+import { useTaskStore } from "../../Task/TaskStore";
 
 export default function ScheduleDeleteModal({ onClose }) {
   const { schedules, deleteSchedule } = useScheduleStore();
   const [selectedId, setSelectedId] = useState(null);
-  const [taskSessions, setTaskSessions] = useState([]);
+  const { tasks, fetchTasks } = useTaskStore();
 
-  // 작업 목록 로드 (배지 표시용)
   useEffect(() => {
-    const savedSessions = localStorage.getItem('task-db-sessions');
-    if (savedSessions) {
-      setTaskSessions(JSON.parse(savedSessions));
-    }
-  }, []);
+    fetchTasks(); // 배지 표시를 위한 최신 작업 리스트 로드
+  }, [fetchTasks]);
 
   // task_id를 통해 작업 라벨을 찾는 함수
   const getTaskLabel = (task_id) => {
-  const task = taskSessions.find(t => t.id === task_id);
-  return task ? task.label : "연결된 작업 없음";
+    const task = tasks.find(t => String(t.id) === String(task_id));
+    return task ? task.label : "연결된 작업 없음";
   };
 
   const handleDelete = () => {

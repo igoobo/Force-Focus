@@ -1,26 +1,15 @@
 import React, { useState, useEffect } from "react";
 import "./ScheduleEditModal.css";
 import { useScheduleStore } from "../ScheduleStore";
+import { useTaskStore } from '../../Task/TaskStore';
 
 export default function ScheduleEditModal({ schedule, onClose }) {
   const { updateSchedule } = useScheduleStore();
-  const [taskSessions, setTaskSessions] = useState([]);
+  const { tasks, fetchTasks } = useTaskStore();
 
   useEffect(() => {
-    const savedSessions = localStorage.getItem('task-db-sessions');
-    if (savedSessions) {
-      const parsedSessions = JSON.parse(savedSessions);
-      setTaskSessions(parsedSessions);
-
-      const taskExists = parsedSessions.some(task => task.id === schedule.task_id);
-      if (!taskExists && schedule.task_id) {
-        setFormData(prev => ({ ...prev, task_id: "" }));
-      }
-    } else {
-      setTaskSessions([]);
-      setFormData(prev => ({ ...prev, task_id: "" }));
-    }
-  }, [schedule]);
+    fetchTasks();
+  }, [fetchTasks]);
 
   const [formData, setFormData] = useState({
     ...schedule,
@@ -69,7 +58,7 @@ export default function ScheduleEditModal({ schedule, onClose }) {
               required
             >
               <option value="">-- 작업 종류를 선택하세요 --</option>
-              {taskSessions.map(task => (
+              {tasks.map(task => (
                 <option key={task.id} value={task.id}>{task.label}</option>
               ))}
             </select>
