@@ -9,10 +9,10 @@ import Login from './components/login/login.jsx';
 
 function App() {
   // Store에서 필요한 상태와 함수들을 가져옵니다.
-  const { isHelpOpen, openHelp, setActiveMenu, isDarkMode } = useMainStore();
-  
-  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('accessToken'));
-  const activeMenu = useMainStore((state) => state.activeMenu);
+  const { 
+    isHelpOpen, openHelp, setActiveMenu, isDarkMode, 
+    isLoggedIn, login, logout, activeMenu 
+  } = useMainStore();
 
   // activeMenu가 변경될 때마다 스크롤을 맨 위로 이동
   useEffect(() => {
@@ -34,27 +34,14 @@ function App() {
   // 로그아웃 로직
   const handleLogout = () => {
     if (window.confirm("로그아웃 하시겠습니까?")) {
-      // 보안을 위해 모든 인증 관련 정보 삭제
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('userEmail');
-      
-      if (setActiveMenu) {
-        setActiveMenu('Overview'); 
-      }
-      
-      setIsLoggedIn(false);
+      logout(); // Store의 logout 함수 호출
     }
-  };
-
-  const handleLoginSuccess = () => {
-    setIsLoggedIn(true);
   };
 
   // 로그인하지 않은 경우 로그인 화면 렌더링
   if (!isLoggedIn) {
     return (
-      <Login onLoginSuccess={handleLoginSuccess} />
+      <Login onLoginSuccess={login} />
     );
   }
 
@@ -66,7 +53,7 @@ function App() {
         onHelp={openHelp}
         onLogout={handleLogout} 
       />
-
+      
       <MenuBar />
       
       {/* 메인 콘텐츠 영역: 배경색을 CSS 변수(var(--bg-main))로 처리하여 다크모드 연동 */}

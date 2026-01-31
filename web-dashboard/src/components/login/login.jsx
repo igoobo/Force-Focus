@@ -3,6 +3,7 @@ import { GoogleLogin } from '@react-oauth/google';
 import './login.css';
 import useMainStore from '../../MainStore.jsx';
 import logoIcon from '../layout/TitleBar/ForceFocus_icon.png'; 
+import authApi from '../../api/authApi';
 
 const Login = ({ onLoginSuccess }) => {
     const isDarkMode = useMainStore((state) => state.isDarkMode);
@@ -12,33 +13,20 @@ const Login = ({ onLoginSuccess }) => {
         setIsLoading(true);
         try {
             // 백엔드 검증 엔드포인트 호출
-            const response = await fetch('/api/v1/auth/google/verify', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json', // 명시적 지정 필수
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({
-                    token: credentialResponse.credential 
-                }),
+            const response = await authApi.post('/api/v1/auth/google/verify', {
+                token: credentialResponse.credential 
             });
 
-            if (response.ok) {
-                const data = await response.json();
-            
-                // 서비스 전용 토큰 저장
-                localStorage.setItem('accessToken', data.access_token);
+            const data = response.data;
+            const token = data.access_token; 
+
+            if (token) {
+                localStorage.setItem('accessToken', token);
                 localStorage.setItem('refreshToken', data.refresh_token);
-            
-                // 로그인 처리 트리거
                 onLoginSuccess(); 
             } else {
-                const errorData = await response.json();
-                // 상세 에러 메시지 표시
-                console.error("Login Error Details:", errorData);
-                alert(`로그인 실패: ${errorData.detail || '검증 오류'}`);
-                setIsLoading(false);
-            }
+                throw new Error("Token not found in response");
+            }   
         } catch (error) {
             console.error("Auth Network Error:", error);
             alert("서버와 통신 중 오류가 발생했습니다. 네트워크 상태를 확인해 주세요.");
