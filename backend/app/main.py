@@ -98,6 +98,7 @@ from app.api.endpoints.desktop import (
     events as desktop_events,
     data as desktop_data,
     feedback as desktop_feedback,
+    models as desktop_models,
 )
 
 # Web Auth
@@ -118,3 +119,4 @@ app.include_router(desktop_auth.router, prefix="/api/v1/auth/desktop", tags=["au
 app.include_router(desktop_events.router, prefix="/api/v1/events", tags=["events"])
 app.include_router(desktop_data.router, prefix="/api/v1/desktop/data", tags=["desktop-data"])
 app.include_router(desktop_feedback.router, prefix="/api/v1/desktop/feedback", tags=["desktop-feedback"])
+app.include_router(desktop_models.router, prefix="/api/v1/desktop/models", tags=["desktop-models"],)
