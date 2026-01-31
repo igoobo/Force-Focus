@@ -9,3 +9,4 @@ motor
 jinja2
 google-auth
 requests
+google-generativeai
