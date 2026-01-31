@@ -1,5 +1,6 @@
 use crate::backend_communicator::BackendCommunicator;
 use crate::storage_manager::StorageManager;
+use crate::inference::InferenceEngine;
 use crate::StorageManagerArcMutex;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -72,7 +73,27 @@ pub fn start_update_loop(app_handle: AppHandle) {
 
                 // 3. 모델 다운로드 시도 (Communicator 로직 재사용)
                 match communicator.download_latest_model(save_path.clone(), &token).await {
-                    Ok(_) => println!("✅ Model update check completed."),
+                    Ok(_) => {
+                        println!("✅ Model downloaded to: {:?}", save_path);
+
+                        // 4. Hot-Swap 실행
+                        // InferenceEngine을 획득하여 reload 호출
+                        if let Some(engine_state) = app_handle.try_state::<Mutex<InferenceEngine>>() {
+                            // Mutex Lock (추론 중이라면 잠시 대기됨)
+                            match engine_state.lock() {
+                                Ok(mut engine) => {
+                                    // 다운로드받은 새 경로(save_path)를 전달하여 리로드
+                                    match engine.reload(Some(save_path.clone())) {
+                                        Ok(_) => println!("✨ Hot-Swap Success: Engine is now using the new model."),
+                                        Err(e) => eprintln!("🔥 Hot-Swap Failed (Engine kept old model): {}", e),
+                                    }
+                                }
+                                Err(e) => eprintln!("Failed to lock InferenceEngine for hot-swap: {}", e),
+                            }
+                        } else {
+                            eprintln!("InferenceEngine state not found.");
+                        }
+                    },
                     Err(e) => eprintln!("⚠️ Model update failed: {}", e),
                 }
             } else {
