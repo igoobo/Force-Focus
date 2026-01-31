@@ -87,6 +87,7 @@ from app.api.endpoints.web import (
     sessions,
     events as web_events,
     feedback,
+    insight,
 )
 
 # User
@@ -111,6 +112,7 @@ app.include_router(schedules.router, prefix="/api/v1", tags=["schedules"])
 app.include_router(sessions.router)
 app.include_router(web_events.router)
 app.include_router(feedback.router)
+app.include_router(insight.router, prefix="/api/v1", tags=["insights"])
 
 # Desktop APIs
 app.include_router(desktop_auth.router, prefix="/api/v1/auth/desktop", tags=["auth-desktop"])
