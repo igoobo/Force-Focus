@@ -6,6 +6,29 @@ import MenuBar from './components/layout/MenuBar/MenuBar.jsx';
 import useMainStore from './MainStore.jsx';
 import HelpModal from './components/layout/Help/HelpModal.jsx';
 import Login from './components/login/login.jsx';
+import axios from 'axios';
+
+const setupAxiosInterceptors = () => {
+    // 중복 등록 방지를 위해 기존 인터셉터가 있다면 제거하는 로직을 넣거나,
+    // 호출 자체를 외부에서 한 번만 합니다.
+    axios.interceptors.response.use(
+        (response) => response,
+        (error) => {
+            if (error.response && error.response.status === 401) {
+                if (!window.isLoggingOut) {
+                    window.isLoggingOut = true;
+                    alert("세션이 만료되었습니다. 다시 로그인해 주세요.");
+                    const { logout } = useMainStore.getState();
+                    logout();
+                    window.location.href = '/'; 
+                }
+            }
+            return Promise.reject(error);
+        }
+    );
+};
+
+setupAxiosInterceptors();
 
 function App() {
   // Store에서 필요한 상태와 함수들을 가져옵니다.
