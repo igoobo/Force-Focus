@@ -10,6 +10,25 @@ from fastapi import HTTPException
 from app.db.mongo import get_db
 from app.schemas.session import SessionCreate, SessionUpdate, SessionRead
 
+from app.crud.events import get_events  # 이벤트 조회를 위해 추가
+
+async def get_session_context_for_llm(user_id: str, session_id: str) -> str:
+    """
+    특정 세션의 이벤트들을 LLM이 분석하기 좋은 텍스트로 변환합니다.
+    """
+    events = await get_events(user_id=user_id, session_id=session_id, limit=300)
+    if not events:
+        return "기록된 이벤트가 없습니다."
+
+    # 시간순 정렬 및 요약
+    events.reverse()
+    event_summary = []
+    for e in events:
+        time = e.timestamp.strftime("%H:%M")
+        event_summary.append(f"[{time}] 앱: {e.app_name}, 창 제목: {e.window_title}")
+
+    return "\n".join(event_summary)
+
 
 def get_sessions_collection():
     """
@@ -47,27 +66,96 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _ensure_aware_utc(dt: datetime) -> datetime:
+    """
+    start_time/end_time에 naive가 들어오는 케이스 방어.
+    naive면 UTC로 간주해서 tzinfo를 붙임.
+    """
+    if dt is None:
+        return dt
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 def _compute_duration_seconds(start_time: datetime, end_time: datetime) -> float:
     """
     duration을 초 단위로 계산. 음수 방지.
     """
-    sec = (end_time - start_time).total_seconds()
+    st = _ensure_aware_utc(start_time)
+    et = _ensure_aware_utc(end_time)
+
+    sec = (et - st).total_seconds()
     if sec < 0:
         raise HTTPException(status_code=400, detail="end_time must be after start_time")
     return float(sec)
+
+
+def _strip_or_none(v: Optional[str]) -> Optional[str]:
+    """
+    CRUD 안전망: Optional[str]가 DB로 들어가기 전 한번 더 정리
+    """
+    if v is None:
+        return None
+    if not isinstance(v, str):
+        return v
+    s = v.strip()
+    return s or None
+
+
+async def _cancel_existing_active_sessions(user_id: str) -> None:
+    """
+    정책: 유저당 active 세션은 1개만 허용.
+    start_session 호출 시 기존 active 세션을 자동 cancelled 처리.
+    - end_time=now
+    - duration 계산해서 저장
+    """
+    col = get_sessions_collection()
+    now = _utcnow()
+
+    cursor = col.find({"user_id": user_id, "status": "active"}).sort("start_time", -1)
+    active_sessions = await cursor.to_list(length=100)  # 충분히 크게
+
+    for s in active_sessions:
+        # 이미 end_time이 있다면 굳이 건드리지 않음(데이터 꼬임 방지)
+        if s.get("end_time") is not None:
+            continue
+
+        try:
+            duration = _compute_duration_seconds(s["start_time"], now)
+        except HTTPException:
+            # start_time이 이상하면 duration 저장 없이라도 종료 처리
+            duration = None
+
+        update_doc = {
+            "status": "cancelled",
+            "end_time": now,
+        }
+        if duration is not None:
+            update_doc["duration"] = duration
+
+        await col.update_one({"_id": s["_id"]}, {"$set": update_doc})
 
 
 # CREATE (START)
 async def start_session(user_id: str, data: SessionCreate) -> SessionRead:
     col = get_sessions_collection()
 
-    # SessionCreate에서 start_time은 필수지만, 혹시라도 None이면 서버 시간으로 보정
+    # 1) 기존 active 자동 종료(정책 적용)
+    await _cancel_existing_active_sessions(user_id)
+
+    # 2) start_time 보정
     start_time = data.start_time or _utcnow()
+    start_time = _ensure_aware_utc(start_time)
+
+    # 3) id 계열 안전망 strip (스키마에서 처리되지만 DB 보호용)
+    task_id = _strip_or_none(data.task_id)
+    profile_id = _strip_or_none(data.profile_id)
 
     doc = {
         "user_id": user_id,
-        "task_id": data.task_id,
-        "profile_id": data.profile_id,
+        "task_id": task_id,
+        "profile_id": profile_id,
         "start_time": start_time,
         "end_time": None,
         "duration": None,
@@ -140,11 +228,13 @@ async def update_session(user_id: str, session_id: str, data: SessionUpdate) -> 
     update_doc = {}
 
     if data.end_time is not None:
-        update_doc["end_time"] = data.end_time
-        update_doc["duration"] = _compute_duration_seconds(existing["start_time"], data.end_time)
+        end_time = _ensure_aware_utc(data.end_time)
+        update_doc["end_time"] = end_time
+        update_doc["duration"] = _compute_duration_seconds(existing["start_time"], end_time)
 
     if data.status is not None:
-        update_doc["status"] = data.status
+        # 스키마에서 strip/blank 방지하지만 안전망
+        update_doc["status"] = _strip_or_none(data.status) or data.status
 
     if data.goal_duration is not None:
         update_doc["goal_duration"] = data.goal_duration
@@ -163,8 +253,7 @@ async def update_session(user_id: str, session_id: str, data: SessionUpdate) -> 
         raise HTTPException(status_code=500, detail="Failed to update session")
     return serialize_session(updated)
 
-
-# (선택) 세션 종료 helper
+# END 세션 (편의 함수)
 async def end_session(
     user_id: str,
     session_id: str,
