@@ -21,6 +21,8 @@ export default function Schedule() {
   const scheduleInitialView = useMainStore((state) => state.scheduleInitialView); // 스케줄 초기 뷰 모드
   const clearScheduleInitialView = useMainStore((state) => state.clearScheduleInitialView); // 초기 뷰 모드 클리어 함수
 
+  const isDarkMode = useMainStore((state) => state.isDarkMode); // 다크모드 상태
+
   const viewMode = useMainStore((state) => state.scheduleViewMode); // 현재 뷰 모드 상태
   const setViewMode = useMainStore((state) => state.setScheduleViewMode); // 뷰 모드 설정 함수
 
@@ -59,9 +61,10 @@ export default function Schedule() {
   // 로딩 중일 때 표시할 화면
   if (loading) {
     return (
-      <div className="schedule-loading-container">
-        <div className="loader"></div>
-        <p>일정 정보를 불러오는 중입니다...</p>
+      <div className={`schedule-container ${isDarkMode ? "dark-theme" : ""}`}>
+        <div className="loading-area">
+          일정 정보를 불러오는 중입니다...
+        </div>
       </div>
     );
   }

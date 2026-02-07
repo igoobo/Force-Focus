@@ -10,6 +10,7 @@
   gap: 12px;
   overflow: hidden;
   transition: all 0.3s ease;
+  animation: schedulesFadeIn 0.4s ease-out forwards;
 }
 
 .schedule-header {
@@ -71,45 +72,33 @@ button:active { transform: scale(0.97); }
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
 }
 
-.schedule-loading-container {
+.loading-area {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 400px; /* TaskView와 동일하게 400px 유지 */
+  min-height: 400px;
   width: 100%;
   font-size: 1.1rem;
   font-weight: 600;
-  color: #64748b; /* TaskView 로딩 텍스트 색상 */
+  color: #64748b;
   gap: 20px;
   animation: fadeIn 0.4s ease-in-out;
 }
 
-/* TaskView의 원형 회전 로더 스타일 적용 */
-.schedule-loading-container::before {
+.loading-area::before {
   content: "";
   width: 48px;
   height: 48px;
   border: 5px solid #e2e8f0;
-  border-left-color: #2563eb; /* TaskView의 포인트 블루 색상 */
+  border-left-color: #2563eb;
   border-radius: 50%;
   animation: spin 1s linear infinite;
-}
-
-/* 기존 .loader 클래스 제거 (::before로 대체됨) */
-.loader {
-  display: none;
 }
 
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
-}
-
-.schedule-loading-container p {
-  font-size: 1.1rem;
-  font-weight: 500;
-  opacity: 0.8;
 }
 
 @keyframes schedulesFadeIn {
@@ -156,11 +145,11 @@ button:active { transform: scale(0.97); }
   color: white !important;
 }
 
-.dark-theme .schedule-loading-container {
+.dark-theme .loading-area {
   color: #94a3b8;
 }
 
-.dark-theme .schedule-loading-container::before {
+.dark-theme .loading-area::before {
   border-color: #334155;
   border-left-color: #3b82f6;
 }
