@@ -109,9 +109,9 @@ app.include_router(me.router)
 # Web Core
 app.include_router(tasks.router, prefix="/api/v1", tags=["tasks"])
 app.include_router(schedules.router, prefix="/api/v1", tags=["schedules"])
-app.include_router(sessions.router)
-app.include_router(web_events.router)
-app.include_router(feedback.router)
+app.include_router(sessions.router, prefix="/api/v1", tags=["sessions"])
+app.include_router(web_events.router, prefix="/api/v1", tags=["events"])
+app.include_router(feedback.router, prefix="/api/v1", tags=["feedback"])
 app.include_router(insight.router, prefix="/api/v1", tags=["insights"])
 
 # Desktop APIs

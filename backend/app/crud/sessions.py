@@ -55,11 +55,11 @@ def serialize_session(session) -> SessionRead:
     )
 
 
-def _safe_object_id(session_id: str) -> ObjectId:
+def _safe_object_id(session_id: str):
     try:
         return ObjectId(session_id)
     except (InvalidId, TypeError):
-        raise HTTPException(status_code=400, detail="Invalid session_id")
+        return session_id
 
 
 def _utcnow() -> datetime:
@@ -145,7 +145,7 @@ async def start_session(user_id: str, data: SessionCreate) -> SessionRead:
     await _cancel_existing_active_sessions(user_id)
 
     # 2) start_time 보정
-    start_time = data.start_time or _utcnow()
+    start_time = data.start_time if data.start_time else _utcnow()
     start_time = _ensure_aware_utc(start_time)
 
     # 3) id 계열 안전망 strip (스키마에서 처리되지만 DB 보호용)
@@ -160,7 +160,7 @@ async def start_session(user_id: str, data: SessionCreate) -> SessionRead:
         "end_time": None,
         "duration": None,
         "status": "active",
-        "goal_duration": data.goal_duration,
+        "goal_duration": data.goal_duration if data.goal_duration else 0,
         "interruption_count": 0,
     }
 
@@ -215,20 +215,37 @@ async def get_current_session(user_id: str) -> Optional[SessionRead]:
 # UPDATE (END 포함)
 async def update_session(user_id: str, session_id: str, data: SessionUpdate) -> SessionRead:
     col = get_sessions_collection()
+    uid = str(user_id)
     oid = _safe_object_id(session_id)
 
-    existing = await col.find_one({"_id": oid})
+    # 1) 기본 ID 기반 조회 시도
+    existing = await col.find_one({"_id": oid, "user_id": uid})
+
+    # 2) [핵심] ID로 못 찾았을 경우, 해당 유저의 현재 활성 세션을 검색
+    if not existing:
+        existing = await col.find_one(
+            {"user_id": uid, "status": "active"},
+            sort=[("start_time", -1)]
+        )
+
     if not existing:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    # 다른 유저 세션 수정 방지
-    if existing.get("user_id") != user_id:
-        raise HTTPException(status_code=403, detail="Forbidden")
+    # 업데이트 대상의 실제 ID 확정
+    target_id = existing["_id"]
 
     update_doc = {}
 
-    if data.end_time is not None:
-        end_time = _ensure_aware_utc(data.end_time)
+    # 데스크탑 앱 필드(end_time_s) 대응: data 객체에 필드가 있거나 dict 형태로 존재할 경우 처리
+    actual_end_time = data.end_time
+    if actual_end_time is None:
+        # Pydantic 모델에 end_time_s가 정의되어 있지 않아도 extra="allow" 설정이 있다면 접근 가능
+        ts = getattr(data, "end_time_s", None)
+        if ts:
+            actual_end_time = datetime.fromtimestamp(ts, tz=timezone.utc)
+
+    if actual_end_time is not None:
+        end_time = _ensure_aware_utc(actual_end_time)
         update_doc["end_time"] = end_time
         update_doc["duration"] = _compute_duration_seconds(existing["start_time"], end_time)
 
@@ -247,8 +264,8 @@ async def update_session(user_id: str, session_id: str, data: SessionUpdate) -> 
     if not update_doc:
         return serialize_session(existing)
 
-    await col.update_one({"_id": oid}, {"$set": update_doc})
-    updated = await col.find_one({"_id": oid})
+    await col.update_one({"_id": target_id}, {"$set": update_doc})
+    updated = await col.find_one({"_id": target_id})
     if not updated:
         raise HTTPException(status_code=500, detail="Failed to update session")
     return serialize_session(updated)
