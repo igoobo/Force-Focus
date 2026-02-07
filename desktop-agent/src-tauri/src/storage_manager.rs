@@ -4,7 +4,7 @@
 Table에 새로운 데이터 추가는 commands.rs에서 이루어짐
 */
 
-use rusqlite::{Connection, OptionalExtension, Result};
+use rusqlite::{Connection, OptionalExtension, Result, params};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -50,6 +50,16 @@ pub struct CachedEvent {
     pub app_name: String,
     pub window_title: String,
     pub activity_vector: String, // JSON String
+}
+
+// 피드백 데이터 조회용 구조체 (DB의 cached_feedback 테이블과 매핑)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CachedFeedback {
+    pub id: i64,          // PK
+    pub timestamp: i64,
+    pub session_id: String, // 필수 필드
+    pub event_id: String,   // context_snapshot에 넣을 데이터
+    pub feedback_type: String,
 }
 
 // Local Storage Manager 구조체
@@ -136,8 +146,9 @@ impl StorageManager {
         // 3. 피드백 캐싱 테이블
         conn.execute(
             "CREATE TABLE IF NOT EXISTS cached_feedback (
-                id INTEGER PRIMARY KEY,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp INTEGER NOT NULL,
+                session_id TEXT NOT NULL,
                 event_id TEXT NOT NULL,
                 feedback_type TEXT NOT NULL
             )",
@@ -279,19 +290,62 @@ impl StorageManager {
         Ok(())
     }
 
-    pub fn cache_feedback(&self, event_id: &str, feedback_type: &str) -> Result<(), String> {
+    // 피드백 저장
+    pub fn cache_feedback(&self, session_id: &str, event_id: &str, feedback_type: &str) -> Result<(), String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         let now_s = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|e| e.to_string())?
-            .as_secs();
+            .as_secs() as i64;
 
         conn.execute(
-            "INSERT INTO cached_feedback (timestamp, event_id, feedback_type) VALUES (?1, ?2, ?3)",
-            rusqlite::params![now_s, event_id, feedback_type],
+            "INSERT INTO cached_feedback (timestamp, session_id, event_id, feedback_type) VALUES (?1, ?2, ?3, ?4)",
+            params![now_s, session_id, event_id, feedback_type],
         )
         .map_err(|e| e.to_string())?;
 
+        Ok(())
+    }
+
+    // 미전송 피드백 조회 (FIFO)
+    pub fn get_unsynced_feedbacks(&self, limit: u32) -> Result<Vec<CachedFeedback>, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        
+        let mut stmt = conn.prepare(
+            "SELECT id, timestamp, session_id, event_id, feedback_type 
+             FROM cached_feedback 
+             ORDER BY timestamp ASC 
+             LIMIT ?1"
+        ).map_err(|e| e.to_string())?;
+
+        let feedback_iter = stmt.query_map([limit], |row| {
+            Ok(CachedFeedback {
+                id: row.get(0)?,
+                timestamp: row.get(1)?,
+                session_id: row.get(2)?,
+                event_id: row.get(3)?,
+                feedback_type: row.get(4)?,
+            })
+        }).map_err(|e| e.to_string())?;
+
+        let mut feedbacks = Vec::new();
+        for f in feedback_iter {
+            feedbacks.push(f.map_err(|e| e.to_string())?);
+        }
+        Ok(feedbacks)
+    }
+
+    // 전송 완료된 피드백 삭제
+    pub fn delete_feedbacks_by_ids(&self, ids: &[i64]) -> Result<(), String> {
+        let mut conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+        for id in ids {
+            tx.execute("DELETE FROM cached_feedback WHERE id = ?1", params![id])
+                .map_err(|e| e.to_string())?;
+        }
+
+        tx.commit().map_err(|e| e.to_string())?;
         Ok(())
     }
 

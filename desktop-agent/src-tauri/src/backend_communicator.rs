@@ -382,12 +382,25 @@ pub async fn submit_feedback(
     
     // 1. 고유 이벤트 ID 생성
     let event_id = format!("event-{}", Uuid::new_v4());
+    
+
+    // 세션 ID를 가장 먼저 조회 (LSN 저장과 백그라운드 전송 모두에 사용하기 위함)
+    let session_id = {
+        let session_state = session_state_mutex.lock().map_err(|e| e.to_string())?;
+        session_state.as_ref()
+            .map(|s| s.session_id.clone())
+            .unwrap_or_else(|| "unknown-session".to_string()) // 세션이 없을 때의 처리
+    };
+
     println!("Submitting feedback: type={}, id={}", feedback_type, event_id);
 
     // 2. LSN(로컬 DB)에 저장 (기존 로직 유지)
     {
         let storage_manager = storage_manager_mutex.lock().map_err(|e| e.to_string())?;
-        storage_manager.cache_feedback(&event_id, &feedback_type)?;
+        
+        // 변경된 cache_feedback 서명에 맞춰 3개의 인자 전달 (session_id 추가)
+        storage_manager.cache_feedback(&session_id, &event_id, &feedback_type)?;
+        
         println!("Feedback cached to LSN successfully.");
     }
 
@@ -417,12 +430,7 @@ pub async fn submit_feedback(
     // UI 스레드를 차단하지 않기 위해 spawn 사용
     let comm = comm_state.inner().clone();
     let feedback_type_clone = feedback_type.clone();
-    
-    // 세션 ID 조회 (없으면 'unknown'으로 처리)
-    let session_id = {
-        let session_state = session_state_mutex.lock().map_err(|e| e.to_string())?;
-        session_state.as_ref().map(|s| s.session_id.clone()).unwrap_or_else(|| "unknown-session".to_string())
-    };
+    let session_id_clone = session_id.clone(); // 클로저로 이동시키기 위해 복제
 
     // 토큰 조회
     let token = {

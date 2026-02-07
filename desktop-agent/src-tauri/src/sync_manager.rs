@@ -2,8 +2,9 @@ use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Manager};
 use tokio::time::sleep;
+use serde_json::json;
 
-use crate::backend_communicator::BackendCommunicator;
+use crate::backend_communicator::{BackendCommunicator, FeedbackPayload};
 use crate::StorageManagerArcMutex;
 
 /// 백그라운드 동기화 루프 시작
@@ -103,6 +104,42 @@ async fn process_sync(app: &AppHandle) -> Result<(), String> {
             storage.delete_events_by_ids(&event_ids)?;
         }
         println!("Sync Manager: Successfully uploaded {} events.", count);
+    }
+
+    // --- [C] Up-Sync: 사용자 피드백  ---
+
+    // 1. 미전송 데이터 조회 (최대 50개)
+    let feedbacks = {
+        let storage = storage_state.lock().map_err(|e| e.to_string())?;
+        storage.get_unsynced_feedbacks(50)?
+    };
+
+    if !feedbacks.is_empty() {
+        let feedback_ids: Vec<i64> = feedbacks.iter().map(|f| f.id).collect();
+        let count = feedbacks.len();
+
+        // 2. [매핑] DB 구조체 -> API Payload 변환
+        // event_id는 서버 스키마에 없으므로 context_snapshot JSON에 넣어줍니다.
+        let payloads: Vec<FeedbackPayload> = feedbacks.into_iter().map(|f| FeedbackPayload {
+            session_id: f.session_id,
+            timestamp: f.timestamp,
+            feedback_type: f.feedback_type,
+            context_snapshot: json!({
+                "related_event_id": f.event_id,
+                "sync_source": "desktop-agent"
+            }),
+        }).collect();
+
+        // 3. 서버 전송
+        comm_state.send_feedback_batch(payloads, &token).await?;
+
+        // 4. 전송 성공 시 로컬 삭제 (Transactional Delete)
+        {
+            let storage = storage_state.lock().map_err(|e| e.to_string())?;
+            storage.delete_feedbacks_by_ids(&feedback_ids)?;
+        }
+        
+        println!("✅ Sync Manager: Uploaded and cleaned up {} feedbacks.", count);
     }
 
     Ok(())
