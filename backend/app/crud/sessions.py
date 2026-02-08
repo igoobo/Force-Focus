@@ -14,14 +14,15 @@ from app.crud.events import get_events  # 이벤트 조회를 위해 추가
 
 async def get_session_full_context(user_id: str, session_id: str) -> str:
     """
-    세션 정보와 해당 세션의 이벤트 목록을 바탕으로 풍부하고 사용자 친화적인 피드백을 구성합니다.
-    방해 요소 점유율을 실제 계산하여 주입하고, AI 가이드가 풍부하게 출력되도록 지침을 제공합니다.
+    세션 정보와 이벤트 목록을 바탕으로 피드백을 구성합니다.
+    [개선] task_id를 통해 작업명과 허용 프로그램 정보를 AI 컨텍스트에 추가합니다.
     """
     col = get_sessions_collection()
+    db = get_db() # Task 조회를 위한 DB 핸들
     uid = str(user_id)
     oid = _safe_object_id(session_id)
 
-    # 1. 세션 본체 찾기 (매핑 로직 적용)
+    # 1. 세션 본체 찾기
     existing = await col.find_one({
         "$or": [{"_id": oid}, {"client_session_id": session_id}],
         "user_id": uid
@@ -36,10 +37,23 @@ async def get_session_full_context(user_id: str, session_id: str) -> str:
     if not existing:
         return "죄송합니다. 분석할 세션 기록을 찾을 수 없습니다."
 
-    # 이벤트 매핑 ID 결정
+    # 작업 상세 정보 조회 로직
+    task_id = existing.get("task_id")
+    task_context = "설정된 특정 작업 정보가 없습니다."
+    if task_id:
+        try:
+            task_data = await db["tasks"].find_one({"_id": _safe_object_id(task_id)})
+            if task_data:
+                # 이미지 데이터 구조 참조: name, target_executable
+                t_name = task_data.get("name", "알 수 없음")
+                t_apps = task_data.get("target_executable", "없음")
+                task_context = f"작업명: {t_name} | 허용 프로그램: {t_apps}"
+        except Exception:
+            task_context = "작업 정보를 불러오는 중 오류가 발생했습니다."
+
     lookup_id = existing.get("client_session_id") or session_id
 
-    # 2. 사용자 친화적인 세션 정보 요약
+    # 사용자 친화적인 세션 정보 요약
     start_time = existing["start_time"]
     start_str = start_time.strftime("%Y년 %m월 %d일 %H시 %M분")
     duration = existing.get("duration")
@@ -50,7 +64,7 @@ async def get_session_full_context(user_id: str, session_id: str) -> str:
     else:
         duration_val = "진행 중인 세션"
 
-    # [수정] 방해 요소 점유율 및 앱 사용 통계 실제 계산 로직
+    # 방해 요소 및 앱 사용 통계 계산 로직 유지
     events = await get_events(user_id=uid, session_id=lookup_id, limit=500)
     app_stats_context = ""
     
@@ -60,7 +74,6 @@ async def get_session_full_context(user_id: str, session_id: str) -> str:
             name = e.app_name or "알 수 없음"
             app_counts[name] = app_counts.get(name, 0) + 1
         
-        # 가장 점유율이 높은 앱 추출
         sorted_apps = sorted(app_counts.items(), key=lambda x: x[1], reverse=True)
         top_app, top_count = sorted_apps[0]
         distraction_ratio = (top_count / len(events)) * 100
@@ -69,17 +82,15 @@ async def get_session_full_context(user_id: str, session_id: str) -> str:
         app_stats_context += f"- 가장 높은 비중의 앱: {top_app}\n"
         app_stats_context += f"- 해당 앱 점유율: {distraction_ratio:.1f}%\n\n"
 
-    # LLM 전달 프롬프트 구성
+    # LLM 전달 프롬프트 구성 (task_context 주입)
     context = f"## 🎯 이번 세션 분석 리포트\n\n"
     context += f"**세션 시작:** {start_str}\n"
     context += f"**총 집중 시간:** {duration_val}\n"
-    context += f"**현재 상태:** {'완료됨' if existing.get('status') == 'completed' else '진행 중'}\n\n"
+    context += f"**설정된 작업 목표:** {task_context}\n\n" # 추가됨
     
     context += app_stats_context
     
     context += "### 🔍 활동 타임라인 상세\n"
-    context += "사용자가 세션 동안 수행한 활동들은 다음과 같습니다. 이 데이터를 바탕으로 흐름을 분석해 주세요.\n\n"
-
     if not events:
         context += "- 수집된 상세 활동 로그가 없습니다.\n"
     else:
@@ -89,16 +100,13 @@ async def get_session_full_context(user_id: str, session_id: str) -> str:
             activity = f"[{time}] {e.app_name} - {e.window_title}" if e.app_name else f"[{time}] {e.window_title}"
             context += f"{i}. {activity}\n"
 
-    # 코치 시스템 지침 (카드 2개 보장 및 점유율 반영)
+    # 코치 시스템 지침 유지 및 보강
     context += "\n---\n"
     context += "### 💡 코치 시스템 지침:\n"
-    context += "1. 제공된 '데이터 기반 활동 분석'의 앱 이름과 점유율을 응답 필드(top_distraction_app, distraction_ratio)에 정확히 반영하세요.\n"
-    context += "2. **분량 지침**: 각 피드백 카드(요약, 평가, 개선방향)의 아이템(`items`)들은 단순한 단답형이 아니라, 왜 그렇게 판단했는지와 구체적인 실천 방법을 포함하여 **항목당 최소 2~3문장 이상의 상세한 설명**으로 작성하세요.\n"
-    context += "3. '피로도' 탭의 회복 전략(recovery_strategies)은 반드시 **서로 다른 카테고리의 전략으로 2개**를 작성하세요.\n"
-    context += "4. 전략 제목은 [시각, 신체, 수분, 환경, 명상] 중 하나를 포함하고, 전체 피드백 총량은 반드시 **500자 이상**의 풍부한 분량으로 작성하세요.\n"
-    context += "5. 세션 ID나 UUID 같은 기술적인 값은 절대 노출하지 마세요.\n"
-
-    print(f"\n[DEBUG] Session Data Compiled. Events: {len(events)} | Distraction: {top_app if events else 'N/A'}")
+    context += "1. '설정된 작업 목표'의 허용 프로그램과 실제 '활동 타임라인'을 대조하여 집중도를 평가하세요.\n"
+    context += "2. 제공된 '데이터 기반 활동 분석'의 앱 이름과 점유율을 응답 필드에 정확히 반영하세요.\n"
+    context += "3. 각 피드백 항목은 항목당 최소 2~3문장 이상의 상세한 설명으로 작성하세요.\n"
+    context += "4. 회복 전략(recovery_strategies)은 서로 다른 카테고리로 2개를 작성하고 전체 500자 이상을 유지하세요.\n"
     
     return context
 
