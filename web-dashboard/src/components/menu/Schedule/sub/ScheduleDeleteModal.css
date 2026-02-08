@@ -103,13 +103,13 @@
   cursor: pointer;
   accent-color: #3b82f6;
   position: absolute;
-  top: 6px;        /* 카드 상단 여백 */
-  left: 6px;       /* 카드 왼쪽 여백 */
+  top: 6px;
+  left: 6px;
 }
 
 /* 일정 정보 (라디오 버튼 옆으로 이동) */
 .delete-schedule-info {
-  margin-left: 42px; /* 라디오 버튼 공간 확보 */
+  margin-left: 42px;
   text-align: left;
 }
 
@@ -157,7 +157,7 @@
 }
 
 .delete-main-btn:disabled {
-  background: #fca5a5;
+  background: #fca5a5 !important;
   cursor: not-allowed;
 }
 
@@ -178,7 +178,7 @@
 }
 
 .delete-cancel-btn:hover {
-  background: #d1d5db;
+  background: #d1d5db !important;
 }
 
 /* 확인 섹션 */
@@ -315,7 +315,7 @@
 }
 
 .dark-theme .delete-main-btn:disabled {
-  background: #7f1d1d;
+  background: #7f1d1d !important;
   color: #fca5a5;
   opacity: 0.5;
 }

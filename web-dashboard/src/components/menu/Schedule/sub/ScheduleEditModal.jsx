@@ -18,7 +18,16 @@ export default function ScheduleEditModal({ schedule, onClose }) {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    
+    setFormData((prev) => {
+      const nextForm = { ...prev, [name]: value };
+      
+      if (name === "start_date") {
+        nextForm.end_date = value;
+      }
+      
+      return nextForm;
+    });
   };
 
   const handleSubmit = (e) => {

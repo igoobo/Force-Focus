@@ -23,7 +23,16 @@ export default function ScheduleAddModal({ onClose }) {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm({ ...form, [name]: value });
+    
+    setForm((prev) => {
+      const nextForm = { ...prev, [name]: value };
+      
+      if (name === "start_date") {
+        nextForm.end_date = value;
+      }
+      
+      return nextForm;
+    });
   };
 
   const handleSubmit = (e) => {
