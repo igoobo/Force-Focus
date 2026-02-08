@@ -12,22 +12,95 @@ from app.schemas.session import SessionCreate, SessionUpdate, SessionRead
 
 from app.crud.events import get_events  # 이벤트 조회를 위해 추가
 
-async def get_session_context_for_llm(user_id: str, session_id: str) -> str:
+async def get_session_full_context(user_id: str, session_id: str) -> str:
     """
-    특정 세션의 이벤트들을 LLM이 분석하기 좋은 텍스트로 변환합니다.
+    세션 정보와 해당 세션의 이벤트 목록을 바탕으로 풍부하고 사용자 친화적인 피드백을 구성합니다.
+    방해 요소 점유율을 실제 계산하여 주입하고, AI 가이드가 풍부하게 출력되도록 지침을 제공합니다.
     """
-    events = await get_events(user_id=user_id, session_id=session_id, limit=300)
+    col = get_sessions_collection()
+    uid = str(user_id)
+    oid = _safe_object_id(session_id)
+
+    # 1. 세션 본체 찾기 (매핑 로직 적용)
+    existing = await col.find_one({
+        "$or": [{"_id": oid}, {"client_session_id": session_id}],
+        "user_id": uid
+    })
+    
+    if not existing:
+        existing = await col.find_one(
+            {"user_id": uid},
+            sort=[("end_time", -1), ("start_time", -1)]
+        )
+
+    if not existing:
+        return "죄송합니다. 분석할 세션 기록을 찾을 수 없습니다."
+
+    # 이벤트 매핑 ID 결정
+    lookup_id = existing.get("client_session_id") or session_id
+
+    # 2. 사용자 친화적인 세션 정보 요약
+    start_time = existing["start_time"]
+    start_str = start_time.strftime("%Y년 %m월 %d일 %H시 %M분")
+    duration = existing.get("duration")
+    
+    if duration:
+        mins, secs = divmod(int(duration), 60)
+        duration_val = f"{mins}분 {secs}초"
+    else:
+        duration_val = "진행 중인 세션"
+
+    # [수정] 방해 요소 점유율 및 앱 사용 통계 실제 계산 로직
+    events = await get_events(user_id=uid, session_id=lookup_id, limit=500)
+    app_stats_context = ""
+    
+    if events:
+        app_counts = {}
+        for e in events:
+            name = e.app_name or "알 수 없음"
+            app_counts[name] = app_counts.get(name, 0) + 1
+        
+        # 가장 점유율이 높은 앱 추출
+        sorted_apps = sorted(app_counts.items(), key=lambda x: x[1], reverse=True)
+        top_app, top_count = sorted_apps[0]
+        distraction_ratio = (top_count / len(events)) * 100
+        
+        app_stats_context = f"### 📊 데이터 기반 활동 분석\n"
+        app_stats_context += f"- 가장 높은 비중의 앱: {top_app}\n"
+        app_stats_context += f"- 해당 앱 점유율: {distraction_ratio:.1f}%\n\n"
+
+    # LLM 전달 프롬프트 구성
+    context = f"## 🎯 이번 세션 분석 리포트\n\n"
+    context += f"**세션 시작:** {start_str}\n"
+    context += f"**총 집중 시간:** {duration_val}\n"
+    context += f"**현재 상태:** {'완료됨' if existing.get('status') == 'completed' else '진행 중'}\n\n"
+    
+    context += app_stats_context
+    
+    context += "### 🔍 활동 타임라인 상세\n"
+    context += "사용자가 세션 동안 수행한 활동들은 다음과 같습니다. 이 데이터를 바탕으로 흐름을 분석해 주세요.\n\n"
+
     if not events:
-        return "기록된 이벤트가 없습니다."
+        context += "- 수집된 상세 활동 로그가 없습니다.\n"
+    else:
+        events.reverse()
+        for i, e in enumerate(events, 1):
+            time = e.timestamp.strftime("%H:%M:%S")
+            activity = f"[{time}] {e.app_name} - {e.window_title}" if e.app_name else f"[{time}] {e.window_title}"
+            context += f"{i}. {activity}\n"
 
-    # 시간순 정렬 및 요약
-    events.reverse()
-    event_summary = []
-    for e in events:
-        time = e.timestamp.strftime("%H:%M")
-        event_summary.append(f"[{time}] 앱: {e.app_name}, 창 제목: {e.window_title}")
+    # 코치 시스템 지침 (카드 2개 보장 및 점유율 반영)
+    context += "\n---\n"
+    context += "### 💡 코치 시스템 지침:\n"
+    context += "1. 제공된 '데이터 기반 활동 분석'의 앱 이름과 점유율을 응답 필드(top_distraction_app, distraction_ratio)에 정확히 반영하세요.\n"
+    context += "2. '피로도' 탭의 회복 전략(recovery_strategies)은 반드시 **서로 다른 카테고리의 전략으로 2개**를 작성하세요.\n"
+    context += "3. 전략 제목은 [시각, 신체, 수분, 환경, 명상] 중 하나를 포함하여 구체적으로 작성하세요. (예: '시각적 피로 회복', '전신 스트레칭')\n"
+    context += "4. 각 전략에는 실천 항목(items)을 2개 이상 포함하고, 전체 피드백은 400자 이상으로 작성하세요.\n"
+    context += "5. 세션 ID나 UUID 같은 기술적인 값은 절대 노출하지 마세요.\n"
 
-    return "\n".join(event_summary)
+    print(f"\n[DEBUG] Session Data Compiled. Events: {len(events)} | Distraction: {top_app if events else 'N/A'}")
+    
+    return context
 
 
 def get_sessions_collection():
@@ -152,8 +225,12 @@ async def start_session(user_id: str, data: SessionCreate) -> SessionRead:
     task_id = _strip_or_none(data.task_id)
     profile_id = _strip_or_none(data.profile_id)
 
+    # [수정] 스키마 필드명인 client_session_id에 직접 접근하여 안전하게 수신
+    client_sid = data.client_session_id 
+
     doc = {
         "user_id": user_id,
+        "client_session_id": client_sid, # 매핑 필드 추가
         "task_id": task_id,
         "profile_id": profile_id,
         "start_time": start_time,
@@ -193,7 +270,10 @@ async def get_session(session_id: str) -> Optional[SessionRead]:
     col = get_sessions_collection()
     oid = _safe_object_id(session_id)
 
-    session = await col.find_one({"_id": oid})
+    # [수정] client_session_id로도 조회 가능하도록 필터 확장
+    session = await col.find_one({
+        "$or": [{"_id": oid}, {"client_session_id": session_id}]
+    })
     if not session:
         return None
     return serialize_session(session)
@@ -218,8 +298,11 @@ async def update_session(user_id: str, session_id: str, data: SessionUpdate) -> 
     uid = str(user_id)
     oid = _safe_object_id(session_id)
 
-    # 1) 기본 ID 기반 조회 시도
-    existing = await col.find_one({"_id": oid, "user_id": uid})
+    # 1) 기본 ID 기반 조회 시도 (매핑 포함)
+    existing = await col.find_one({
+        "$or": [{"_id": oid}, {"client_session_id": session_id}],
+        "user_id": uid
+    })
 
     # 2) [핵심] ID로 못 찾았을 경우, 해당 유저의 현재 활성 세션을 검색
     if not existing:
@@ -231,27 +314,26 @@ async def update_session(user_id: str, session_id: str, data: SessionUpdate) -> 
     if not existing:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    # 업데이트 대상의 실제 ID 확정
     target_id = existing["_id"]
-
     update_doc = {}
 
-    # 데스크탑 앱 필드(end_time_s) 대응: data 객체에 필드가 있거나 dict 형태로 존재할 경우 처리
+    # [수정] 업데이트 중 앱의 ID가 확인되면 client_session_id 매핑 정보 보강
+    if not existing.get("client_session_id") and "local-" in str(session_id):
+        update_doc["client_session_id"] = session_id
+
+    # 데스크탑 앱 호환: 앱에서 명시적 종료 시간을 주지 않더라도 서버 시간 사용
     actual_end_time = data.end_time
     if actual_end_time is None:
-        # Pydantic 모델에 end_time_s가 정의되어 있지 않아도 extra="allow" 설정이 있다면 접근 가능
         ts = getattr(data, "end_time_s", None)
-        if ts:
-            actual_end_time = datetime.fromtimestamp(ts, tz=timezone.utc)
+        actual_end_time = datetime.fromtimestamp(ts, tz=timezone.utc) if ts else _utcnow()
 
     if actual_end_time is not None:
         end_time = _ensure_aware_utc(actual_end_time)
         update_doc["end_time"] = end_time
         update_doc["duration"] = _compute_duration_seconds(existing["start_time"], end_time)
 
-    if data.status is not None:
-        # 스키마에서 strip/blank 방지하지만 안전망
-        update_doc["status"] = _strip_or_none(data.status) or data.status
+    # 상태 업데이트 및 기본값 설정
+    update_doc["status"] = _strip_or_none(data.status) or "completed"
 
     if data.goal_duration is not None:
         update_doc["goal_duration"] = data.goal_duration
@@ -260,9 +342,6 @@ async def update_session(user_id: str, session_id: str, data: SessionUpdate) -> 
         if data.interruption_count < 0:
             raise HTTPException(status_code=400, detail="interruption_count must be >= 0")
         update_doc["interruption_count"] = data.interruption_count
-
-    if not update_doc:
-        return serialize_session(existing)
 
     await col.update_one({"_id": target_id}, {"$set": update_doc})
     updated = await col.find_one({"_id": target_id})

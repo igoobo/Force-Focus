@@ -1,8 +1,10 @@
+# backend/app/api/endpoints/web/insight.py
+
 import os
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, Query
 from google import genai
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.api.deps import get_current_user_id
 from app.crud import sessions as session_crud
@@ -14,70 +16,69 @@ router = APIRouter(prefix="/insight", tags=["AI Insight"])
 # Gemini 클라이언트 설정
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-async def get_session_context_for_llm(user_id: str, session_id: str) -> str:
-    """
-    특정 세션의 이벤트들을 LLM이 분석하기 좋은 텍스트로 변환합니다.
-    """
-    # 세션 내 이벤트를 최대 300개까지 가져옵니다. (필요시 조절)
-    events = await event_crud.get_events(user_id=user_id, session_id=session_id, limit=300)
-    
-    if not events:
-        return "기록된 세부 활동 로그가 없습니다."
-
-    # 시간순 정렬 (과거 -> 현재)
-    events.reverse()
-    
-    event_logs = []
-    for e in events:
-        time_str = e.timestamp.strftime("%H:%M:%S")
-        log_line = f"[{time_str}] 앱: {e.app_name or '알 수 없음'}, 제목: {e.window_title or '정보 없음'}"
-        event_logs.append(log_line)
-
-    return "\n".join(event_logs)
-
 @router.get("/analyze/{session_id}", response_model=InsightResponse)
 async def analyze_session_insight(
     session_id: str,
     user_id: str = Depends(get_current_user_id)
 ):
     """
-    특정 세션 ID를 받아 해당 세션의 모든 이벤트를 분석하고 JSON 리포트를 생성합니다.
+    세션 데이터를 분석하여 리포트를 생성합니다. 
+    데이터 부족 시 영문 배지와 구조화된 범용 피드백을 제공합니다.
     """
-    # 1. 세션 기본 정보 조회
+    # 1. 데이터 통합 컨텍스트 및 세션 정보 추출
+    event_context = await session_crud.get_session_full_context(user_id, session_id)
     session = await session_crud.get_session(session_id)
     if not session:
-        raise HTTPException(status_code=404, detail="세션 정보를 찾을 수 없습니다.")
-    
-    if session.user_id != user_id:
-        raise HTTPException(status_code=403, detail="해당 세션에 접근할 권한이 없습니다.")
+         sessions = await session_crud.get_sessions(user_id, limit=1)
+         session = sessions[0] if sessions else None
 
-    # 2. 세션 내 상세 이벤트 로그 추출
-    event_context = await get_session_context_for_llm(user_id, session_id)
+    # 데이터 부족 여부 판별
+    is_data_insufficient = "기록된 활동 로그가 없습니다" in event_context or not session
 
-    # 3. LLM 프롬프트 구성
-    # InsightResponse 스키마의 필드 설명을 기반으로 페르소나를 부여합니다.
-    prompt = f"""
-    당신은 전문적인 생산성 분석가입니다. 아래 제공된 사용자의 작업 세션 데이터를 분석하여 상세 리포트를 작성하세요.
-    응답은 반드시 'InsightResponse' JSON 구조를 엄격히 따라야 합니다.
+    # 2. 가변 프롬프트 구성
+    if is_data_insufficient:
+        prompt = """
+        사용자의 작업 데이터가 부족합니다. 전문 생산성 코치로서 '범용 생산성 최적화 가이드'를 InsightResponse 형식으로 작성하세요.
+        프론트엔드 UI의 모든 섹션이 채워지도록 상세하고 풍성한 내용을 생성해야 합니다.
 
-    [세션 정보]
-    - 작업 분류: {session.task_id}
-    - 목표 시간: {session.goal_duration or 0}분
-    - 실제 소요 시간: {round((session.duration or 0) / 60, 1)}분
-    - 방해/개입 횟수: {session.interruption_count}회
+        [스타일 및 구조 지침]
+        1. 영문 배지 적용: 
+           - summary_badge: 'READY'
+           - focus_badge: 'STANDBY'
+           - fatigue_badge: 'STABLE'
+        2. 카드 제목 (이모티콘 포함) 및 구성 (summary_cards):
+           - 첫 번째 카드: 제목 '📝 요약', 데이터가 적어 기본 분석 모드로 동작 중임을 알리고 딥워크의 중요성 설명.
+           - 두 번째 카드: 제목 '💡 추천 실천 사항', 뽀모도로 기법(25분 집중/5분 휴식) 등 데이터가 없을 때 추천하는 습관 제안.
+           - 세 번째 카드: 제목 '⚠️ 주의 사항', 멀티태스킹 방지 및 알림 관리 등 주의할 점 제안.
+        3. 텍스트 강조: 중요 키워드는 반드시 **볼드체**(**내용**)를 사용하세요.
+        4. 기타 필수 필드: 
+           - focus_stats: max_continuous '25분(권장)', threshold '양호', average_score '70'.
+           - focus_insight_title: '뇌과학 기반 집중력 향상법'.
+           - focus_insight_content: 도파민 관리 및 환경 설정법 상세 서술.
+           - fatigue_description: 디지털 피로도 예방을 위한 20-20-20 규칙 등 상세 서술.
+           - recovery_strategies: '안구 건조 예방', '전신 스트레칭' 등 2개 이상의 전략을 상세 항목과 함께 제공.
+        5. 모든 응답은 InsightResponse JSON 구조를 엄격히 따를 것.
+        """
+    else:
+        prompt = f"""
+        당신은 전문 생산성 분석가입니다. 아래 데이터를 분석하여 InsightResponse 형식으로 응답하세요.
+        
+        [데이터]
+        - 작업: {session.task_id if session else '미분류'}
+        - 실제 로그: {event_context}
 
-    [활동 상세 로그]
-    {event_context}
-
-    [작성 가이드라인]
-    1. summary_title: 사용자의 집중 패턴을 한 단어로 정의하세요 (예: '초집중 모드', '멀티태스킹형').
-    2. summary_description: 로그를 기반으로 무엇을 잘했고, 무엇이 방해되었는지 구체적으로 서술하세요.
-    3. focus_stats: 로그의 타임스탬프 간격을 분석하여 최대 연속 집중 시간을 추정하세요.
-    4. distraction_ratio: 작업과 관련 없는 앱(SNS, 유튜브 등)의 비중을 계산하세요.
-    """
+        [분석 지침]
+        1. 영문 배지 적용: 성과에 따라 'EXCELLENT', 'DEEP FOCUS', 'WARNING' 등 영문 대문자 사용.
+        2. 카드 제목 (이모티콘 포함):
+           - 첫 번째 카드: '📊 요약'
+           - 두 번째 카드: '✅ 양호한 점'
+           - 세 번째 카드: '🚀 개선이 필요한 점'
+        3. 텍스트 강조: 앱 이름, 특정 시간대, 집중도 등 핵심 요소는 반드시 **볼드체**(**내용**)를 사용하세요.
+        4. 모든 응답은 InsightResponse JSON 구조를 엄격히 따를 것.
+        """
 
     try:
-        # 4. Gemini API 호출 (Response Schema 강제)
+        # 3. Gemini API 호출
         response = client.models.generate_content(
             model="gemini-2.0-flash", 
             contents=prompt,
@@ -86,24 +87,17 @@ async def analyze_session_insight(
                 "response_schema": InsightResponse
             }
         )
-        
-        # 5. 파싱된 결과 반환
         return response.parsed
 
     except Exception as e:
         print(f"LLM Analysis Error: {str(e)}")
-        raise HTTPException(
-            status_code=500, 
-            detail=f"AI 분석 중 오류가 발생했습니다: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail="AI 분석 중 오류가 발생했습니다.")
 
 @router.get("/last-session", response_model=InsightResponse)
 async def analyze_last_session(user_id: str = Depends(get_current_user_id)):
     """
-    사용자의 가장 최근 종료된 세션을 찾아 분석합니다. (메인 대시보드용)
+    최근 세션을 분석하거나 데이터가 없으면 가이드 모드 결과를 반환합니다.
     """
     sessions = await session_crud.get_sessions(user_id, limit=1)
-    if not sessions:
-        raise HTTPException(status_code=404, detail="분석할 최근 세션이 없습니다.")
-    
-    return await analyze_session_insight(sessions[0].id, user_id)
+    target_id = sessions[0].id if sessions else "no_data"
+    return await analyze_session_insight(target_id, user_id)
