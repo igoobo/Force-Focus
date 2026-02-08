@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import "./Schedule.css";
 import { useScheduleStore } from './ScheduleStore';
 import useMainStore from "../../../MainStore";
@@ -115,15 +116,28 @@ export default function Schedule() {
       {viewMode === "month" && <ScheduleMonth key="month" schedules={schedules} onScheduleClick={openEditModal} />}
       {viewMode === "list" && <ScheduleList key="list" schedules={schedules} onScheduleClick={openEditModal} />}
 
-      {isAddOpen && <ScheduleAddModal onClose={closeAddModal} />}
-      {isDeleteOpen && <ScheduleDeleteModal onClose={closeDeleteModal} />}
+      {isAddOpen && createPortal(
+        <div className={isDarkMode ? "dark-theme" : ""}>
+          <ScheduleAddModal onClose={closeAddModal} />
+        </div>,
+        document.body
+      )}
       
-      {/* 수정 모달 렌더링 */}
-      {isEditOpen && selectedSchedule && (
-        <ScheduleEditModal 
-          schedule={selectedSchedule} 
-          onClose={closeEditModal} 
-        />
+      {isDeleteOpen && createPortal(
+        <div className={isDarkMode ? "dark-theme" : ""}>
+          <ScheduleDeleteModal onClose={closeDeleteModal} />
+        </div>,
+        document.body
+      )}
+      
+      {isEditOpen && selectedSchedule && createPortal(
+        <div className={isDarkMode ? "dark-theme" : ""}>
+          <ScheduleEditModal 
+            schedule={selectedSchedule} 
+            onClose={closeEditModal} 
+          />
+        </div>,
+        document.body
       )}
     </div>
   );

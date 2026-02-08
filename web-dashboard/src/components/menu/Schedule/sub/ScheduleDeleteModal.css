@@ -145,7 +145,7 @@
 }
 
 .delete-main-btn {
-  background: #ef4444;
+  background: #ef4444 !important;
   color: white;
   border: none;
   border-radius: 6px;
