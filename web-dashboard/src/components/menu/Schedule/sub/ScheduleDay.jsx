@@ -158,7 +158,7 @@ export default function ScheduleDay({ schedules = [], onScheduleClick }) {
               >
                 <div className="task-title">{s.name}</div>
                 <div className="task-time">
-                  {s.start_time} ~ {s.end_time}
+                  {s.start_time.slice(0, 5)} ~ {s.end_time.slice(0, 5)}
                 </div>
                 <div className="task-desc">{s.description}</div>
               </div>

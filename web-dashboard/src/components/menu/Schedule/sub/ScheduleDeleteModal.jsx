@@ -61,7 +61,7 @@ export default function ScheduleDeleteModal({ onClose }) {
                       <span className="delete-task-badge">{getTaskLabel(s.task_id)}</span>
                     </div>
                     <p className="delete-schedule-time">
-                      {s.start_date} {s.start_time} ~ {s.end_time}
+                      {s.start_date} {s.start_time.slice(0, 5)} ~ {s.end_time.slice(0, 5)}
                     </p>
                     {s.description && (
                       <p className="delete-schedule-desc">{s.description}</p>

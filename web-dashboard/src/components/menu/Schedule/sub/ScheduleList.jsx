@@ -43,7 +43,7 @@ const ScheduleList = ({ schedules = [], onScheduleClick }) => {
                   <span className="task-badge">{getTaskLabel(item.task_id)}</span>
                 </div>
                 <span className="card-date">
-                  {item.start_date} {item.start_time} ~ {item.end_date} {item.end_time}
+                  {item.start_date} {item.start_time.slice(0, 5)} ~ {item.end_date} {item.end_time.slice(0, 5)}
                 </span>
               </div>
 

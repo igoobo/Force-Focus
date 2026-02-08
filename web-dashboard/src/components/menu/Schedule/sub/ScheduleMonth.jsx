@@ -1,165 +1,176 @@
-import React, { useState } from "react";
-import "./ScheduleMonth.css";
+import React, { useEffect, useState } from "react";
+import "./ScheduleDay.css";
 
-// 스케줄 월간 뷰 컴포넌트
-export default function ScheduleMonth({ schedules, onScheduleClick }) {
-  const today = new Date(); // 오늘 날짜
+// [수정] 오전 9시 이전 날짜 밀림 방지를 위해 로컬 시간대 기준으로 YYYY-MM-DD 추출
+const getFormattedDateString = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
-  // 현재 표시 중인 연 - 월 - 1일 (오늘 날짜 기준으로 초기화)
-  const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1)); 
+// 스케줄 일간 뷰 컴포넌트
+export default function ScheduleDay({ schedules = [], onScheduleClick }) {
+  const [currentDate, setCurrentDate] = useState(new Date()); // 오늘 날짜로 설정
+  
+  // 표시 대상 날짜의 '연-월-일' 문자열을 상태 변화 없이 계산
+  const currentDisplayDateStr = getFormattedDateString(currentDate);
+  
+  // 실제 '오늘' 날짜의 '연-월-일' 문자열
+  const todayStr = getFormattedDateString(new Date());
 
-  const year = currentDate.getFullYear(); // 현재 연도
-  const month = currentDate.getMonth(); // 현재 월 (0-11)
-  const daysInMonth = new Date(year, month + 1, 0).getDate(); // 해당 월의 총 일수
-  const startDayOfWeek = new Date(year, month, 1).getDay(); // 해당 월의 1일이 무슨 요일인지 (0:일, 6:토)
-  const endDayOfWeek = new Date(year, month, daysInMonth).getDay(); // 해당 월의 마지막 날이 무슨 요일인지
+  // 오늘 날짜인지 여부를 판단함
+  const isCurrentlyToday = currentDisplayDateStr === todayStr;
 
-  const isCurrentMonth =
-    today.getFullYear() === year && today.getMonth() === month; // 현재 보고 있는 달이 이번 달인지 여부
-  const todayDate = today.getDate(); // 오늘 날짜의 일자
+  // 요일 배열 정의
+  const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
 
-  // 지난/다음 달 정보
-  const prevMonthDays = new Date(year, month, 0).getDate();
-  const nextMonthDayCount = 6 - endDayOfWeek;
+  // 현재 날짜의 요일 계산
+  const dayOfWeek = weekdays[currentDate.getDay()];
 
-  // 공휴일/기념일 (사전 지정)
-  const holidays = [
-    { month: 1, day: 1, name: "신정" },
-    { month: 3, day: 1, name: "삼일절" },
-    { month: 5, day: 5, name: "어린이날" },
-    { month: 6, day: 6, name: "현충일" },
-    { month: 8, day: 15, name: "광복절" },
-    { month: 10, day: 3, name: "개천절" },
-    { month: 10, day: 9, name: "한글날" },
-    { month: 12, day: 25, name: "성탄절" },
-  ];
+  // 토요일과 일요일에 대한 클래스 지정 (토요일: saturday, 일요일: sunday)
+  const dayClass =
+    currentDate.getDay() === 0
+      ? "sunday"
+      : currentDate.getDay() === 6
+      ? "saturday"
+      : "";
 
-  // 날짜 배열 구성
-  const days = [];
+  // 한 시간당 높이를 60px로 설정
+  const HOUR_HEIGHT = 60;
+  
+  // 현재 날짜일 때만 위치를 계산하고, 아니면 null로 설정
+  const [currentPosition, setCurrentPosition] = useState(null); 
 
-  for (let i = startDayOfWeek - 1; i >= 0; i--) {
-    days.push({
-      date: new Date(year, month - 1, prevMonthDays - i),
-      type: "prev",
-    });
-  }
-  for (let i = 1; i <= daysInMonth; i++) {
-    days.push({
-      date: new Date(year, month, i),
-      type: "current",
-    });
-  }
-  for (let i = 1; i <= nextMonthDayCount; i++) {
-    days.push({
-      date: new Date(year, month + 1, i),
-      type: "next",
-    });
-  }
+  // useEffect 1) 현재 시간에 따른 시간 표시선 위치 업데이트
+  // currentDisplayDateStr 또는 todayStr 변경 시 useEffect 재실행
+  useEffect(() => {
+    const updatePosition = () => {
+      if (!isCurrentlyToday) {   // isCurrentlyToday가 false이면 업데이트 중단
+        setCurrentPosition(null);
+        return;
+      }  
 
-  // 날짜 포맷 함수 (YYYY-MM-DD)
-  const formatDate = (date) => {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
+      const now = new Date(); // 현재 시각
+      const minutes = now.getHours() * 60 + now.getMinutes(); // 현재 시각을 분 단위로 변환
+      const position = (minutes / 60) * HOUR_HEIGHT - 1; // 현재 시각에 따른 위치 계산 (-1px 보정)
+      setCurrentPosition(position); // 위치 상태 업데이트
+    };
+
+    if (isCurrentlyToday) {  // 오늘 날짜일 때만 타이머를 설정
+      updatePosition();
+      const timer = setInterval(updatePosition, 60000);
+      return () => clearInterval(timer);
+    } else {
+      setCurrentPosition(null); // 오늘 날짜가 아닐 경우 위치 초기화 및 타이머 없음 보장
+      return () => {};
+    }
+  }, [currentDisplayDateStr, todayStr, isCurrentlyToday]);
+
+  // 날짜 조작 함수 개선 (timestamp 사용)
+  const navigateDay = (direction) => {
+    const newDate = new Date(currentDate);
+    // 현재 날짜의 밀리초를 가져와 24시간(86400000ms)을 더하거나 뺌
+    newDate.setDate(newDate.getDate() + direction);
+    setCurrentDate(newDate);
   };
 
-  // 이동 함수
-  const handlePrevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
-  const handleNextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
-  const handleToday = () =>
-    setCurrentDate(new Date(today.getFullYear(), today.getMonth(), 1));
+  // 네비게이션 버튼 핸들러
+  const handlePrevDay = () => navigateDay(-1); // 이전 날로 이동
+  const handleNextDay = () => navigateDay(1); // 다음 날로 이동
+  const handleToday = () => setCurrentDate(new Date()); // 오늘 날짜로 이동
+
+  // 일정 필터링
+  const daySchedules = schedules.filter(
+    (s) => s.start_date === currentDisplayDateStr || s.end_date === currentDisplayDateStr
+  );
 
   return (
-    <div className="month-view">
-      {/* 상단 제목바 */}
-      <div className="month-title-bar">
-        {/* 왼쪽/중앙: 내비게이션 및 제목 */}
-        <div className="month-nav-group">
-          <button className="nav-btn" onClick={handlePrevMonth}>〈</button>
-          <h2 className="month-title">
-            {year}년 {month + 1}월
-          </h2>
-          <button className="nav-btn" onClick={handleNextMonth}>〉</button>
+    <div className="day-view">
+      {/* 상단 날짜 헤더 */}
+      <div className="day-header">
+        {/* 좌측 영역: ◀, ▶, '오늘' 버튼을 모두 포함하며 동일 간격 배치 */}
+        <div className="day-header-left">
+          <button className="nav-btn" onClick={handlePrevDay} title="이전 날">
+            〈
+          </button>
+          <button className="today-btn" onClick={handleToday}>
+            오늘
+          </button>
+          <button className="nav-btn" onClick={handleNextDay} title="다음 날">
+            〉
+          </button>
+        </div>
+        {/* 중앙 영역: 제목만 배치 */}
+        <div className="day-header-center">
+          <span className={`day-title ${dayClass}`}>
+            {currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월{" "}
+            {currentDate.getDate()}일 ({dayOfWeek})
+          </span>
         </div>
 
-        {/* 오른쪽: 오늘 버튼 단독 배치 */}
-        <div className="month-action-group">
-          <button className="today-btn-inline" onClick={handleToday}>오늘</button>
+        {/* 우측 영역: 비워두고 flex: 1로 중앙 정렬 보조 */}
+        <div className="day-header-right">
+          {/* 비움 */}
         </div>
       </div>
-      
-      {/* 달력 본문 */}
-      <div className="month-grid">
-        {["일", "월", "화", "수", "목", "금", "토"].map((d, i) => (
-          <div
-            key={i}
-            className={`month-day-header ${
-              i === 0 ? "sunday" : i === 6 ? "saturday" : ""
-            }`}
-          >
-            {d}
-          </div>
-        ))}
 
-        {days.map((item, i) => {
-          const dayOfWeek = i % 7;
-          const isSunday = dayOfWeek === 0;
-          const isSaturday = dayOfWeek === 6;
-          const isToday =
-            isCurrentMonth &&
-            item.type === "current" &&
-            item.date.getDate() === todayDate;
-
-          const isHoliday =
-            item.type === "current" &&
-            holidays.some(
-              (h) =>
-                h.month === item.date.getMonth() + 1 &&
-                h.day === item.date.getDate()
-            );
-
-          // 현재 날짜(YYYY-MM-DD)
-          const currentDateStr = formatDate(item.date);
-
-          // 해당 날짜의 일정 필터링
-          const dailySchedules = schedules.filter(
-            (s) => s.start_date === currentDateStr
-          );
-
-          return (
-            <div
-              key={i}
-              className={`month-cell ${
-                item.type !== "current" ? "faded-cell" : ""
-              } ${isToday ? "today-cell" : ""}`}
+      {/* 본문 */}
+      <div className="day-body">
+        {/* 시간 라벨 컬럼 */}
+        <div className="day-time-column">
+          {/* 0시부터 23시까지 라벨을 생성합니다. */}
+          {Array.from({ length: 24 }, (_, i) => (
+            <div 
+              key={i} 
+              className="day-time-label" 
             >
-              <div
-                className={`day-number
-                  ${item.type !== "current" ? "faded-text" : ""}
-                  ${isSunday || isHoliday ? "sunday-text" : ""}
-                  ${isSaturday ? "saturday-text" : ""}`}
-              >
-                {item.date.getDate()}
-              </div>
-
-              {/* 일정 표시 */}
-              {dailySchedules.map((s) => (
-                <div 
-                  key={s.id} 
-                  className="month-task" 
-                  style={{ cursor: "pointer" }} // 커서 추가
-                  onClick={() => onScheduleClick && onScheduleClick(s)} // 클릭 이벤트 추가
-                >
-                  <strong>{s.name}</strong>
-                  <div className="task-time">
-                    {s.start_time} ~ {s.end_time}
-                  </div>
-                </div>
-              ))}
+              {/* span 태그로 감싸서 CSS에서 상대 위치 조정 */}
+              <span>{i.toString().padStart(2, "0")}:00</span>
             </div>
-          );
-        })}
+          ))}
+        </div>
+
+        {/* 타임라인 및 일정 영역 */}
+        <div className="day-timeline">
+          {/* 현재 시간선: 오늘일 경우에만 렌더링 */}
+          {isCurrentlyToday && currentPosition !== null && (
+            <div
+              className="current-time-line"
+              style={{ top: `${currentPosition}px` }}
+            ></div>
+          )}
+
+          {/* 시간 구분선 (0시부터 23시까지) */}
+          {Array.from({ length: 24 }, (_, i) => (
+            <div key={i} className="time-line"></div>
+          ))}
+
+          {/* 일정 */}
+          {daySchedules.map((s) => {
+            const [sh, sm] = s.start_time.split(":").map((v) => parseInt(v, 10));
+            const [eh, em] = s.end_time.split(":").map((v) => parseInt(v, 10));
+            const totalStart = sh * 60 + sm;
+            const totalEnd = eh * 60 + em;
+            const top = (totalStart / 60) * HOUR_HEIGHT;
+            const height = ((totalEnd - totalStart) / 60) * HOUR_HEIGHT;
+
+            return (
+              <div
+                key={s.id}
+                className="day-task"
+                style={{ top: `${top}px`, height: `${height}px`, cursor: "pointer" }} // 커서 추가
+                onClick={() => onScheduleClick && onScheduleClick(s)} // 클릭 이벤트 추가
+              >
+                <div className="task-title">{s.name}</div>
+                <div className="task-time">
+                  {s.start_time.slice(0, 5)} ~ {s.end_time.slice(0, 5)}
+                </div>
+                <div className="task-desc">{s.description}</div>
+              </div>
+    );
+  })}
+        </div>
       </div>
     </div>
   );
