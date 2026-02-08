@@ -78,7 +78,7 @@ export default function Feedback() {
       <div className={`feedback-container ${isDarkMode ? "dark-theme" : ""}`}>
         <div className="feedback-content" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <div className="loader"></div>
-          <p style={{ marginLeft: '15px', color: 'var(--text-muted)' }}>AI가 귀하의 활동을 심층 분석 중입니다...</p>
+          <p style={{ marginLeft: '15px', color: 'var(--text-muted)' }}>최근 세션 활동을 분석하고 있습니다...</p>
         </div>
       </div>
     );

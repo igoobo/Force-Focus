@@ -76,26 +76,34 @@ button:active { transform: scale(0.97); }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
-  min-height: 400px;
-  gap: 1.5rem;
-  color: var(--menu-text);
+  min-height: 400px; /* TaskView와 동일하게 400px 유지 */
+  width: 100%;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #64748b; /* TaskView 로딩 텍스트 색상 */
+  gap: 20px;
+  animation: fadeIn 0.4s ease-in-out;
 }
 
-.loader {
+/* TaskView의 원형 회전 로더 스타일 적용 */
+.schedule-loading-container::before {
+  content: "";
   width: 48px;
   height: 48px;
-  border: 5px solid var(--menu-border);
-  border-bottom-color: var(--menu-active-text);
+  border: 5px solid #e2e8f0;
+  border-left-color: #2563eb; /* TaskView의 포인트 블루 색상 */
   border-radius: 50%;
-  display: inline-block;
-  box-sizing: border-box;
-  animation: rotation 1s linear infinite;
+  animation: spin 1s linear infinite;
 }
 
-@keyframes rotation {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+/* 기존 .loader 클래스 제거 (::before로 대체됨) */
+.loader {
+  display: none;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .schedule-loading-container p {
@@ -146,4 +154,13 @@ button:active { transform: scale(0.97); }
 .dark-theme .delete-btn:hover {
   background-color: #ba3636 !important;
   color: white !important;
+}
+
+.dark-theme .schedule-loading-container {
+  color: #94a3b8;
+}
+
+.dark-theme .schedule-loading-container::before {
+  border-color: #334155;
+  border-left-color: #3b82f6;
 }
