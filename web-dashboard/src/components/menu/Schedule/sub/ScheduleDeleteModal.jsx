@@ -98,7 +98,7 @@ export default function ScheduleDeleteModal({ onClose }) {
             onClick={handleDelete} 
             disabled={selectedIds.length === 0}
           >
-            {selectedIds.length > 0 ? `${selectedIds.length}개 삭제` : "일괄 삭제"}
+            {selectedIds.length > 0 ? `${selectedIds.length}개 삭제` : "삭제"}
           </button>
           <button className="delete-cancel-btn" onClick={onClose}>닫기</button>
         </div>
