@@ -16,6 +16,10 @@ def get_tasks_collection():
 
 
 def _safe_object_id(task_id: str) -> ObjectId:
+    # ✅ 공백 방지 안전망 (leading/trailing space로 InvalidId 나는 케이스 방지)
+    if isinstance(task_id, str):
+        task_id = task_id.strip()
+
     try:
         return ObjectId(task_id)
     except (InvalidId, TypeError):
@@ -34,22 +38,35 @@ def serialize_task(task) -> TaskRead:
         linked_session_id=task.get("linked_session_id"),
         target_executable=task.get("target_executable"),
         target_arguments=task.get("target_arguments"),
+        # ✅ 추가
+        isCustom=task.get("isCustom", False),
     )
 
 
 # CREATE
 async def create_task(user_id: str, task_data: TaskCreate) -> TaskRead:
     tasks_collection = get_tasks_collection()
+
+    payload = task_data.model_dump()
+
+    # ✅ payload에서 created_at/status가 들어올 여지를 차단(정책적으로 서버가 소유)
+    payload.pop("created_at", None)
+    payload.pop("status", None)
+
     new_task = {
         "user_id": user_id,
-        **task_data.model_dump(),
+        **payload,
+        # 방어: 혹시 payload에 안 왔어도 기본값 보장
+        "isCustom": task_data.isCustom,
         "created_at": datetime.now(),
         "status": "pending",
     }
+
     result = await tasks_collection.insert_one(new_task)
     saved = await tasks_collection.find_one({"_id": result.inserted_id})
     if not saved:
         raise HTTPException(status_code=500, detail="Failed to create task")
+
     return serialize_task(saved)
 
 
@@ -61,32 +78,41 @@ async def get_tasks(user_id: str):
 
 
 # READ ONE
-async def get_task(task_id: str):
+async def get_task(user_id: str, task_id: str):
     tasks_collection = get_tasks_collection()
     oid = _safe_object_id(task_id)
-    doc = await tasks_collection.find_one({"_id": oid})
+    doc = await tasks_collection.find_one({"_id": oid, "user_id": user_id})
     return serialize_task(doc) if doc else None
 
 
 # UPDATE
-async def update_task(task_id: str, task_data: TaskUpdate):
+async def update_task(user_id: str, task_id: str, task_data: TaskUpdate):
     tasks_collection = get_tasks_collection()
     oid = _safe_object_id(task_id)
 
-    update_fields = {k: v for k, v in task_data.model_dump().items() if v is not None}
-    if not update_fields:
-        return await get_task(task_id)
+    update_fields = {
+        k: v for k, v in task_data.model_dump().items()
+        if v is not None
+    }
 
-    await tasks_collection.update_one({"_id": oid}, {"$set": update_fields})
-    updated = await tasks_collection.find_one({"_id": oid})
-    if not updated:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return serialize_task(updated)
+    if not update_fields:
+        return await get_task(user_id, task_id)
+
+    result = await tasks_collection.update_one(
+        {"_id": oid, "user_id": user_id},
+        {"$set": update_fields},
+    )
+
+    if result.matched_count == 0:
+        return None  # endpoint에서 404 처리
+
+    updated = await tasks_collection.find_one({"_id": oid, "user_id": user_id})
+    return serialize_task(updated) if updated else None
 
 
 # DELETE
-async def delete_task(task_id: str) -> bool:
+async def delete_task(user_id: str, task_id: str) -> bool:
     tasks_collection = get_tasks_collection()
     oid = _safe_object_id(task_id)
-    result = await tasks_collection.delete_one({"_id": oid})
+    result = await tasks_collection.delete_one({"_id": oid, "user_id": user_id})
     return result.deleted_count == 1

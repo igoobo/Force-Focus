@@ -93,9 +93,9 @@ async def get_session_full_context(user_id: str, session_id: str) -> str:
     context += "\n---\n"
     context += "### 💡 코치 시스템 지침:\n"
     context += "1. 제공된 '데이터 기반 활동 분석'의 앱 이름과 점유율을 응답 필드(top_distraction_app, distraction_ratio)에 정확히 반영하세요.\n"
-    context += "2. '피로도' 탭의 회복 전략(recovery_strategies)은 반드시 **서로 다른 카테고리의 전략으로 2개**를 작성하세요.\n"
-    context += "3. 전략 제목은 [시각, 신체, 수분, 환경, 명상] 중 하나를 포함하여 구체적으로 작성하세요. (예: '시각적 피로 회복', '전신 스트레칭')\n"
-    context += "4. 각 전략에는 실천 항목(items)을 2개 이상 포함하고, 전체 피드백은 400자 이상으로 작성하세요.\n"
+    context += "2. **분량 지침**: 각 피드백 카드(요약, 평가, 개선방향)의 아이템(`items`)들은 단순한 단답형이 아니라, 왜 그렇게 판단했는지와 구체적인 실천 방법을 포함하여 **항목당 최소 2~3문장 이상의 상세한 설명**으로 작성하세요.\n"
+    context += "3. '피로도' 탭의 회복 전략(recovery_strategies)은 반드시 **서로 다른 카테고리의 전략으로 2개**를 작성하세요.\n"
+    context += "4. 전략 제목은 [시각, 신체, 수분, 환경, 명상] 중 하나를 포함하고, 전체 피드백 총량은 반드시 **500자 이상**의 풍부한 분량으로 작성하세요.\n"
     context += "5. 세션 ID나 UUID 같은 기술적인 값은 절대 노출하지 마세요.\n"
 
     print(f"\n[DEBUG] Session Data Compiled. Events: {len(events)} | Distraction: {top_app if events else 'N/A'}")
