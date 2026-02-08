@@ -1,7 +1,13 @@
 import React, { useEffect, useState } from "react";
 import "./ScheduleDay.css";
 
-const getFormattedDateString = (date) => date.toISOString().split("T")[0];
+// [수정] 오전 9시 이전 날짜 밀림 방지를 위해 로컬 시간대 기준으로 YYYY-MM-DD 추출
+const getFormattedDateString = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 // 스케줄 일간 뷰 컴포넌트
 export default function ScheduleDay({ schedules = [], onScheduleClick }) {

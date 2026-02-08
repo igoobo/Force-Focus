@@ -32,7 +32,7 @@ export default function ScheduleWeek({ schedules, onScheduleClick }) {
       {/* 요일 + 본문 컬럼 */}
       <div className="day-columns">
         {weekDays.map((day) => {
-          // 오전 9시 이전 날짜 밀림 방지를 위해 로컬 시간대 기준으로 YYYY-MM-DD 추출
+          // [수정] 오전 9시 이전 날짜 밀림 방지를 위해 로컬 시간대 기준으로 YYYY-MM-DD 추출
           const year = day.getFullYear();
           const month = String(day.getMonth() + 1).padStart(2, '0');
           const date = String(day.getDate()).padStart(2, '0');
