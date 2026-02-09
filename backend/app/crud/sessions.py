@@ -52,7 +52,7 @@ async def get_session_full_context(user_id: str, session_id: str) -> str:
             task_context = "작업 정보를 불러오는 중 오류가 발생했습니다."
     else:
         # 작업이 없을 때 AI에게 부여하는 추가 컨텍스트
-        task_info_str += " AI는 활동 로그와 창 제목을 분석하여 사용자가 어떤 성격의 업무(예: 코딩, 기획, 단순 웹서핑 등)를 수행 중이었는지 스스로 판단하세요."
+        task_context += " AI는 활동 로그와 창 제목을 분석하여 사용자가 어떤 성격의 업무(예: 코딩, 기획, 단순 웹서핑 등)를 수행 중이었는지 스스로 판단하세요."
 
     lookup_id = existing.get("client_session_id") or session_id
 
