@@ -71,14 +71,29 @@ impl InferenceEngine {
         Ok((session, scaler))
     }
 
-    /// Hot-Swap: 실행 중 모델 파일이 바뀌면 다시 로드
-    pub fn reload(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        println!("🔄 Reloading AI Model...");
-        let (new_session, new_scaler) = Self::load_resources(&self.model_path, &self.scaler_path)?;
+    /// Hot-Swap: 실행 중 모델 파일(경로)이 바뀌면 다시 로드
+    /// new_model_path: Some(path)가 들어오면 해당 경로로 모델을 교체함. None이면 기존 경로 사용.
+    pub fn reload(&mut self, new_model_path: Option<PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
+        println!("🔄 Hot-Swap Requested...");
         
+        // 1. 경로 결정 (새 경로가 있으면 업데이트)
+        let target_model_path = if let Some(path) = new_model_path {
+            println!("📂 Switching model path to: {:?}", path);
+            path
+        } else {
+            self.model_path.clone()
+        };
+
+        // 2. 리소스 로드 시도 (실패 시 엔진 상태 유지 위해 임시 변수에 로드)
+        // 스케일러는 현재 경로 유지 (추후 스케일러 업데이트 필요 시 인자 추가 가능)
+        let (new_session, new_scaler) = Self::load_resources(&target_model_path, &self.scaler_path)?;
+        
+        // 3. 교체 적용 (Atomic-like swap)
         self.session = new_session;
         self.scaler = new_scaler;
-        println!("✅ AI Model Reloaded Successfully.");
+        self.model_path = target_model_path; // 경로 정보도 갱신
+        
+        println!("✅ AI Model Hot-Swapped Successfully.");
         Ok(())
     }
 

@@ -32,7 +32,8 @@ def serialize_feedback_read(doc) -> FeedbackRead:
     return FeedbackRead(
         id=str(doc["_id"]),
         user_id=doc["user_id"],
-        event_id=doc["event_id"],
+        event_id=doc.get("event_id"),
+        client_event_id=doc.get("client_event_id"),
         feedback_type=doc["feedback_type"],  # DB에 str로 있어도 Enum으로 자동 캐스팅됨
         timestamp=doc["timestamp"],
     )
@@ -44,7 +45,7 @@ async def create_feedback(user_id: str, data: FeedbackCreate) -> FeedbackRead:
 
     doc = {
         "user_id": user_id,
-        "event_id": data.event_id,
+        "client_event_id": data.client_event_id,
         "feedback_type": data.feedback_type.value
         if isinstance(data.feedback_type, FeedbackTypeEnum)
         else str(data.feedback_type),

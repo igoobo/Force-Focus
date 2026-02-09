@@ -11,6 +11,12 @@ use tokio::spawn;
 use dotenv::dotenv;
 use std::env;
 
+// 파일 I/O 및 스트림 처리
+use std::path::PathBuf;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
+use futures_util::StreamExt;
+
 // lib.rs에서 정의한 전역 상태 타입들
 use crate::{
     ActiveSessionInfo, InputStatsArcMutex, SessionStateArcMutex, StorageManagerArcMutex, Task,
@@ -42,17 +48,13 @@ fn get_api_base_url() -> String {
 
 // --- 2. API 요청/응답을 위한 구조체 ---
 
-/// `POST /feedback` API의 Request Body 스키마
-/// (API 명세서: event_id, feedback_type)
-#[derive(Debug, Serialize)]
-struct FeedbackRequest<'a> {
-    event_id: &'a str,      // 이벤트 ID (임시)
-    feedback_type: &'a str, // "is_work" 또는 "distraction_ignored"
+// 피드백 데이터 구조체 (서버 전송용)
+#[derive(Debug, Serialize, Clone)]
+pub struct FeedbackPayload {
+    pub client_event_id: String,
+    pub feedback_type: String,
+    pub timestamp: String,
 }
-
-// (API 응답을 위한 Deserialize 구조체도 필요시 추가)
-// #[derive(Debug, Deserialize)]
-// struct FeedbackResponse { ... }
 
 // --- 세션 API 요청/응답 모델 ---
 #[derive(Debug, Serialize)]
@@ -79,6 +81,7 @@ struct EventBatchRequest {
 #[derive(Debug, Serialize)]
 struct EventData {
     session_id: String,
+    pub client_event_id: String,
     timestamp: i64,
     app_name: String,
     window_title: String,
@@ -127,6 +130,69 @@ impl BackendCommunicator {
         }
     }
 
+    // 피드백 배치 전송
+    pub async fn send_feedback_batch(
+        &self,
+        feedbacks: Vec<FeedbackPayload>,
+        token: &str,
+    ) -> Result<(), String> {
+        let url = format!("{}/desktop/feedback/batch", get_api_base_url());
+
+        if feedbacks.is_empty() { return Ok(()); }
+
+        println!("Sending {} feedback items to {}", feedbacks.len(), url);
+
+        let response = self.client.post(&url)
+            .bearer_auth(token)
+            .json(&feedbacks)
+            .send()
+            .await
+            .map_err(|e| format!("Request failed: {}", e))?;
+
+        if response.status().is_success() {
+            println!("✅ Feedback batch sent successfully.");
+            Ok(())
+        } else {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            Err(format!("Server returned error {}: {}", status, text))
+        }
+    }
+
+    // 최신 모델 다운로드 (스트리밍)
+    pub async fn download_latest_model(
+        &self,
+        save_path: PathBuf,
+        token: &str,
+    ) -> Result<(), String> {
+        let url = format!("{}/desktop/models/latest", get_api_base_url());
+        println!("Downloading model from {}", url);
+
+        let response = self.client.get(&url)
+            .bearer_auth(token)
+            .send()
+            .await
+            .map_err(|e| format!("Request failed: {}", e))?;
+
+        if !response.status().is_success() {
+            return Err(format!("Download failed: {}", response.status()));
+        }
+
+        let mut file = File::create(&save_path).await
+            .map_err(|e| format!("File create error: {}", e))?;
+
+        let mut stream = response.bytes_stream();
+        while let Some(item) = stream.next().await {
+            let chunk = item.map_err(|e| format!("Chunk error: {}", e))?;
+            file.write_all(&chunk).await
+                .map_err(|e| format!("Write error: {}", e))?;
+        }
+
+        file.flush().await.map_err(|e| format!("Flush error: {}", e))?;
+        println!("✅ Model downloaded to {:?}", save_path);
+        Ok(())
+    }
+
     // [핵심 추가] sync_manager가 호출할 동기화 메서드
     pub async fn sync_events_batch(
         &self,
@@ -143,6 +209,7 @@ impl BackendCommunicator {
                 match serde_json::from_str(&e.activity_vector) {
                     Ok(json_val) => Some(EventData {
                         session_id: e.session_id,
+                        client_event_id: e.client_event_id,
                         timestamp: e.timestamp,
                         app_name: e.app_name,
                         window_title: e.window_title,
@@ -304,20 +371,37 @@ pub fn logout(storage_manager_mutex: State<'_, StorageManagerArcMutex>) -> Resul
 #[command]
 pub async fn submit_feedback(
     feedback_type: String,
+    // 통신 객체 및 세션 상태
+    comm_state: State<'_, Arc<BackendCommunicator>>,
+    session_state_mutex: State<'_, SessionStateArcMutex>,
     // LSN 저장용
     storage_manager_mutex: State<'_, StorageManagerArcMutex>,
     // FSM 리셋용 AppCore 상태 추가
     app_core_state: State<'_, Mutex<AppCore>>, 
 ) -> Result<(), String> {
     
-    // 1. 고유 이벤트 ID 생성
-    let event_id = format!("event-{}", Uuid::new_v4());
-    println!("Submitting feedback: type={}, id={}", feedback_type, event_id);
+    // 1. 현재 모니터링 중인 이벤트 ID 조회 (AppCore에서 가져옴)
+    let client_event_id = {
+        let app = app_core_state.lock().map_err(|_| "Failed to lock AppCore")?;
+        // 만약 모니터링 시작 전이라 ID가 없다면, 새로 생성하거나 에러 처리
+        app.current_event_id.clone().unwrap_or_else(|| format!("evt-fallback-{}", Uuid::new_v4()))
+    };
+    
+
+    // 세션 ID를 가장 먼저 조회 (LSN 저장과 백그라운드 전송 모두에 사용하기 위함)
+    let session_id = {
+        let session_state = session_state_mutex.lock().map_err(|e| e.to_string())?;
+        session_state.as_ref()
+            .map(|s| s.session_id.clone())
+            .unwrap_or_else(|| "unknown-session".to_string()) // 세션이 없을 때의 처리
+    };
+
+    
 
     // 2. LSN(로컬 DB)에 저장 (기존 로직 유지)
     {
         let storage_manager = storage_manager_mutex.lock().map_err(|e| e.to_string())?;
-        storage_manager.cache_feedback(&event_id, &feedback_type)?;
+        storage_manager.cache_feedback(&client_event_id, &feedback_type)?;
         println!("Feedback cached to LSN successfully.");
     }
 
@@ -341,6 +425,35 @@ pub async fn submit_feedback(
             // 일단 오버레이는 꺼주는 게 UX상 좋음 (또는 유지 정책에 따라 결정)
             app.state_engine.manual_reset();
         }
+    }
+
+    // 4. 백그라운드 전송 (Communicator 활용)
+    // UI 스레드를 차단하지 않기 위해 spawn 사용
+    let comm = comm_state.inner().clone();
+    let feedback_type_clone = feedback_type.clone();
+    let client_event_id_clone = client_event_id.clone();
+
+    // 토큰 조회
+    let token = {
+        let storage = storage_manager_mutex.lock().map_err(|e| e.to_string())?;
+        storage.load_auth_token().unwrap_or(None).map(|t| t.0)
+    };
+
+    if let Some(auth_token) = token {
+        spawn(async move {
+            let payload = FeedbackPayload {
+                client_event_id: client_event_id_clone,
+                feedback_type: feedback_type_clone,
+                timestamp: chrono::Utc::now().to_rfc3339(),
+            };
+            
+            // 공용 메서드 호출
+            if let Err(e) = comm.send_feedback_batch(vec![payload], &auth_token).await {
+                eprintln!("Background Feedback Sync Failed: {}", e);
+            } else {
+                println!("Background Feedback Sync Success");
+            }
+        });
     }
 
     Ok(())

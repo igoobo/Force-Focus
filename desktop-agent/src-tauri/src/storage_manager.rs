@@ -4,7 +4,7 @@
 Table에 새로운 데이터 추가는 commands.rs에서 이루어짐
 */
 
-use rusqlite::{Connection, OptionalExtension, Result};
+use rusqlite::{Connection, OptionalExtension, Result, params};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -46,10 +46,20 @@ pub struct LocalSchedule {
 pub struct CachedEvent {
     pub id: i64,
     pub session_id: String,
+    pub client_event_id: String,
     pub timestamp: i64,
     pub app_name: String,
     pub window_title: String,
     pub activity_vector: String, // JSON String
+}
+
+// 피드백 데이터 조회용 구조체 (DB의 cached_feedback 테이블과 매핑)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CachedFeedback {
+    pub id: i64,          
+    pub timestamp: i64,
+    pub event_id: String,   
+    pub feedback_type: String,
 }
 
 // Local Storage Manager 구조체
@@ -124,6 +134,7 @@ impl StorageManager {
             "CREATE TABLE IF NOT EXISTS cached_events (
                 id INTEGER PRIMARY KEY,
                 session_id TEXT NOT NULL,
+                client_event_id TEXT NOT NULL,
                 timestamp INTEGER NOT NULL,
                 app_name TEXT NOT NULL,       
                 window_title TEXT NOT NULL,   
@@ -138,7 +149,7 @@ impl StorageManager {
             "CREATE TABLE IF NOT EXISTS cached_feedback (
                 id INTEGER PRIMARY KEY,
                 timestamp INTEGER NOT NULL,
-                event_id TEXT NOT NULL,
+                event_id TEXT NOT NULL, 
                 feedback_type TEXT NOT NULL
             )",
             [],
@@ -253,6 +264,7 @@ impl StorageManager {
     pub fn cache_event(
         &self,
         session_id: &str,
+        client_event_id: &str,
         app_name: &str,
         window_title: &str,
         activity_vector_json: &str, // JSON 문자열을 직접 받음
@@ -265,10 +277,11 @@ impl StorageManager {
 
         // 스키마에 맞게 INSERT
         conn.execute(
-            "INSERT INTO cached_events (session_id, timestamp, app_name, window_title, activity_vector) 
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+            "INSERT INTO cached_events (session_id, client_event_id, timestamp, app_name, window_title, activity_vector) 
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             rusqlite::params![
                 session_id,
+                client_event_id,
                 now_s,
                 app_name,
                 window_title,
@@ -279,19 +292,61 @@ impl StorageManager {
         Ok(())
     }
 
+    // 피드백 저장
     pub fn cache_feedback(&self, event_id: &str, feedback_type: &str) -> Result<(), String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         let now_s = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|e| e.to_string())?
-            .as_secs();
+            .as_secs() as i64;
 
         conn.execute(
             "INSERT INTO cached_feedback (timestamp, event_id, feedback_type) VALUES (?1, ?2, ?3)",
-            rusqlite::params![now_s, event_id, feedback_type],
+            params![now_s, event_id, feedback_type],
         )
         .map_err(|e| e.to_string())?;
 
+        Ok(())
+    }
+
+    // 미전송 피드백 조회 (FIFO)
+    pub fn get_unsynced_feedbacks(&self, limit: u32) -> Result<Vec<CachedFeedback>, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+
+        let mut stmt = conn.prepare(
+            "SELECT id, timestamp, event_id, feedback_type 
+             FROM cached_feedback 
+             ORDER BY timestamp ASC 
+             LIMIT ?1"
+        ).map_err(|e| e.to_string())?;
+        
+        let rows = stmt.query_map([limit], |row| {
+            Ok(CachedFeedback {
+                id: row.get(0)?,
+                timestamp: row.get(1)?,
+                event_id: row.get(2)?,
+                feedback_type: row.get(3)?,
+            })
+        }).map_err(|e| e.to_string())?;
+
+        let mut feedbacks = Vec::new();
+        for row in rows {
+            feedbacks.push(row.map_err(|e| e.to_string())?);
+        }
+        Ok(feedbacks)
+    }
+
+    // 전송 완료된 피드백 삭제
+    pub fn delete_feedbacks_by_ids(&self, ids: &[i64]) -> Result<(), String> {
+        let mut conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+        for id in ids {
+            tx.execute("DELETE FROM cached_feedback WHERE id = ?1", params![id])
+                .map_err(|e| e.to_string())?;
+        }
+
+        tx.commit().map_err(|e| e.to_string())?;
         Ok(())
     }
 
@@ -300,10 +355,9 @@ impl StorageManager {
     pub fn get_unsynced_events(&self, limit: u32) -> Result<Vec<CachedEvent>, String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
 
-        // 오래된 순서(ASC)로 조회하여 순차적 전송 보장
         let mut stmt = conn
             .prepare(
-                "SELECT id, session_id, timestamp, app_name, window_title, activity_vector 
+                "SELECT id, session_id, client_event_id, timestamp, app_name, window_title, activity_vector 
              FROM cached_events 
              ORDER BY timestamp ASC 
              LIMIT ?1",
@@ -315,10 +369,11 @@ impl StorageManager {
                 Ok(CachedEvent {
                     id: row.get(0)?,
                     session_id: row.get(1)?,
-                    timestamp: row.get(2)?,
-                    app_name: row.get(3)?,
-                    window_title: row.get(4)?,
-                    activity_vector: row.get(5)?,
+                    client_event_id: row.get(2)?, 
+                    timestamp: row.get(3)?,
+                    app_name: row.get(4)?,
+                    window_title: row.get(5)?,
+                    activity_vector: row.get(6)?,
                 })
             })
             .map_err(|e| e.to_string())?;

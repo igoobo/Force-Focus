@@ -16,6 +16,7 @@ pub mod widget_manager;
 pub mod window_commands;
 pub mod inference;
 pub mod feature_extractor;
+pub mod model_update_manager;
 
 // --- 2. 전역 use ---
 
@@ -28,6 +29,7 @@ use tauri::{AppHandle, Builder, Emitter, Manager, State, Url, WindowEvent};
 use tauri_plugin_deep_link::DeepLinkExt; //  딥 링크 확장 트레이트
 use tauri_plugin_autostart::MacosLauncher;
 use std::env; //  환경 변수 및 인자 수집용
+use std::path::PathBuf;
 
 // --- 3. 전역 상태 타입 정의 ---
 
@@ -240,6 +242,49 @@ pub fn run() {
 
             let app_handle = app.handle().clone();
 
+            // --- 1. 모델 경로 결정 전략 (AppData 우선 -> Resource 폴백) ---
+            let app_data_dir = app_handle.path().app_data_dir().ok();
+            
+            // A. AppData 경로 시도 (업데이트된 모델)
+            let mut model_path_buf = PathBuf::new();
+            if let Some(ref dir) = app_data_dir {
+                model_path_buf.push(dir);
+                model_path_buf.push("models");
+                model_path_buf.push("personal_model.onnx");
+            }
+
+            // B. 경로 결정
+            let final_model_path = if model_path_buf.exists() {
+                // 업데이트된 모델이 존재하면 사용
+                println!("Using updated model from AppData: {:?}", model_path_buf);
+                model_path_buf.to_string_lossy().to_string()
+            } else {
+                // 없으면 내장 리소스 사용 (기존 방식)
+                println!("Using default embedded model (resources).");
+                // 주의: 배포 시 resource_dir()을 써야 하지만, 개발 환경 호환을 위해 상대 경로 유지
+                "resources/models/personal_model.onnx".to_string()
+            };
+
+            // 스케일러도 동일한 로직 적용 가능 (여기서는 생략하고 리소스 사용)
+            let scaler_path = "resources/models/scaler_params.json".to_string();
+
+            // --- 2. 추론 엔진 초기화 및 등록 ---
+            // (run 함수 밖에서 했던 초기화를 setup 안으로 이동하여 app_handle 경로 활용)
+            let inference_engine_opt = match InferenceEngine::new(&final_model_path, &scaler_path) { 
+                Ok(engine) => {
+                    println!("✅ ML Inference Engine Loaded.");
+                    Some(Mutex::new(engine))
+                }
+                Err(e) => {
+                    eprintln!("⚠️ Failed to load ML Engine: {}", e);
+                    None
+                }
+            };
+
+            if let Some(engine) = inference_engine_opt {
+                app.manage(engine);
+            }
+
             // --- LSN 초기화 및 등록 ---
             let storage_manager = StorageManager::new_from_path(app_handle.clone())
                 .expect("Failed to initialize StorageManager (LSN)");
@@ -342,6 +387,9 @@ pub fn run() {
             // --- 스케줄 모니터링 시작 ---
             // 1분마다 로컬 DB를 확인하여 스케줄을 실행
             schedule_monitor::start_monitor_loop(app.handle().clone());
+
+            // --- 모델 업데이트 매니저 시작 ---
+            model_update_manager::start_update_loop(app.handle().clone());
 
             Ok(())
         })

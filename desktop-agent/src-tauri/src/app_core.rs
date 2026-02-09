@@ -12,7 +12,9 @@ use crate::{
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::sync::Mutex;
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, Runtime, State, WebviewUrl, WebviewWindowBuilder};
+use uuid::Uuid;
 
 // ================================================================
 // [Core Struct] 중앙 관제소 AppCore
@@ -29,6 +31,9 @@ pub struct AppCore {
     
     // 4. ML의 최근 판단 결과를 기억 (5초간 유지용)
     pub last_inference_result: crate::inference::InferenceResult,
+
+    // 현재 모니터링 중인 이벤트의 ID (피드백 연결용)
+    pub current_event_id: Option<String>,
 }
 
 impl AppCore {
@@ -53,6 +58,7 @@ impl AppCore {
             state_engine: StateEngine::new(),
             last_event_count: 0,
             last_inference_result: crate::inference::InferenceResult::Inlier, // 초기값
+            current_event_id: None,
         }
     }
 }
@@ -145,6 +151,12 @@ pub fn start_core_loop<R: Runtime>(
                         let active_tokens = commands::get_semantic_tokens(&window_info.app_name, &window_info.title);
                         let sanitized_active_title = active_tokens.join(" ");
 
+                        // UUID 생성 (Flag 발급)
+                        let client_evt_id = format!("evt-{}", Uuid::new_v4());
+
+                        // AppCore 상태에 ID 저장 (피드백 연결용)
+                        core.current_event_id = Some(client_evt_id.clone());
+
                         // InputStats에 시각 데이터 업데이트
                         // [!] ML 모델을 위해 '전경 여부'도 포함할 수 있지만, 현재는 title만 저장
                         input_stats.visible_windows = visible_windows_raw;
@@ -168,7 +180,7 @@ pub fn start_core_loop<R: Runtime>(
                             0.0, 0.0, 0.0 
                         ];
 
-                        
+
                         // 4. 데이터 저장 (학습용 데이터셋 구축)
                         // LSN에 이벤트를 저장해야 나중에 꺼내서 학습할 수 있습니다.
                         let storage = storage_manager_mutex.lock().unwrap();
@@ -182,6 +194,7 @@ pub fn start_core_loop<R: Runtime>(
                         storage
                             .cache_event(
                                 &active_session.session_id,
+                                &client_evt_id,
                                 &window_info.app_name,
                                 &sanitized_active_title,
                                 &activity_vector_json, // JSON 문자열 전달
