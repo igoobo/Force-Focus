@@ -33,6 +33,7 @@ async def create_events_batch(
             id=str(uuid.uuid4()),
             user_id=user_id, # [수정] 진짜 user_id 사용
             session_id=event_data.session_id,
+            client_event_id=event_data.client_event_id,
             timestamp=event_data.timestamp,
             app_name=event_data.app_name,
             window_title=event_data.window_title,

@@ -12,6 +12,7 @@ class EventCreate(BaseModel):
     """
     user_id: Optional[str] = None
     session_id: Optional[str] = None
+    client_event_id: Optional[str] = None
     timestamp: datetime
     app_name: Optional[str] = None
     window_title: Optional[str] = None
@@ -35,6 +36,7 @@ class EventRead(BaseModel):
     id: str
     user_id: str
     session_id: Optional[str] = None
+    client_event_id: Optional[str] = None
     timestamp: datetime
     app_name: Optional[str] = None
     window_title: Optional[str] = None
