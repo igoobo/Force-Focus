@@ -21,7 +21,7 @@ class FeedbackInDB(BaseModel):
     """
     id: PyObjectId = Field(default_factory=ObjectId, alias="_id")
     user_id: str
-    event_id: str
+    client_event_id: Optional[str] = None
 
     # "is_work", "distraction_ignored" 등
     feedback_type: FeedbackTypeEnum
