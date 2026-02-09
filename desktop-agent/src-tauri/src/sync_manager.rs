@@ -3,6 +3,7 @@ use std::time::Duration;
 use tauri::{AppHandle, Manager};
 use tokio::time::sleep;
 use serde_json::json;
+use chrono::{DateTime, Utc}; // 날짜 변환용
 
 use crate::backend_communicator::{BackendCommunicator, FeedbackPayload};
 use crate::StorageManagerArcMutex;
@@ -120,14 +121,14 @@ async fn process_sync(app: &AppHandle) -> Result<(), String> {
 
         // 2. [매핑] DB 구조체 -> API Payload 변환
         // event_id는 서버 스키마에 없으므로 context_snapshot JSON에 넣어줍니다.
-        let payloads: Vec<FeedbackPayload> = feedbacks.into_iter().map(|f| FeedbackPayload {
-            session_id: f.session_id,
-            timestamp: f.timestamp,
-            feedback_type: f.feedback_type,
-            context_snapshot: json!({
-                "related_event_id": f.event_id,
-                "sync_source": "desktop-agent"
-            }),
+        let payloads: Vec<FeedbackPayload> = feedbacks.into_iter().map(|f| {
+             let dt = DateTime::<Utc>::from_timestamp(f.timestamp, 0).unwrap_or(Utc::now());
+             
+             FeedbackPayload {
+                client_event_id: f.event_id,
+                feedback_type: f.feedback_type,
+                timestamp: dt.to_rfc3339(),
+            }
         }).collect();
 
         // 3. 서버 전송

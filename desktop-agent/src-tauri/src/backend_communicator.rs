@@ -51,11 +51,9 @@ fn get_api_base_url() -> String {
 // 피드백 데이터 구조체 (서버 전송용)
 #[derive(Debug, Serialize, Clone)]
 pub struct FeedbackPayload {
-    pub session_id: String,
-    pub timestamp: i64,
-    pub feedback_type: String, // "is_work" 또는 "distraction_ignored"
-    // UI에서 "이벤트 ID"가 넘어온다면 context_snapshot 안에 넣거나 필드를 추가하여 유연하게 처리
-    pub context_snapshot: serde_json::Value, 
+    pub client_event_id: String,
+    pub feedback_type: String,
+    pub timestamp: String,
 }
 
 // --- 세션 API 요청/응답 모델 ---
@@ -83,6 +81,7 @@ struct EventBatchRequest {
 #[derive(Debug, Serialize)]
 struct EventData {
     session_id: String,
+    pub client_event_id: String,
     timestamp: i64,
     app_name: String,
     window_title: String,
@@ -210,6 +209,7 @@ impl BackendCommunicator {
                 match serde_json::from_str(&e.activity_vector) {
                     Ok(json_val) => Some(EventData {
                         session_id: e.session_id,
+                        client_event_id: e.client_event_id,
                         timestamp: e.timestamp,
                         app_name: e.app_name,
                         window_title: e.window_title,
@@ -380,8 +380,12 @@ pub async fn submit_feedback(
     app_core_state: State<'_, Mutex<AppCore>>, 
 ) -> Result<(), String> {
     
-    // 1. 고유 이벤트 ID 생성
-    let event_id = format!("event-{}", Uuid::new_v4());
+    // 1. 현재 모니터링 중인 이벤트 ID 조회 (AppCore에서 가져옴)
+    let client_event_id = {
+        let app = app_core_state.lock().map_err(|_| "Failed to lock AppCore")?;
+        // 만약 모니터링 시작 전이라 ID가 없다면, 새로 생성하거나 에러 처리
+        app.current_event_id.clone().unwrap_or_else(|| format!("evt-fallback-{}", Uuid::new_v4()))
+    };
     
 
     // 세션 ID를 가장 먼저 조회 (LSN 저장과 백그라운드 전송 모두에 사용하기 위함)
@@ -392,15 +396,12 @@ pub async fn submit_feedback(
             .unwrap_or_else(|| "unknown-session".to_string()) // 세션이 없을 때의 처리
     };
 
-    println!("Submitting feedback: type={}, id={}", feedback_type, event_id);
+    
 
     // 2. LSN(로컬 DB)에 저장 (기존 로직 유지)
     {
         let storage_manager = storage_manager_mutex.lock().map_err(|e| e.to_string())?;
-        
-        // 변경된 cache_feedback 서명에 맞춰 3개의 인자 전달 (session_id 추가)
-        storage_manager.cache_feedback(&session_id, &event_id, &feedback_type)?;
-        
+        storage_manager.cache_feedback(&client_event_id, &feedback_type)?;
         println!("Feedback cached to LSN successfully.");
     }
 
@@ -430,7 +431,7 @@ pub async fn submit_feedback(
     // UI 스레드를 차단하지 않기 위해 spawn 사용
     let comm = comm_state.inner().clone();
     let feedback_type_clone = feedback_type.clone();
-    let session_id_clone = session_id.clone(); // 클로저로 이동시키기 위해 복제
+    let client_event_id_clone = client_event_id.clone();
 
     // 토큰 조회
     let token = {
@@ -441,10 +442,9 @@ pub async fn submit_feedback(
     if let Some(auth_token) = token {
         spawn(async move {
             let payload = FeedbackPayload {
-                session_id,
-                timestamp: chrono::Utc::now().timestamp(),
+                client_event_id: client_event_id_clone,
                 feedback_type: feedback_type_clone,
-                context_snapshot: serde_json::json!({ "source": "overlay_interaction" }),
+                timestamp: chrono::Utc::now().to_rfc3339(),
             };
             
             // 공용 메서드 호출
