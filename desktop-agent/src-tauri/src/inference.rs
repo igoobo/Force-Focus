@@ -29,7 +29,7 @@ pub enum InferenceResult {
 // 3. 메인 추론 엔진
 pub struct InferenceEngine {
     // ONNX Runtime 세션 (Thread-safe하지 않으므로 &mut 접근 필요)
-    session: Session,
+    session: Option<Session>, // Option으로 감싸서 Unload(None) 상태 허용 -> Windows File Lock 해결
     scaler: ScalerParams,
     
     // Hot-Swap을 위해 경로 기억
@@ -47,7 +47,7 @@ impl InferenceEngine {
         let (session, scaler) = Self::load_resources(&model_path, &scaler_path)?;
 
         Ok(Self {
-            session,
+            session: Some(session), // Some으로 감싸기
             scaler,
             model_path: model_path.as_ref().to_path_buf(),
             scaler_path: scaler_path.as_ref().to_path_buf(),
@@ -71,31 +71,58 @@ impl InferenceEngine {
         Ok((session, scaler))
     }
 
-    /// Hot-Swap: 실행 중 모델 파일(경로)이 바뀌면 다시 로드
-    /// new_model_path: Some(path)가 들어오면 해당 경로로 모델을 교체함. None이면 기존 경로 사용.
-    pub fn reload(&mut self, new_model_path: Option<PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
-        println!("🔄 Hot-Swap Requested...");
-        
-        // 1. 경로 결정 (새 경로가 있으면 업데이트)
-        let target_model_path = if let Some(path) = new_model_path {
-            println!("📂 Switching model path to: {:?}", path);
-            path
-        } else {
-            self.model_path.clone()
-        };
+    // ================================================================
+    // Windows File Lock 해결을 위한 Lifecycle 메서드
+    // ================================================================
 
-        // 2. 리소스 로드 시도 (실패 시 엔진 상태 유지 위해 임시 변수에 로드)
-        // 스케일러는 현재 경로 유지 (추후 스케일러 업데이트 필요 시 인자 추가 가능)
-        let (new_session, new_scaler) = Self::load_resources(&target_model_path, &self.scaler_path)?;
-        
-        // 3. 교체 적용 (Atomic-like swap)
-        self.session = new_session;
-        self.scaler = new_scaler;
-        self.model_path = target_model_path; // 경로 정보도 갱신
-        
-        println!("✅ AI Model Hot-Swapped Successfully.");
+    /// Unload: 모델 파일 핸들 해제
+    /// 이 함수를 호출하면 Session이 Drop되면서 OS에게 파일 제어권을 반환합니다.
+    pub fn unload_model(&mut self) {
+        if self.session.is_some() {
+            println!("🔻 [InferenceEngine] Unloading model to release file lock...");
+            self.session = None; 
+        }
+    }
+
+    /// Load: 특정 경로의 모델을 다시 로드 (업데이트 후 호출)
+    pub fn load_model(&mut self, model_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+        println!("🔺 [InferenceEngine] Loading model from: {:?}", model_path);
+        // 스케일러는 기존 경로 재사용 (필요시 인자로 받도록 수정 가능)
+        let (session, _) = Self::load_resources(model_path, &self.scaler_path)?;
+        self.session = Some(session);
+        self.model_path = model_path.to_path_buf();
         Ok(())
     }
+
+    /// Hot-Swap: 실행 중 모델 파일(경로)이 바뀌면 다시 로드
+    /// new_model_path: Some(path)가 들어오면 해당 경로로 모델을 교체함. None이면 기존 경로 사용.
+    /// Hot-Swap: Unload -> Wait -> Reload 패턴 적용
+    pub fn reload(&mut self, new_model_path: Option<PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
+        println!("🔄 [InferenceEngine] Hot-Swap Requested...");
+        
+        let target_model_path = new_model_path.unwrap_or(self.model_path.clone());
+
+        // 1. 안전한 교체를 위해 Unload 먼저 수행
+        self.unload_model();
+
+        // 2. 잠시 대기 (OS가 파일 핸들을 놓을 시간 확보, Windows 이슈 방지)
+        // std::thread::sleep은 blocking이지만, 업데이트는 가끔 일어나므로 허용
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        // 3. 리로드 (파일이 교체되었다고 가정)
+        // load_resources를 재사용하여 스케일러와 세션 모두 갱신
+        let (new_session, new_scaler) = Self::load_resources(&target_model_path, &self.scaler_path)?;
+        
+        self.session = Some(new_session);
+        self.scaler = new_scaler;
+        self.model_path = target_model_path; 
+        
+        println!("✅ [InferenceEngine] Hot-Swapped Successfully.");
+        Ok(())
+    }
+    // ================================================================
+    // 기존 기능 유지 (Infer, Cache Update)
+    // ================================================================
 
     /// Feedback: 사용자가 "나 일하는 중이야"라고 신고하면 캐시에 등록
     /// token: 현재 활성 창의 식별자 (예: "Figma")
@@ -105,12 +132,18 @@ impl InferenceEngine {
         self.local_cache.insert(token.clone(), expiration);
         println!("🧠 Local Cache Updated: '{}' is now trusted until {:?}", token, expiration);
     }
-
+    
     /// 메인 추론 함수
     /// input_vector: FeatureExtractor가 만든 6차원 벡터
     /// active_token: 현재 활성 창의 토큰 (Cache 확인용)
     pub fn infer(&mut self, mut input_vector: [f64; 6], active_token: Option<String>) -> Result<(f64, InferenceResult), Box<dyn std::error::Error>> {
         
+        // Session이 None이면 추론 불가 (Early Return)
+        let session = match &mut self.session {
+            Some(s) => s,
+            None => return Err("Model is unloaded. Cannot infer.".into()),
+        };
+
         // 1. Local Cache Check & Override (문서 Phase 5)
         // 사용자가 피드백을 준 토큰(예: "YouTube"로 강의 듣기)이라면
         // 문맥 점수(0번 인덱스)를 강제로 1.0(만점)으로 수정
@@ -136,7 +169,7 @@ impl InferenceEngine {
         // 3. Inference
         let input_tensor = Value::from_array(scaled_input)?;
         let inputs = ort::inputs![ "float_input" => input_tensor ]; 
-        let outputs = self.session.run(inputs)?;
+        let outputs = session.run(inputs)?;
 
         let scores = outputs["scores"].try_extract_tensor::<f32>()?;
         let current_score = scores.1[0] as f64;
