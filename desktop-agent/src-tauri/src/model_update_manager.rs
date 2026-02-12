@@ -8,8 +8,9 @@ use tauri::{AppHandle, Manager};
 use tokio::time::sleep;
 
 // 모델 저장 경로 (lib.rs와 일치시킴)
-const MODEL_DIR: &str = "resources/models";
+const MODEL_DIR: &str = "models"; // 상대 경로만 정의 (OS 경로와 결합용)
 const MODEL_FILENAME: &str = "personal_model.onnx";
+const SCALER_FILENAME: &str = "scaler_params.json";
 
 pub fn start_update_loop(app_handle: AppHandle) {
     // 백그라운드 스레드(Green Thread) 시작
@@ -60,49 +61,88 @@ pub fn start_update_loop(app_handle: AppHandle) {
                     }
                 };
 
-                // 저장 경로: AppData/Roaming/com.force.focus/models/personal_model.onnx
-                let mut save_path = app_data_dir.clone();
-                save_path.push("models"); // 하위 폴더
-                
-                // 폴더가 없으면 생성
-                if !save_path.exists() {
-                    let _ = std::fs::create_dir_all(&save_path);
+                let model_dir = app_data_dir.join(MODEL_DIR);
+                if !model_dir.exists() {
+                    let _ = std::fs::create_dir_all(&model_dir);
                 }
-                
-                save_path.push(MODEL_FILENAME);
+
+                let final_model_path = model_dir.join(MODEL_FILENAME);
+                let final_scaler_path = model_dir.join(SCALER_FILENAME);
+
+                // ================================================================
+                // 새로운 업데이트 파이프라인 (Version Check -> Download -> Swap)
+                // ================================================================
 
                 // 3. 모델 다운로드 시도 (Communicator 로직 재사용)
-                match communicator.download_latest_model(save_path.clone(), &token).await {
-                    Ok(_) => {
-                        println!("✅ Model downloaded to: {:?}", save_path);
 
-                        // 4. Hot-Swap 실행
-                        // InferenceEngine을 획득하여 reload 호출
-                        if let Some(engine_state) = app_handle.try_state::<Mutex<InferenceEngine>>() {
-                            // Mutex Lock (추론 중이라면 잠시 대기됨)
-                            match engine_state.lock() {
-                                Ok(mut engine) => {
-                                    // 다운로드받은 새 경로(save_path)를 전달하여 리로드
-                                    match engine.reload(Some(save_path.clone())) {
-                                        Ok(_) => println!("✨ Hot-Swap Success: Engine is now using the new model."),
-                                        Err(e) => eprintln!("🔥 Hot-Swap Failed (Engine kept old model): {}", e),
+                // Step A: 버전 확인
+                match communicator.check_latest_model_version(&token).await {
+                    Ok(info) => {
+                        // TODO: 현재 로컬 버전과 비교하는 로직 추가 가능 (storage_manager에 저장된 버전 등)
+                        // 여기서는 일단 무조건 업데이트 시도한다고 가정 (또는 info.version 비교)
+
+                        println!("✨ New version found: {}", info.version);
+
+                        // Step B: 임시 파일로 다운로드 (Atomic Update 준비)
+                        let temp_model_path = model_dir.join("temp_model.onnx");
+                        let temp_scaler_path = model_dir.join("temp_scaler.json");
+
+                        let download_result = async {
+                            communicator.download_file(&info.download_urls.model, &temp_model_path, &token).await?;
+                            communicator.download_file(&info.download_urls.scaler, &temp_scaler_path, &token).await?;
+                            Ok::<(), anyhow::Error>(())
+                        }.await;
+
+                        match download_result {
+                            Ok(_) => {
+                                // Step C: 파일 교체 및 엔진 리로드 (Critical Section)
+                                if let Some(engine_state) = app_handle.try_state::<Mutex<InferenceEngine>>() {
+                                    match engine_state.lock() {
+                                        Ok(mut engine) => {
+                                            // 1. Unload (Windows File Lock 해제)
+                                            engine.unload_model();
+                                            
+                                            // 2. 파일 교체 (Rename)
+                                            // 백업 (선택사항)
+                                            if final_model_path.exists() {
+                                                let _ = std::fs::rename(&final_model_path, final_model_path.with_extension("bak"));
+                                            }
+                                            
+                                            // 덮어쓰기
+                                            if let Err(e) = std::fs::rename(&temp_model_path, &final_model_path) {
+                                                eprintln!("🔥 File Swap Failed (Model): {}", e);
+                                            }
+                                            if let Err(e) = std::fs::rename(&temp_scaler_path, &final_scaler_path) {
+                                                eprintln!("🔥 File Swap Failed (Scaler): {}", e);
+                                            }
+
+                                            // 3. Reload
+                                            // 잠시 대기 (OS 파일 핸들 완전 해제 보장)
+                                            // 비동기 컨텍스트지만 Mutex 안이라 thread::sleep 사용 (주의)
+                                            // 짧은 시간이므로 허용
+                                            std::thread::sleep(Duration::from_millis(100)); 
+                                            
+                                            match engine.load_model(&final_model_path) {
+                                                Ok(_) => println!("✅ Hot-Swap Complete: Version {}", info.version),
+                                                Err(e) => eprintln!("🔥 Reload Failed: {}", e),
+                                            }
+                                        }
+                                        Err(e) => eprintln!("Failed to lock engine: {}", e),
                                     }
                                 }
-                                Err(e) => eprintln!("Failed to lock InferenceEngine for hot-swap: {}", e),
                             }
-                        } else {
-                            eprintln!("InferenceEngine state not found.");
+                            Err(e) => eprintln!("Download failed: {}", e),
                         }
-                    },
-                    Err(e) => eprintln!("⚠️ Model update failed: {}", e),
+                    }
+                    Err(e) => {
+                        // 버전 확인 실패 (네트워크 오류 or 최신 버전 없음 등)
+                        // 조용히 넘어감
+                        // eprintln!("Update check failed: {}", e); 
+                    }
                 }
-            } else {
-                // 로그인이 안 되어 있으면 조용히 대기
-                // println!("ModelManager: User not logged in. Skipping update.");
             }
 
-            // 4. 다음 주기 대기 (예: 1시간 = 3600초)
-            // 개발 중 테스트를 위해 5분(300초) 등으로 짧게 잡아도 됩니다.
+            // 4. 다음 주기 대기 (1시간)
             sleep(Duration::from_secs(3600)).await;
         }
     });
