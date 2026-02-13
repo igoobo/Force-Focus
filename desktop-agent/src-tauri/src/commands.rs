@@ -43,6 +43,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindowVisible, GW_OWNER,
 };
 use crate::app_core::AppCore;
+use crate::model_update_manager::ModelUpdateManager;
 
 #[cfg(target_os = "windows")]
 use std::ffi::OsString;
@@ -610,4 +611,23 @@ pub fn extract_semantic_keywords(app_name: &str, window_title: &str) -> Vec<Stri
 // [중복: 헬퍼 함수 및 나머지 코드]
 pub fn get_semantic_tokens(app_name: &str, window_title: &str) -> Vec<String> {
     extract_semantic_keywords(app_name, window_title)
+}
+
+// ================================================================
+// ML 모델 수동 업데이트 트리거
+// ================================================================
+
+/// 프론트엔드 UI에서 "업데이트 확인" 버튼 클릭 시 호출
+/// - token: 프론트엔드 AuthContext의 JWT 토큰
+/// - manager: main.rs에서 .manage()로 등록된 ModelUpdateManager 인스턴스 (자동 주입)
+#[tauri::command]
+pub async fn check_model_update(
+    token: String,
+    manager: State<'_, ModelUpdateManager>, 
+) -> Result<bool, String> {
+    println!("🖱️ [Command] Manual update requested.");
+    
+    // 비동기 작업 수행 (UI 스레드 차단 방지)
+    // check_and_update는 Result<bool, String>을 반환하므로 그대로 사용 가능
+    manager.check_and_update(&token).await
 }

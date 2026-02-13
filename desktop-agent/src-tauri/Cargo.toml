@@ -58,6 +58,9 @@ tokio = { version = "1.48.0", features = ["full"] }
 # 스트림 처리를 위한 유틸리티
 futures-util = "0.3.31"
 
+# 에러 처리를 위한 모던 스탠다드 (기존 코드에 없다면 추가)
+anyhow = "1.0"
+
 # .env
 dotenv = "0.15.0"
 tauri-plugin-deep-link = "2"

@@ -16,6 +16,7 @@ use std::path::PathBuf;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use futures_util::StreamExt;
+use anyhow::Result;
 
 // lib.rs에서 정의한 전역 상태 타입들
 use crate::{
@@ -114,6 +115,23 @@ struct ApiSchedule {
     is_active: bool,
 }
 
+// ================================================================
+// ML 모델 업데이트를 위한 DTO 및 메서드 확장
+// ================================================================
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ModelVersionResponse {
+    pub status: String,
+    pub version: String,
+    pub download_urls: ModelDownloadUrls,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ModelDownloadUrls {
+    pub model: String,
+    pub scaler: String,
+}
+
 // --- 3. BackendCommunicator 상태 정의 ---
 
 /// reqwest::Client를 전역 상태로 관리하기 위한 구조체
@@ -128,6 +146,54 @@ impl BackendCommunicator {
         Self {
             client: Client::new(),
         }
+    }
+
+    /// 최신 모델 버전 메타데이터 조회
+    pub async fn check_latest_model_version(&self, token: &str) -> Result<ModelVersionResponse> {
+        // 기존 스타일 준수: 헬퍼 함수로 URL 조합
+        let url = format!("{}/desktop/models/latest", get_api_base_url());
+        
+        let resp = self.client.get(&url)
+            .bearer_auth(token)
+            .send()
+            .await?;
+            
+        // 상태 코드 확인 (에러 시 anyhow::Error로 변환)
+        let resp = resp.error_for_status()?;
+        
+        let info: ModelVersionResponse = resp.json().await?;
+        Ok(info)
+    }
+
+    /// 범용 파일 다운로드 (모델 .onnx 및 스케일러 .json 공용)
+    /// - endpoint: "/api/..." (상대경로) 또는 "https://..." (절대경로) 모두 처리
+    pub async fn download_file(&self, endpoint: &str, save_path: &PathBuf, token: &str) -> Result<()> {
+        // 유연한 URL 처리: endpoint가 http로 시작하면 그대로, 아니면 Base URL 결합
+        let url = if endpoint.starts_with("http") {
+            endpoint.to_string()
+        } else {
+            format!("{}{}", get_api_base_url(), endpoint)
+        };
+        
+        println!("[BackendCommunicator] Downloading stream from: {}", url);
+
+        let resp = self.client.get(&url)
+            .bearer_auth(token)
+            .send()
+            .await?
+            .error_for_status()?;
+
+        // 스트리밍 다운로드 구현 (메모리 효율적)
+        let mut file = File::create(save_path).await?;
+        let mut stream = resp.bytes_stream();
+
+        while let Some(item) = stream.next().await {
+            let chunk = item?; // 네트워크 에러 전파
+            file.write_all(&chunk).await?;
+        }
+        
+        file.flush().await?;
+        Ok(())
     }
 
     // 피드백 배치 전송

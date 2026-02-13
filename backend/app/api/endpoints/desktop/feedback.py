@@ -5,6 +5,8 @@ from app import crud
 from app.api import deps
 from app.schemas.feedback import FeedbackCreate
 
+from app.ml.train import train_user_model
+
 router = APIRouter()
 
 @router.post("/batch", status_code=status.HTTP_201_CREATED)
@@ -28,8 +30,13 @@ async def receive_feedback_batch(
         )
         saved_count += 1
     
-    # TODO: 추후 이곳에 재학습 트리거(Background Task) 로직이 추가될 예정입니다.
-    # background_tasks.add_task(...)
+    
+    # 2. 백그라운드 학습 트리거
+    # 즉시 응답을 반환하기 위해, 학습 작업은 백그라운드 큐에 등록만 합니다.
+    # 정책: 피드백이 1개라도 들어오면 모델을 최신화합니다. (추후 '10개당 1번' 등으로 최적화 가능)
+    if saved_count > 0:
+        print(f"[Trigger] Scheduling training for user: {user_id}")
+        background_tasks.add_task(train_user_model, user_id)
 
     return {
         "status": "success", 
