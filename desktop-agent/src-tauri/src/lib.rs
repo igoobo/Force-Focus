@@ -17,7 +17,7 @@ pub mod window_commands;
 pub mod inference;
 pub mod feature_extractor;
 pub mod model_update_manager;
-
+use crate::model_update_manager::ModelUpdateManager; 
 // --- 2. 전역 use ---
 
 use crate::storage_manager::StorageManager;
@@ -285,6 +285,14 @@ pub fn run() {
                 app.manage(engine);
             }
 
+            // --- 2. [ML] 모델 업데이트 매니저 등록 (핵심) ---
+            // 구조체를 생성하여 State로 등록 (commands.rs에서 사용)
+            let update_manager = ModelUpdateManager::new(app_handle.clone());
+            app.manage(update_manager);
+
+            // 백그라운드 자동 업데이트 루프 시작
+            model_update_manager::start_update_loop(app_handle.clone());
+
             // --- LSN 초기화 및 등록 ---
             let storage_manager = StorageManager::new_from_path(app_handle.clone())
                 .expect("Failed to initialize StorageManager (LSN)");
@@ -388,9 +396,6 @@ pub fn run() {
             // 1분마다 로컬 DB를 확인하여 스케줄을 실행
             schedule_monitor::start_monitor_loop(app.handle().clone());
 
-            // --- 모델 업데이트 매니저 시작 ---
-            model_update_manager::start_update_loop(app.handle().clone());
-
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -399,6 +404,7 @@ pub fn run() {
             commands::get_all_processes_summary,
             commands::get_input_frequency_stats,
             commands::get_visible_windows, // 시각 센서 커맨드 등록
+            commands::check_model_update,
             // backend_communicator 모듈의 커맨드를 핸들러에 등록
             backend_communicator::submit_feedback,
             backend_communicator::start_session,
