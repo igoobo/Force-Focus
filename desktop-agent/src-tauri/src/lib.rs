@@ -414,7 +414,9 @@ pub fn run() {
             backend_communicator::login,             //  로그인 커맨드
             backend_communicator::logout,            //  로그아웃 커맨드
             backend_communicator::check_auth_status, // 자동 로그인 커맨드 등록
-            window_commands::hide_overlay
+            window_commands::hide_overlay,
+            window_commands::show_overlay,                   
+            window_commands::set_overlay_ignore_cursor_events, 
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

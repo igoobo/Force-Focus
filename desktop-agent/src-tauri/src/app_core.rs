@@ -3,6 +3,7 @@
 use crate::{
     commands::{self, ActiveWindowInfo, WindowInfo}, // commands 모듈 활용
     state_engine::{self, StateEngine, InterventionTrigger},
+    window_commands,
     InputStatsArcMutex,     // lib.rs에서 정의한 타입
     SessionStateArcMutex,   // 전역 세션 상태 import
     StateEngineArcMutex,    // lib.rs에서 정의할 타입
@@ -242,14 +243,57 @@ pub fn start_core_loop<R: Runtime>(
                 // ------------------------------------------------
                 match trigger {
                     InterventionTrigger::TriggerNotification => {
-                        println!("🔔 Notification");
-                        app_handle_clone.emit("intervention-trigger", "notification").ok();
+                        println!("🔔 [Action] Notification (Click-Through)");
+                        
+                        // 1. 창이 없으면 생성
+                        ensure_overlay_exists(&app_handle_clone);
+
+                        if let Some(overlay_window) = app_handle_clone.get_webview_window("overlay") {
+                            // 1. 투명 모드(Click-Through) 활성화
+                            let _ = window_commands::set_overlay_ignore_cursor_events(app_handle_clone.clone(), true);
+                            
+                            // 2. 창 표시
+                            let _ = window_commands::show_overlay(app_handle_clone.clone());
+                            
+                            // 3. [핵심 수정] 특정 윈도우에 직접 발송
+                            // 문자열 대신 확실한 JSON 형태 전송 권장하지만, 기존 호환성을 위해 문자열 유지하되 타겟팅 변경
+                            overlay_window.emit("intervention-trigger", "notification").ok();
+                        }
                     },
                     InterventionTrigger::TriggerOverlay => {
-                        println!("🚫 Overlay");
-                        trigger_overlay(&app_handle_clone);
+                        println!("🚫 [Action] Blocking Overlay");
+                        
+                        // 1. 창이 없으면 생성
+                        ensure_overlay_exists(&app_handle_clone);
+
+                        if let Some(overlay_window) = app_handle_clone.get_webview_window("overlay") {
+                            // 1. 차단 모드(Block Input) 활성화
+                            let _ = window_commands::set_overlay_ignore_cursor_events(app_handle_clone.clone(), false);
+                            
+                            // 2. 창 표시
+                            let _ = window_commands::show_overlay(app_handle_clone.clone());
+                            
+                            // 3. [핵심 수정] 특정 윈도우에 직접 발송
+                            println!("➡️ Sending 'overlay' event directly to window...");
+                            overlay_window.emit("intervention-trigger", "overlay").ok();
+                            
+                            // [안전장치] 혹시 React가 렌더링 중이라 못 받을까봐 100ms 뒤 한 번 더 쏠 수도 있음 (선택 사항)
+                            // std::thread::spawn(move || {
+                            //     std::thread::sleep(Duration::from_millis(200));
+                            //     overlay_window.emit("intervention-trigger", "overlay").ok();
+                            // });
+                        }
                     },
-                    InterventionTrigger::DoNothing => {}
+                    InterventionTrigger::DoNothing => {
+                        // 게이지가 0이면 숨김
+                        if core.state_engine.get_gauge_ratio() <= 0.0 {
+                             if let Some(window) = app_handle_clone.get_webview_window("overlay") {
+                                 if window.is_visible().unwrap_or(false) {
+                                     let _ = window_commands::hide_overlay(app_handle_clone.clone(), app_handle_clone.state());
+                                 }
+                             }
+                        }
+                    }
                 }
 
                 
@@ -271,14 +315,10 @@ pub fn start_core_loop<R: Runtime>(
     });
 }
 
-// [Helper] 오버레이 창 띄우기 (기존 기능 유지)
-fn trigger_overlay<R: Runtime>(app_handle: &AppHandle<R>) {
-    if let Some(window) = app_handle.get_webview_window("overlay") {
-        if !window.is_visible().unwrap_or(false) {
-             window.show().ok();
-             window.set_focus().ok();
-        }
-    } else {
+// [Helper] 오버레이 생성 도우미 (표시는 show_overlay에 위임)
+fn ensure_overlay_exists<R: Runtime>(app_handle: &AppHandle<R>) {
+    if app_handle.get_webview_window("overlay").is_none() {
+        // 투명 창 속성으로 생성
         WebviewWindowBuilder::new(
             app_handle,
             "overlay",
@@ -287,6 +327,9 @@ fn trigger_overlay<R: Runtime>(app_handle: &AppHandle<R>) {
         .fullscreen(true)
         .always_on_top(true)
         .skip_taskbar(true)
+        .transparent(true)  // [필수]
+        .decorations(false) // [필수]
+        .visible(false)     // 일단 숨김 상태로 생성
         .build().ok();
     }
 }
