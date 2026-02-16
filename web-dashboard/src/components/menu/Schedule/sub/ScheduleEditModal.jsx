@@ -1,41 +1,40 @@
 import React, { useState, useEffect } from "react";
 import "./ScheduleEditModal.css";
 import { useScheduleStore } from "../ScheduleStore";
+import { useTaskStore } from '../../Task/TaskStore';
 
 export default function ScheduleEditModal({ schedule, onClose }) {
-  const { addSchedule, deleteSchedule } = useScheduleStore();
-  const [taskSessions, setTaskSessions] = useState([]);
+  const { updateSchedule } = useScheduleStore();
+  const { tasks, fetchTasks } = useTaskStore();
 
   useEffect(() => {
-    const savedSessions = localStorage.getItem('task-db-sessions');
-    if (savedSessions) {
-      const parsedSessions = JSON.parse(savedSessions);
-      setTaskSessions(parsedSessions);
-
-      const taskExists = parsedSessions.some(task => task.id === schedule.taskId);
-      if (!taskExists && schedule.taskId) {
-        setFormData(prev => ({ ...prev, taskId: "" }));
-      }
-    } else {
-      setTaskSessions([]);
-      setFormData(prev => ({ ...prev, taskId: "" }));
-    }
-  }, [schedule]);
+    fetchTasks();
+  }, [fetchTasks]);
 
   const [formData, setFormData] = useState({
     ...schedule,
-    taskId: schedule.taskId || "" // 기존 연결된 작업이 있으면 로드
+    task_id: schedule.task_id || "" // 기존 연결된 작업이 있으면 로드
   });
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    
+    setFormData((prev) => {
+      const nextForm = { ...prev, [name]: value };
+      
+      if (name === "start_date") {
+        nextForm.end_date = value;
+      }
+      
+      return nextForm;
+    });
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    deleteSchedule(schedule.id);
-    addSchedule(formData);
+  
+    updateSchedule(formData); 
+  
     alert("일정이 수정되었습니다.");
     onClose();
   };
@@ -62,13 +61,13 @@ export default function ScheduleEditModal({ schedule, onClose }) {
           <div className="form-group">
             <label>작업 종류</label>
             <select 
-              name="taskId" 
-              value={formData.taskId} 
+              name="task_id" 
+              value={formData.task_id} 
               onChange={handleChange} 
               required
             >
               <option value="">-- 작업 종류를 선택하세요 --</option>
-              {taskSessions.map(task => (
+              {tasks.map(task => (
                 <option key={task.id} value={task.id}>{task.label}</option>
               ))}
             </select>
@@ -97,11 +96,11 @@ export default function ScheduleEditModal({ schedule, onClose }) {
           <div className="form-row">
             <div className="form-group">
               <label>종료 날짜</label>
-              <input type="date" name="due_date" value={formData.due_date} onChange={handleChange} required />
+              <input type="date" name="end_date" value={formData.end_date} onChange={handleChange} required />
             </div>
             <div className="form-group">
               <label>종료 시간</label>
-              <input type="time" name="due_time" value={formData.due_time} onChange={handleChange} required />
+              <input type="time" name="end_time" value={formData.end_time} onChange={handleChange} required />
             </div>
           </div>
 

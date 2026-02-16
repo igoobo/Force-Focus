@@ -1,38 +1,43 @@
 import React, { useState, useEffect } from "react";
 import "./ScheduleAddModal.css";
 import { useScheduleStore } from '../ScheduleStore';
+import { useTaskStore } from '../../Task/TaskStore';
 
 export default function ScheduleAddModal({ onClose }) {
   const addSchedule = useScheduleStore((state) => state.addSchedule);
-  const [taskSessions, setTaskSessions] = useState([]);
+  const { tasks, fetchTasks } = useTaskStore();
 
   useEffect(() => {
-    const savedSessions = localStorage.getItem('task-db-sessions');
-    if (savedSessions) {
-      setTaskSessions(JSON.parse(savedSessions));
-    } else {
-      setTaskSessions([]);
-    }
-  }, []);
+    fetchTasks(); // 컴포넌트 마운트 시 최신 작업 목록 로드
+  }, [fetchTasks]);
 
   const [form, setForm] = useState({
     name: "",
-    taskId: "",
+    task_id: "",
     description: "",
     start_date: "",
     start_time: "",
-    due_date: "",
-    due_time: "",
+    end_date: "",
+    end_time: "",
   });
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm({ ...form, [name]: value });
+    
+    setForm((prev) => {
+      const nextForm = { ...prev, [name]: value };
+      
+      if (name === "start_date") {
+        nextForm.end_date = value;
+      }
+      
+      return nextForm;
+    });
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!form.taskId) {
+    if (!form.task_id) {
       alert("연결할 작업을 선택해 주세요.");
       return;
     }
@@ -63,13 +68,13 @@ export default function ScheduleAddModal({ onClose }) {
           <div className="form-group">
             <label>작업 종류</label>
             <select 
-              name="taskId" 
-              value={form.taskId} 
+              name="task_id" 
+              value={form.task_id} 
               onChange={handleChange} 
               required
             >
               <option value="">-- 작업 종류를 선택하세요 --</option>
-              {taskSessions.map(task => (
+              {tasks.map(task => (
                 <option key={task.id} value={task.id}>{task.label}</option>
               ))}
             </select>
@@ -99,11 +104,11 @@ export default function ScheduleAddModal({ onClose }) {
           <div className="form-row">
             <div className="form-group">
               <label>종료 날짜</label>
-              <input type="date" name="due_date" value={form.due_date} onChange={handleChange} required />
+              <input type="date" name="end_date" value={form.end_date} onChange={handleChange} required />
             </div>
             <div className="form-group">
               <label>종료 시간</label>
-              <input type="time" name="due_time" value={form.due_time} onChange={handleChange} required />
+              <input type="time" name="end_time" value={form.end_time} onChange={handleChange} required />
             </div>
           </div>
 

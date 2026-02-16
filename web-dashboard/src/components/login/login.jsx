@@ -1,32 +1,51 @@
-import React from 'react';
+import React, { useState } from "react";
 import { GoogleLogin } from '@react-oauth/google';
 import './login.css';
 import useMainStore from '../../MainStore.jsx';
 import logoIcon from '../layout/TitleBar/ForceFocus_icon.png'; 
+import authApi from '../../api/authApi';
 
 const Login = ({ onLoginSuccess }) => {
     const isDarkMode = useMainStore((state) => state.isDarkMode);
+    const [isLoading, setIsLoading] = useState(false);
     
-    const handleGoogleSuccess = (credentialResponse) => {
-        localStorage.setItem('accessToken', credentialResponse.credential);
-        onLoginSuccess();
+    const handleGoogleSuccess = async (credentialResponse) => {
+        setIsLoading(true);
+        try {
+            // 백엔드 검증 엔드포인트 호출
+            const response = await authApi.post('/api/v1/auth/google/verify', {
+                token: credentialResponse.credential 
+            });
+
+            const data = response.data;
+            const token = data.access_token; 
+
+            if (token) {
+                localStorage.setItem('accessToken', token);
+                localStorage.setItem('refreshToken', data.refresh_token);
+                onLoginSuccess(); 
+            } else {
+                throw new Error("Token not found in response");
+            }   
+        } catch (error) {
+            console.error("Auth Network Error:", error);
+            alert("서버와 통신 중 오류가 발생했습니다. 네트워크 상태를 확인해 주세요.");
+            setIsLoading(false);
+        }
     };
 
     const handleGoogleError = () => {
-        alert("구글 로그인에 실패했습니다. 다시 시도해 주세요.");
+        alert("구글 로그인 세션이 만료되었거나 취소되었습니다. 다시 시도해 주세요.");
     };
 
     return (
         <div className={`login-container ${isDarkMode ? 'dark-theme' : ''}`}>
-            <div className="login-wrapper"> {/* 두 카드를 세로로 정렬할 래퍼 */}
-                
-                {/* 첫 번째 행: 브랜드 카드 */}
+            <div className="login-wrapper">
                 <div className="brand-card">
                     <img src={logoIcon} alt="ForceFocus Logo" className="login-brand-logo" />
-                    <h1 className="brand-name"><br></br>Force-Focus <br></br> Web Dashboard</h1>
+                    <h1 className="brand-name"><br />Force-Focus <br /> Web Dashboard</h1>
                 </div>
 
-                {/* 두 번째 행: 로그인 폼 카드 */}
                 <div className="login-form-card">
                     <div className="login-header">
                         <h2>Dashboard Login</h2>
@@ -34,15 +53,23 @@ const Login = ({ onLoginSuccess }) => {
                     </div>
 
                     <div className="google-login-wrapper">
-                        <GoogleLogin
-                            onSuccess={handleGoogleSuccess}
-                            onError={handleGoogleError}
-                            theme={isDarkMode ? "filled_black" : "outline"}
-                            shape="pill"
-                            size="large"
-                            width="360px"
-                            useOneTap
-                        />
+                        {isLoading ? (
+                            // 로딩 중 표시될 UI
+                            <div className="login-loading">
+                                <div className="spinner"></div>
+                                <p>로그인 정보를 확인 중입니다...</p>
+                            </div>
+                        ) : (
+                            <GoogleLogin
+                                onSuccess={handleGoogleSuccess}
+                                onError={handleGoogleError}
+                                theme={isDarkMode ? "filled_black" : "outline"}
+                                shape="pill"
+                                size="large"
+                                width="360px"
+                                useOneTap
+                            />
+                        )}
                     </div>
 
                     <div className="login-footer">
@@ -51,7 +78,6 @@ const Login = ({ onLoginSuccess }) => {
                         </p>
                     </div>
                 </div>
-                
             </div>
         </div>
     );

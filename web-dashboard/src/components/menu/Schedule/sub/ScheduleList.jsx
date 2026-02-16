@@ -1,24 +1,22 @@
 import React, { useState, useEffect } from "react";
 import "./ScheduleList.css";
+import { useTaskStore } from "../../Task/TaskStore";
 
 const ScheduleList = ({ schedules = [], onScheduleClick }) => {
-  // 작업 목록을 가져와서 taskId에 해당하는 작업 이름을 매핑하기 위함
-  const [taskSessions, setTaskSessions] = useState([]);
+  // 작업 목록을 가져와서 task_id에 해당하는 작업 이름을 매핑하기 위함
+  const { tasks, fetchTasks } = useTaskStore(); // 서버 DB의 작업 목록 가져오기
 
   useEffect(() => {
-    const savedSessions = localStorage.getItem('task-db-sessions');
-    if (savedSessions) {
-      setTaskSessions(JSON.parse(savedSessions));
-    }
-  }, []);
+    fetchTasks(); // 최신 작업 정보를 DB에서 조회
+  }, [fetchTasks]);
 
   const sortedSchedules = [...schedules].sort(
     (a, b) => new Date(b.start_date + " " + b.start_time) - new Date(a.start_date + " " + a.start_time)
   );
 
-  // taskId를 통해 작업 라벨을 찾는 함수
-  const getTaskLabel = (taskId) => {
-    const task = taskSessions.find(t => t.id === taskId);
+  // task_id를 통해 작업 라벨을 찾는 함수
+  const getTaskLabel = (task_id) => {
+    const task = tasks.find(t => String(t.id) === String(task_id));
     return task ? task.label : "연결된 작업 없음";
   };
 
@@ -42,10 +40,10 @@ const ScheduleList = ({ schedules = [], onScheduleClick }) => {
                 <div className="title-row">
                   <h3 className="card-title">{item.name}</h3>
                   {/* 연결된 작업 유형을 태그 형태로 출력 */}
-                  <span className="task-badge">{getTaskLabel(item.taskId)}</span>
+                  <span className="task-badge">{getTaskLabel(item.task_id)}</span>
                 </div>
                 <span className="card-date">
-                  {item.start_date} {item.start_time} ~ {item.due_date} {item.due_time}
+                  {item.start_date} {item.start_time.slice(0, 5)} ~ {item.end_date} {item.end_time.slice(0, 5)}
                 </span>
               </div>
 

@@ -6,13 +6,36 @@ import MenuBar from './components/layout/MenuBar/MenuBar.jsx';
 import useMainStore from './MainStore.jsx';
 import HelpModal from './components/layout/Help/HelpModal.jsx';
 import Login from './components/login/login.jsx';
+import axios from 'axios';
+
+const setupAxiosInterceptors = () => {
+    // 중복 등록 방지를 위해 기존 인터셉터가 있다면 제거하는 로직을 넣거나,
+    // 호출 자체를 외부에서 한 번만 합니다.
+    axios.interceptors.response.use(
+        (response) => response,
+        (error) => {
+            if (error.response && error.response.status === 401) {
+                if (!window.isLoggingOut) {
+                    window.isLoggingOut = true;
+                    alert("세션이 만료되었습니다. 다시 로그인해 주세요.");
+                    const { logout } = useMainStore.getState();
+                    logout();
+                    window.location.href = '/'; 
+                }
+            }
+            return Promise.reject(error);
+        }
+    );
+};
+
+setupAxiosInterceptors();
 
 function App() {
   // Store에서 필요한 상태와 함수들을 가져옵니다.
-  const { isHelpOpen, openHelp, setActiveMenu, isDarkMode } = useMainStore();
-  
-  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('accessToken'));
-  const activeMenu = useMainStore((state) => state.activeMenu);
+  const { 
+    isHelpOpen, openHelp, setActiveMenu, isDarkMode, 
+    isLoggedIn, login, logout, activeMenu 
+  } = useMainStore();
 
   // activeMenu가 변경될 때마다 스크롤을 맨 위로 이동
   useEffect(() => {
@@ -34,25 +57,14 @@ function App() {
   // 로그아웃 로직
   const handleLogout = () => {
     if (window.confirm("로그아웃 하시겠습니까?")) {
-      localStorage.removeItem('accessToken');
-      
-      // 로그아웃 시에도 메뉴 상태를 'Overview'로 초기화
-      if (setActiveMenu) {
-        setActiveMenu('Overview'); 
-      }
-      
-      setIsLoggedIn(false);
+      logout(); // Store의 logout 함수 호출
     }
-  };
-
-  const handleLoginSuccess = () => {
-    setIsLoggedIn(true);
   };
 
   // 로그인하지 않은 경우 로그인 화면 렌더링
   if (!isLoggedIn) {
     return (
-      <Login onLoginSuccess={handleLoginSuccess} />
+      <Login onLoginSuccess={login} />
     );
   }
 
@@ -64,7 +76,7 @@ function App() {
         onHelp={openHelp}
         onLogout={handleLogout} 
       />
-
+      
       <MenuBar />
       
       {/* 메인 콘텐츠 영역: 배경색을 CSS 변수(var(--bg-main))로 처리하여 다크모드 연동 */}

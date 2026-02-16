@@ -18,10 +18,23 @@ def get_feedback_collection():
 
 
 def _safe_object_id(feedback_id: str) -> ObjectId:
+    # ✅ 공백 방지 안전망
+    if isinstance(feedback_id, str):
+        feedback_id = feedback_id.strip()
+
     try:
         return ObjectId(feedback_id)
     except (InvalidId, TypeError):
         raise HTTPException(status_code=400, detail="Invalid feedback_id")
+
+
+def _strip_or_none(v: Optional[str]) -> Optional[str]:
+    if v is None:
+        return None
+    if not isinstance(v, str):
+        return v
+    s = v.strip()
+    return s or None
 
 
 def serialize_feedback_read(doc) -> FeedbackRead:
@@ -32,7 +45,8 @@ def serialize_feedback_read(doc) -> FeedbackRead:
     return FeedbackRead(
         id=str(doc["_id"]),
         user_id=doc["user_id"],
-        event_id=doc["event_id"],
+        event_id=doc.get("event_id"),
+        client_event_id=doc.get("client_event_id"),
         feedback_type=doc["feedback_type"],  # DB에 str로 있어도 Enum으로 자동 캐스팅됨
         timestamp=doc["timestamp"],
     )
@@ -44,7 +58,9 @@ async def create_feedback(user_id: str, data: FeedbackCreate) -> FeedbackRead:
 
     doc = {
         "user_id": user_id,
-        "event_id": data.event_id,
+        # ✅ 혹시라도 upstream에서 공백이 섞여 들어오면 방지 (스키마에서 이미 처리됨)
+        # "event_id": _strip_or_none(data.event_id) or data.event_id,
+        "client_event_id": data.client_event_id,
         "feedback_type": data.feedback_type.value
         if isinstance(data.feedback_type, FeedbackTypeEnum)
         else str(data.feedback_type),
@@ -69,8 +85,12 @@ async def get_feedbacks(
     col = get_feedback_collection()
 
     q = {"user_id": user_id}
+
+    # ✅ "   " 같은 값은 필터에 쓰지 않도록 None 처리
+    event_id = _strip_or_none(event_id)
     if event_id:
         q["event_id"] = event_id
+
     if feedback_type:
         q["feedback_type"] = feedback_type.value if isinstance(feedback_type, FeedbackTypeEnum) else str(feedback_type)
 

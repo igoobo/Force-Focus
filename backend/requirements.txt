@@ -7,3 +7,6 @@ authlib
 python-jose
 motor
 jinja2
+google-auth
+requests
+google-genai
