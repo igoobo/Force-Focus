@@ -51,7 +51,17 @@ const ScheduleList = ({ schedules = [], onScheduleClick }) => {
 
               <div className="card-footer">
                 <span className="created-at">
-                  생성일: {item.created_at ? new Date(item.created_at).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" }) : "정보 없음"}
+                  생성일: {item.created_at ? 
+                    new Date(item.created_at.endsWith('Z') ? item.created_at : item.created_at.replace(' ', 'T') + 'Z')
+                      .toLocaleDateString("ko-KR", { 
+                        year: 'numeric', 
+                        month: '2-digit', 
+                        day: '2-digit',
+                        timeZone: "Asia/Seoul" 
+                      })
+                      .replace(/\s/g, '') // 공백 제거 (yyyy.mm.dd. 형태 유지)
+                      .replace(/(\d{4})\.(\d{2})\.(\d{2})\./, '$1. $2. $3.') // 숫자 뒤에 한 칸씩 띄움
+                    : "정보 없음"}
                 </span>
               </div>
             </div>
