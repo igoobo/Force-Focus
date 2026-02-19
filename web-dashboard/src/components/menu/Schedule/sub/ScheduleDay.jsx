@@ -3,6 +3,7 @@ import "./ScheduleDay.css";
 
 // [수정] 오전 9시 이전 날짜 밀림 방지를 위해 로컬 시간대 기준으로 YYYY-MM-DD 추출
 const getFormattedDateString = (date) => {
+  if (!(date instanceof Date) || isNaN(date)) return ""; // 방어 코드 추가
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -10,11 +11,12 @@ const getFormattedDateString = (date) => {
 };
 
 // 스케줄 일간 뷰 컴포넌트
-export default function ScheduleDay({ schedules = [], onScheduleClick }) {
-  const [currentDate, setCurrentDate] = useState(new Date()); // 오늘 날짜로 설정
-  
+export default function ScheduleDay({ schedules = [], onScheduleClick, currentDate, setCurrentDate }) {
+  // [수정] currentDate가 유효하지 않을 경우를 대비한 안전한 date 객체 생성
+  const date = (currentDate instanceof Date && !isNaN(currentDate)) ? currentDate : new Date();
+
   // 표시 대상 날짜의 '연-월-일' 문자열을 상태 변화 없이 계산
-  const currentDisplayDateStr = getFormattedDateString(currentDate);
+  const currentDisplayDateStr = getFormattedDateString(date);
   
   // 실제 '오늘' 날짜의 '연-월-일' 문자열
   const todayStr = getFormattedDateString(new Date());
@@ -26,13 +28,13 @@ export default function ScheduleDay({ schedules = [], onScheduleClick }) {
   const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
 
   // 현재 날짜의 요일 계산
-  const dayOfWeek = weekdays[currentDate.getDay()];
+  const dayOfWeek = weekdays[date.getDay()];
 
   // 토요일과 일요일에 대한 클래스 지정 (토요일: saturday, 일요일: sunday)
   const dayClass =
-    currentDate.getDay() === 0
+    date.getDay() === 0
       ? "sunday"
-      : currentDate.getDay() === 6
+      : date.getDay() === 6
       ? "saturday"
       : "";
 
@@ -69,16 +71,25 @@ export default function ScheduleDay({ schedules = [], onScheduleClick }) {
 
   // 날짜 조작 함수 개선 (timestamp 사용)
   const navigateDay = (direction) => {
-    const newDate = new Date(currentDate);
-    // 현재 날짜의 밀리초를 가져와 24시간(86400000ms)을 더하거나 뺌
-    newDate.setDate(newDate.getDate() + direction);
-    setCurrentDate(newDate);
+    // [수정] 'a is not a function' 에러 방지를 위한 함수형 업데이트 적용
+    if (typeof setCurrentDate !== 'function') return;
+    
+    setCurrentDate((prevDate) => {
+      const baseDate = (prevDate instanceof Date && !isNaN(prevDate)) ? prevDate : new Date();
+      const newDate = new Date(baseDate);
+      newDate.setDate(baseDate.getDate() + direction);
+      return newDate;
+    });
   };
 
   // 네비게이션 버튼 핸들러
   const handlePrevDay = () => navigateDay(-1); // 이전 날로 이동
   const handleNextDay = () => navigateDay(1); // 다음 날로 이동
-  const handleToday = () => setCurrentDate(new Date()); // 오늘 날짜로 이동
+  const handleToday = () => {
+    if (typeof setCurrentDate === 'function') {
+      setCurrentDate(new Date()); // 오늘 날짜로 이동
+    }
+  };
 
   // 일정 필터링
   const daySchedules = schedules.filter(
@@ -104,8 +115,9 @@ export default function ScheduleDay({ schedules = [], onScheduleClick }) {
         {/* 중앙 영역: 제목만 배치 */}
         <div className="day-header-center">
           <span className={`day-title ${dayClass}`}>
-            {currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월{" "}
-            {currentDate.getDate()}일 ({dayOfWeek})
+            {/* [수정] date 객체를 사용하여 getFullYear 에러 방지 */}
+            {date.getFullYear()}년 {date.getMonth() + 1}월{" "}
+            {date.getDate()}일 ({dayOfWeek})
           </span>
         </div>
 

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import "./ScheduleMonth.css";
 
 // 스케줄 월간 뷰 컴포넌트
-export default function ScheduleMonth({ schedules, onScheduleClick }) {
+export default function ScheduleMonth({ schedules, onScheduleClick, onDateClick }) {
   const today = new Date(); // 오늘 날짜
 
   // 현재 표시 중인 연 - 월 - 1일 (오늘 날짜 기준으로 초기화)
@@ -133,6 +133,8 @@ export default function ScheduleMonth({ schedules, onScheduleClick }) {
               className={`month-cell ${
                 item.type !== "current" ? "faded-cell" : ""
               } ${isToday ? "today-cell" : ""}`}
+              onClick={() => onDateClick && onDateClick(item.date)}
+              style={{ cursor: "pointer" }}
             >
               <div
                 className={`day-number
@@ -149,7 +151,10 @@ export default function ScheduleMonth({ schedules, onScheduleClick }) {
                   key={s.id} 
                   className="month-task" 
                   style={{ cursor: "pointer" }} // 커서 추가
-                  onClick={() => onScheduleClick && onScheduleClick(s)} // 클릭 이벤트 추가
+                  onClick={(e) => {
+                    e.stopPropagation(); // 날짜 클릭 이벤트 방지
+                    onScheduleClick && onScheduleClick(s);
+                  }}
                 >
                   <strong>{s.name}</strong>
                   <div className="task-time">

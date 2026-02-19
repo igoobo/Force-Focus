@@ -1,13 +1,22 @@
 import { create } from "zustand";
 import { scheduleApi } from "../../../api/scheduleApi";
 
+// 날짜를 "YYYY-MM-DD" 형식의 문자열로 반환하는 유틸 함수
+const getTodayStr = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 // 서버 데이터와 프론트엔드 임시 데이터를 동기화하는 정규화 함수
 const normalizeSchedule = (s) => ({
   ...s,
   name: s.name || "새 일정",
   description: s.description || "등록된 설명이 없습니다.",
-  start_date: s.start_date || "2026-01-25",
-  end_date: s.end_date || "2026-01-25",
+  start_date: s.start_date || getTodayStr(),
+  end_date: s.end_date || getTodayStr(),
   start_time: s.start_time || "00:00:00",
   end_time: s.end_time || "00:00:00",
   task_id: s.task_id || "미분류 작업"
@@ -15,8 +24,14 @@ const normalizeSchedule = (s) => ({
 
 export const useScheduleStore = create((set, get) => ({
   schedules: [],
+  viewDate: new Date(),
   loading: false,
   error: null,
+
+  setViewDate: (dateOrFn) => 
+    set((state) => ({
+      viewDate: typeof dateOrFn === 'function' ? dateOrFn(state.viewDate) : dateOrFn
+    })),
 
   // 1. 전체 일정 불러오기 (Read)
   fetchSchedules: async () => {
@@ -52,8 +67,8 @@ export const useScheduleStore = create((set, get) => ({
         start_time: rawStartTime.length === 5 ? `${rawStartTime}:00` : rawStartTime,
         end_time: rawEndTime.length === 5 ? `${rawEndTime}:00` : rawEndTime,
         days_of_week: [0, 1, 2, 3, 4, 5, 6], 
-        start_date: newSchedule.start_date || "2026-01-17",
-        end_date: newSchedule.end_date || "2026-01-17",
+        start_date: newSchedule.start_date || getTodayStr(),
+        end_date: newSchedule.end_date || getTodayStr(),
         is_active: true
       };
 

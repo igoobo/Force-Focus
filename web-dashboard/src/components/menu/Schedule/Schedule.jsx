@@ -14,7 +14,7 @@ import ScheduleEditModal from "./sub/ScheduleEditModal";
 
 // 스케줄 메뉴 컴포넌트
 export default function Schedule() {
-  const { schedules, loading, fetchSchedules, clearSchedules } = useScheduleStore(); // 현재 저장된 일정 가져오기
+  const { schedules, loading, fetchSchedules, clearSchedules, viewDate, setViewDate } = useScheduleStore(); // 현재 저장된 일정 가져오기
   const [isAddOpen, setIsAddOpen] = useState(false); // 일정 추가 모달 상태 (초기값 : 닫힘)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false); // 일정 삭제 모달 상태 (초기값 : 닫힘)
   const [isEditOpen, setIsEditOpen] = useState(false); // 일정 수정 모달 상태 (초기값 : 닫힘)
@@ -28,6 +28,12 @@ export default function Schedule() {
   const setViewMode = useMainStore((state) => state.setScheduleViewMode); // 뷰 모드 설정 함수
 
   const currentUser = localStorage.getItem('userEmail'); // 현재 사용자 식별자
+  
+  // 날짜 칸 클릭 시 실행될 핸들러
+  const handleDateClick = (date) => {
+    setViewDate(date);   // 클릭한 날짜로 변경
+    setViewMode("day");  // 일간 뷰로 변경
+  };
 
   // 일정 추가 모달 열기/닫기 함수
   const openAddModal = () => setIsAddOpen(true);
@@ -111,9 +117,9 @@ export default function Schedule() {
       </div>
 
       {/* 각 뷰 컴포넌트에 onScheduleClick 프롭으로 수정 함수 전달 */}
-      {viewMode === "day" && <ScheduleDay key="day" schedules={schedules} onScheduleClick={openEditModal} />}
+      {viewMode === "day" && <ScheduleDay key="day" schedules={schedules} onScheduleClick={openEditModal} currentDate={viewDate} setCurrentDate={setViewDate} />}
       {viewMode === "week" && <ScheduleWeek key="week" schedules={schedules} onScheduleClick={openEditModal} />}
-      {viewMode === "month" && <ScheduleMonth key="month" schedules={schedules} onScheduleClick={openEditModal} />}
+      {viewMode === "month" && <ScheduleMonth key="month" schedules={schedules} onScheduleClick={openEditModal} onDateClick={handleDateClick} />}
       {viewMode === "list" && <ScheduleList key="list" schedules={schedules} onScheduleClick={openEditModal} />}
 
       {isAddOpen && createPortal(

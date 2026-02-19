@@ -17,6 +17,7 @@ export default function Overview() {
   const [viewMode, setViewMode] = useState("주");
   const { fetchSchedules } = useScheduleStore();
   
+  const [previewDate, setPreviewDate] = useState(new Date());
   const scrollRef = useRef(null);
 
   // --- 오늘 날짜 계산 로직 ---
@@ -67,7 +68,7 @@ export default function Overview() {
 
   const renderSchedulePreview = () => {
     switch (viewMode) {
-      case "일": return <ScheduleDay schedules={schedules} isPreview={true} />;
+      case "일": return <ScheduleDay schedules={schedules} isPreview={true} currentDate={previewDate} setCurrentDate={setPreviewDate}/>;
       case "주": return <ScheduleWeek schedules={schedules} isPreview={true} />;
       case "월": return <ScheduleMonth schedules={schedules} isPreview={true} />;
       default: return <ScheduleDay schedules={schedules} isPreview={true} />;
