@@ -51,7 +51,7 @@ const ScheduleList = ({ schedules = [], onScheduleClick }) => {
 
               <div className="card-footer">
                 <span className="created-at">
-                  생성일: {new Date(item.created_at).toLocaleDateString()}
+                  생성일: {item.created_at ? new Date(item.created_at).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" }) : "정보 없음"}
                 </span>
               </div>
             </div>
