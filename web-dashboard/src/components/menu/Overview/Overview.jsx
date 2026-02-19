@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import "./Overview.css";
 import useMainStore from "../../../MainStore";
-import { useScheduleStore } from "../Schedule/ScheduleStore"; 
+import { useScheduleStore } from "../Schedule/ScheduleStore";
+import authApi from "../../../api/authApi";
 
 // 스케줄 관련 컴포넌트 임포트
 import ScheduleDay from "../Schedule/sub/ScheduleDay";
@@ -20,6 +21,26 @@ export default function Overview() {
   const [previewDate, setPreviewDate] = useState(new Date());
   const scrollRef = useRef(null);
 
+  // 피드백 데이터 상태 관리
+  const [feedbackData, setFeedbackData] = useState(null);
+  const [isFeedbackLoading, setIsFeedbackLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchFeedback = () => {
+      // API 호출 로직을 제거하고 세션 스토리지의 데이터만 확인
+      const cachedFeedback = sessionStorage.getItem("last_ai_feedback");
+      
+      if (cachedFeedback) {
+        setFeedbackData(JSON.parse(cachedFeedback));
+      }
+      
+      // 즉시 로딩 상태를 해제하여 데이터가 있으면 보여주고, 없으면 빈 상태를 유지
+      setIsFeedbackLoading(false);
+    };
+    
+    fetchFeedback();
+  }, []);
+
   // --- 오늘 날짜 계산 로직 ---
   const today = new Date();
   const dayIndex = today.getDay();
@@ -31,11 +52,6 @@ export default function Overview() {
 
   const dayClassName = dayIndex === 0 ? "sunday" : dayIndex === 6 ? "saturday" : "";
   const summary = useMemo(() => getActivitySummary(), []);
-
-  const INTEGRATED_FEEDBACK = {
-  title: "효율적 사용자",
-  summary: "전체 작업의 절반 가까이를 핵심 툴에 할애하고 있습니다. 35분 연속 딥 워크는 상위 15%의 생산성 수치입니다.",
-  };
 
   // 자동 스크롤 로직 (기존 유지)
   useEffect(() => {
@@ -76,12 +92,12 @@ export default function Overview() {
   };
 
   const handleMoveToSchedule = () => {
-  const viewMap = { "일": "day", "주": "week", "월": "month" };
-  const targetView = viewMap[viewMode] || "week";
-  
-  // Overview의 현재 viewMode를 인자로 넘기며 메뉴 이동
-  setActiveMenu("스케줄", targetView);
-};
+    const viewMap = { "일": "day", "주": "week", "월": "month" };
+    const targetView = viewMap[viewMode] || "week";
+    
+    // Overview의 현재 viewMode를 인자로 넘기며 메뉴 이동
+    setActiveMenu("스케줄", targetView);
+  };
 
   return (
     <div className="overview-container">
@@ -126,8 +142,22 @@ export default function Overview() {
           <div className="card feedback-card" onClick={() => setActiveMenu("피드백")}>
             <h4>최근 작업 피드백</h4>
             <div className="feedback-highlight-container">
-            <span className="feedback-main-title">{INTEGRATED_FEEDBACK.title}</span>
-            <p className="feedback-text">{INTEGRATED_FEEDBACK.summary}</p>
+            {!isFeedbackLoading && feedbackData ? (
+                <>
+                  <span className="feedback-main-title">
+                    {/* Feedback.jsx의 summary_title 필드 사용 */}
+                    {feedbackData.summary_title || "종합 피드백"}
+                  </span>
+                  <p className="feedback-text">
+                    {/* Feedback.jsx의 summary_description 필드 사용 */}
+                    {feedbackData.summary_description|| "데이터 분석 결과가 존재합니다."}
+                  </p>
+                </>
+              ) : (
+                <p className="feedback-text empty-feedback">
+                  {isFeedbackLoading ? "데이터를 분석 중입니다..." : "지금 작업 피드백을 확인해 보세요!"}
+                </p>
+              )}
           </div>
           </div>
         </div>
