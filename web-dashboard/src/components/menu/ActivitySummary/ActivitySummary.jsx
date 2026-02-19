@@ -8,6 +8,7 @@ import { useActivityStore } from "./ActivityStore";
 export default function ActivitySummary() {
   const activityViewMode = useMainStore((state) => state.activityViewMode);
   const setActivityViewMode = useMainStore((state) => state.setActivityViewMode);
+  const isDarkMode = useMainStore((state) => state.isDarkMode);
   const { stats, loading, fetchAndAnalyze } = useActivityStore();
 
   useEffect(() => {
@@ -21,12 +22,12 @@ export default function ActivitySummary() {
 
   if (loading) {
     return (
-      <div className={`activity-summary ${activityViewMode}`}>
-        <div className="summary-header">
-          <span className="summary-title">📊 주간 활동 요약 리포트</span>
-        </div>
-        <div className="summary-content" style={{ justifyContent: 'center', alignItems: 'center' }}>
-          <p>활동 데이터를 분석 중입니다...</p>
+      <div className={`activity-summary ${activityViewMode} ${isDarkMode ? "dark-theme" : ""}`}>
+        <div className="summary-content" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+          <div className="loader"></div>
+          <p style={{ marginLeft: '15px', color: 'var(--text-muted)', fontWeight: '500' }}>
+            활동 데이터를 불러오고 있습니다...
+          </p>
         </div>
       </div>
     );
