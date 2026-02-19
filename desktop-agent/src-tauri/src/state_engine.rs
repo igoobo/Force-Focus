@@ -176,6 +176,11 @@ impl StateEngine {
         // Enum 상태를 문자열로 변환 (Debug 트레이트 활용)
         format!("{:?}", self.current_state)
     }
+
+    // [Fix] app_core.rs에서 상태 확인용 Getter 추가
+    pub fn get_state(&self) -> FSMState {
+        self.current_state.clone()
+    }
 }
 
 

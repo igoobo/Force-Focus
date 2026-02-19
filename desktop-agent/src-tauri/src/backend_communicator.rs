@@ -2,7 +2,7 @@
 
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use tauri::{command, State};
+use tauri::{command, State, AppHandle};
 
 // 백그라운드 동기화를 위해 tokio::spawn과 Arc, Mutex를 사용
 use std::sync::{Arc, Mutex};
@@ -647,11 +647,13 @@ pub async fn start_session(
 // --- 세션 종료 커맨드 ---
 #[command]
 pub async fn end_session(
+    app_handle: AppHandle,
     user_evaluation_score: u8,
     // comm_state도 백그라운드 동기화를 위해 Arc<BackendCommunicator>를 받도록 변경
     comm_state: State<'_, Arc<BackendCommunicator>>,
     session_state_mutex: State<'_, SessionStateArcMutex>,
     storage_manager_mutex: State<'_, StorageManagerArcMutex>,
+    app_core_state: State<'_, Mutex<AppCore>>, // [Fix] FSM 리셋을 위해 추가
 ) -> Result<(), String> {
     // 1. '쓰기' 락: .await 전에 LSN과 전역 상태를 즉시 업데이트
     // 반환값: (session_id, auth_token)
@@ -673,6 +675,13 @@ pub async fn end_session(
         // LSN 및 전역 상태 정리 (먼저 실행)
         storage_manager.delete_active_session()?;
         *session_state = None; // 전역 상태 초기화
+
+        // [Fix] 세션 종료 시 오버레이 숨기기 및 FSM 리셋 (UX: 즉시 반응)
+        // hide_overlay는 내부적으로 AppCore.manual_reset()을 호출합니다.
+        use crate::window_commands;
+        if let Err(e) = window_commands::hide_overlay(app_handle.clone(), app_core_state) {
+            eprintln!("Warning: Failed to hide overlay on session end: {}", e);
+        }
 
         println!(
             "Session ID {} successfully ended locally (score: {}).",
