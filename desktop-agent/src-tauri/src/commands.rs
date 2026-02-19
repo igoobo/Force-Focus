@@ -20,8 +20,6 @@ use sysinfo::System;
 use rdev::{listen, Event, EventType};
 use std::thread;
 
-use regex::Regex;
-use std::collections::HashSet;
 use std::path::Path;
 
 // [추가] Windows API 사용을 위한 모듈 import (Windows 환경에서만 컴파일)
@@ -513,102 +511,20 @@ pub fn get_visible_windows() -> Result<Vec<WindowInfo>, String> {
 }
 
 // --- 토큰화 및 숫자 필터링 = 시맨틱 태깅 ---
-// 목표:
-// 1. 네이티브 앱 -> 파일 확장자만 추출
-// 2. 웹 브라우저 -> 제목 전체를 토큰화한 뒤, '숫자가 포함된 토큰'만 제거하여 맥락 보존
-// 전략: 복잡한 파싱 대신, 단순히 띄어쓰기로 나누고 숫자가 섞인 '위험한 토큰'을 모두 버림.
+// 목표: ML 모델과 동일한 'Simple Tokenization' (Spec: ML_models.md)
+// 1. App Name + Window Title 결합
+// 2. Non-alphanumeric 기준 분리
+// 3. 소문자 변환
 pub fn extract_semantic_keywords(app_name: &str, window_title: &str) -> Vec<String> {
-    let mut tokens = Vec::new();
-    let lower_app = app_name.to_lowercase();
-    let lower_title = window_title.to_lowercase();
-
-    // 1. [공통] 파일 확장자 추출 (가장 안전한 식별자)
-    let ext_re = Regex::new(r"\.([a-z0-9]{2,4})\b").unwrap();
-    for cap in ext_re.captures_iter(&lower_title) {
-        if let Some(match_) = cap.get(1) {
-            tokens.push(format!(".{}", match_.as_str()));
-        }
-    }
-
-    // 2. 브라우저 감지
-    let browsers = [
-        "chrome", "edge", "firefox", "whale", "brave", "opera", "safari", "browser",
-    ];
-    let is_browser = browsers.iter().any(|&b| lower_app.contains(b));
-
-    if is_browser {
-        // 3. [단순화] 구분자를 공백으로 치환하여 '문장'을 '단어열'로 만듦
-        // 예: "방송 - CHZZK" -> "방송   CHZZK"
-        let cleaner_re = Regex::new(r"[\-\|:\[\]\(\)]").unwrap();
-        let clean_title = cleaner_re.replace_all(&lower_title, " ");
-
-        // 4. 불용어 목록
-        let stopwords: HashSet<&str> = [
-            "google",
-            "microsoft",
-            "chrome",
-            "edge",
-            "firefox",
-            "whale",
-            "profile",
-            "프로필",
-            "guest",
-            "게스트",
-            "search",
-            "검색",
-            "새 탭",
-            "new tab",
-            "loading",
-            "로딩",
-            "sign in",
-            "login",
-            "로그인",
-            "window",
-            "application",
-            "site",
-            "page",
-            "web",
-            "browser",
-            "view",
-        ]
-        .iter()
-        .cloned()
-        .collect();
-
-        // 5. 공백 기준 분리 및 필터링
-        for token in clean_title.split_whitespace() {
-            // [핵심] 숫자가 하나라도 포함되면 개인정보(ID, 날짜, 버전)로 간주하여 제거
-            if token.chars().any(char::is_numeric) {
-                continue;
-            }
-
-            // 특수문자만 있는 경우 제거 (한글/영어만 남김)
-            // (간단히 길이나 알파벳/한글 여부 체크)
-            let is_valid_word = token.chars().any(|c| c.is_alphabetic()); // 알파벳/한글이 하나라도 있어야 함
-            if !is_valid_word || token.chars().count() < 2 {
-                continue;
-            }
-
-            // 불용어 제거
-            if !stopwords.contains(token) {
-                tokens.push(token.to_string());
-            }
-        }
-    }
-
-    // 6. 중복 제거 및 정렬
-    tokens.sort();
-    tokens.dedup();
-
-    // 7. 토큰 제한
-    if tokens.len() > 15 {
-        tokens.truncate(15);
-    }
-
-    tokens
+    let full_text = format!("{} {}", app_name, window_title).to_lowercase();
+    
+    full_text.split(|c: char| !c.is_alphanumeric())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect()
 }
 
-// [중복: 헬퍼 함수 및 나머지 코드]
+// [Wrapper] 기존 코드 호환성 유지
 pub fn get_semantic_tokens(app_name: &str, window_title: &str) -> Vec<String> {
     extract_semantic_keywords(app_name, window_title)
 }

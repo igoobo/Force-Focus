@@ -13,27 +13,35 @@ pub struct FeatureExtractor {
 
 impl FeatureExtractor {
     pub fn new() -> Self {
-        // Global Knowledge 초기화 (추후 서버에서 받아오는 데이터)
+        // Global Knowledge 초기화 (Synced with backend/train.py)
         // 문서 Phase 2: 보편적 업무/딴짓 구분
         let mut map = HashMap::new();
         // 생산성 도구 (Positive)
-        map.insert("code".to_string(), 1.0);      // VSCode
-        map.insert("studio".to_string(), 1.0);    // Android Studio, Visual Studio
-        map.insert("idea".to_string(), 1.0);      // IntelliJ
-        map.insert("rust".to_string(), 1.0);      // Rust 관련 파일
-        map.insert("py".to_string(), 1.0);        // Python 파일
+        map.insert("code".to_string(), 0.9);      // VSCode
+        map.insert("vs".to_string(), 0.9);        // Visual Studio
+        map.insert("studio".to_string(), 0.9);    // Android Studio
+        map.insert("intellij".to_string(), 0.9);  // IntelliJ
+        map.insert("idea".to_string(), 0.9);      // IntelliJ Process Name
+        map.insert("rust".to_string(), 0.9);      // Rust 관련 파일
+        map.insert("py".to_string(), 0.9);        // Python 파일
+        
         map.insert("github".to_string(), 0.8);    // GitHub
         map.insert("stackoverflow".to_string(), 0.8);
         map.insert("arxiv".to_string(), 0.9);     // 논문
-        map.insert("notion".to_string(), 0.7);    // 문서화
+        
+        map.insert("slack".to_string(), 0.5);     // Communication
+        map.insert("notion".to_string(), 0.7);    // Documentation
 
         // 딴짓 도구 (Negative)
-        map.insert("youtube".to_string(), -1.0);
-        map.insert("netflix".to_string(), -1.0);
-        map.insert("twitch".to_string(), -1.0);
-        map.insert("steam".to_string(), -1.0);
-        map.insert("game".to_string(), -1.0);
-        map.insert("lol".to_string(), -1.0);
+        map.insert("youtube".to_string(), -0.9);
+        map.insert("netflix".to_string(), -0.9);
+        map.insert("chzzk".to_string(), -0.9);    // Chzzk
+        map.insert("twitch".to_string(), -0.9);
+        map.insert("steam".to_string(), -0.9);
+        map.insert("game".to_string(), -0.9);
+        map.insert("lol".to_string(), -0.9);
+        
+        map.insert("chrome".to_string(), 0.1);    // Neutral (Browser)
 
         Self {
             input_count_history: VecDeque::with_capacity(60), // 1분
@@ -83,10 +91,10 @@ impl FeatureExtractor {
         };
 
         // --- Feature 6: Interaction Gate (Sigmoid Logic) ---
-        // 문서 수식: Sigmoid(1 / (Input + epsilon)) * Context
+        // 문서 수식: Sigmoid(1 / (Input + 0.1)) * Context
         // 입력이 적을수록(침묵) 1.0에 가까워짐 -> 문맥이 중요해짐
         // 입력이 많으면(타이핑) 0.5에 가까워짐 -> 문맥 영향력 감소 (행동 자체가 중요)
-        let input_factor = 1.0 / (delta + 1.0); // 분모 0 방지
+        let input_factor = 1.0 / (delta + 0.1); // 분모 0 방지 (Spec: 0.1)
         let sigmoid_val = 1.0 / (1.0 + (-input_factor).exp()); // Basic Sigmoid
         
         // 문서 의도: "입력이 없을 때(Sigmoid High) 문맥이 긍정적이면 Interaction 점수 부여"
