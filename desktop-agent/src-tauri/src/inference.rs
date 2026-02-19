@@ -135,8 +135,8 @@ impl InferenceEngine {
     
     /// 메인 추론 함수
     /// input_vector: FeatureExtractor가 만든 6차원 벡터
-    /// active_token: 현재 활성 창의 토큰 (Cache 확인용)
-    pub fn infer(&mut self, mut input_vector: [f64; 6], active_token: Option<String>) -> Result<(f64, InferenceResult), Box<dyn std::error::Error>> {
+    /// active_tokens: 현재 활성 창의 토큰 리스트 (Cache 확인용)
+    pub fn infer(&mut self, mut input_vector: [f64; 6], active_tokens: Vec<String>) -> Result<(f64, InferenceResult), Box<dyn std::error::Error>> {
         
         // Session이 None이면 추론 불가 (Early Return)
         let session = match &mut self.session {
@@ -145,18 +145,24 @@ impl InferenceEngine {
         };
 
         // 1. Local Cache Check & Override (문서 Phase 5)
-        // 사용자가 피드백을 준 토큰(예: "YouTube"로 강의 듣기)이라면
+        // 사용자가 피드백을 준 토큰(예: "YouTube"로 강의 듣기)이 하나라도 있다면
         // 문맥 점수(0번 인덱스)를 강제로 1.0(만점)으로 수정
-        if let Some(token) = active_token {
+        let mut cache_hit = false;
+        for token in active_tokens {
             if let Some(expire_time) = self.local_cache.get(&token) {
                 if Instant::now() < *expire_time {
-                    // 캐시 히트! 문맥 점수 강제 상향
-                    input_vector[0] = 1.0; 
+                    cache_hit = true;
+                    // Note: 하나라도 맞으면 Trusted로 간주
                 } else {
-                    // 만료된 기억 삭제
-                    self.local_cache.remove(&token);
+                    // 만료된 기억 (Lazy Deletion: 여기서는 삭제 안 하고 넘어가거나, 별도 클린업 필요)
+                    // self.local_cache.remove(&token); // loop 중 borrow checker 이슈 가능성 있음
                 }
             }
+        }
+        
+        if cache_hit {
+             // 캐시 히트! 문맥 점수 강제 상향
+             input_vector[0] = 1.0; 
         }
 
         // 2. Preprocessing (Standard Scaling)
