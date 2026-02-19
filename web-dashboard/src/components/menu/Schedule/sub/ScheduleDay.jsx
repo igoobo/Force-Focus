@@ -38,8 +38,9 @@ export default function ScheduleDay({ schedules = [], onScheduleClick, currentDa
       ? "saturday"
       : "";
 
-  // 한 시간당 높이를 60px로 설정
-  const HOUR_HEIGHT = 60;
+  // 한 시간당 높이를 80px로 설정
+  const HOUR_HEIGHT = 80;
+  const OFFSET_Y = 20;
   
   // 현재 날짜일 때만 위치를 계산하고, 아니면 null로 설정
   const [currentPosition, setCurrentPosition] = useState(null); 
@@ -55,7 +56,7 @@ export default function ScheduleDay({ schedules = [], onScheduleClick, currentDa
 
       const now = new Date(); // 현재 시각
       const minutes = now.getHours() * 60 + now.getMinutes(); // 현재 시각을 분 단위로 변환
-      const position = (minutes / 60) * HOUR_HEIGHT - 1; // 현재 시각에 따른 위치 계산 (-1px 보정)
+      const position = (minutes / 60) * HOUR_HEIGHT + OFFSET_Y; // 현재 시각에 따른 위치 계산 (-1px 보정)
       setCurrentPosition(position); // 위치 상태 업데이트
     };
 
@@ -153,8 +154,8 @@ export default function ScheduleDay({ schedules = [], onScheduleClick, currentDa
             ></div>
           )}
 
-          {/* 시간 구분선 (0시부터 23시까지) */}
-          {Array.from({ length: 24 }, (_, i) => (
+          {/* 시간 구분선 (0시부터 23시까지 30분 간격으로) */}
+          {Array.from({ length: 48 }, (_, i) => (
             <div key={i} className="time-line"></div>
           ))}
 
@@ -166,7 +167,7 @@ export default function ScheduleDay({ schedules = [], onScheduleClick, currentDa
             const totalEnd = eh * 60 + em;
             const durationMinutes = totalEnd - totalStart; // 일정 지속 시간(분) 계산
   
-            const top = (totalStart / 60) * HOUR_HEIGHT;
+            const top = (totalStart / 60) * HOUR_HEIGHT + OFFSET_Y;
             const height = (durationMinutes / 60) * HOUR_HEIGHT;
 
             return (
@@ -179,14 +180,14 @@ export default function ScheduleDay({ schedules = [], onScheduleClick, currentDa
                 <div className="task-title">{s.name}</div>
       
                 {/* 20분 이상인 경우에만 시간 정보 노출 */}
-                {durationMinutes >= 20 && (
+                {durationMinutes >= 25 && (
                   <div className="task-time">
                     {s.start_time.slice(0, 5)} ~ {s.end_time.slice(0, 5)}
                   </div>
                 )}
       
                 {/* 40분 이상인 경우에만 상세 설명 노출 */}
-                {durationMinutes >= 40 && (
+                {durationMinutes >= 50 && (
                   <div className="task-desc">{s.description}</div>
                 )}
               </div>

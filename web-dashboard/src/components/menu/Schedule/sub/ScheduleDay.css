@@ -71,49 +71,42 @@
   flex: 1;
   display: flex;
   height: 100%;
-  overflow-y: hidden;
-  background: var(--card-bg);;
+  overflow-y: auto; 
+  background: var(--card-bg);
 }
 
 .day-time-column {
   width: 60px;
-  background: var(--card-bg);;
-  border-right: 1px solid #e5e7eb;
+  background: var(--card-bg);
+  border-right: 1px solid #d1d5db;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   position: relative;
   z-index: 1;
-  padding-top: 0;
+  padding-top: 20px; /* 00:00 잘림 방지용 여백 */
 }
 
-/* 시간 라벨: 레이아웃 흐름을 방해하지 않도록 높이를 0으로 설정 */
+/* 시간 라벨: 높이를 JS의 HOUR_HEIGHT와 동일하게 (80px 권장) */
 .day-time-label {
-  height: 60px;
+  height: 80px; 
   display: flex;
   align-items: flex-start; 
   justify-content: flex-end;
-  color: transparent;
-  font-size: 0.75rem;
-  padding-right: 8px;
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
   width: 100%;
 }
 
 .day-time-label span {
-  color: #9ca3af;
+  color: #6b7280;
+  font-size: 0.75rem;
   position: relative;
   right: 8px;
-  top: -10px;
+  top: -8px;
   pointer-events: none;
-  padding: 0;
-  margin: 0;
 }
 
 .day-time-label:first-child span {
-  top: -15px;
+  top: -8px;
 }
 
 .day-timeline {
@@ -123,22 +116,17 @@
   overflow-y: auto;
   scroll-behavior: smooth;
   border-left: none;  
-  position: relative;
   z-index: 2;
   overflow-x: visible;
-  padding-left: 10px; 
-  padding-top: 0;
+  padding-left: 0; 
+  padding-top: 20px;
 }
 
 .time-line {
-  height: 60px;
-  border-bottom: 1px solid #e5e7eb;
+  height: 40px;
+  border-top: 1.2px solid #dadfe5 !important;
   position: relative;
-}
-
-.time-line:first-child {
-  border-top: 1px solid #e5e7eb;
-  border-bottom: 1px solid #e5e7eb;
+  box-sizing: border-box;
 }
 
 /* 현재 시간 표시선 */
@@ -150,7 +138,7 @@
   background-color: #ef4444;
   box-shadow: 0 0 3px rgba(239, 68, 68, 0.5);
   z-index: 100;
-  transition: top 1s linear, background-color 0.3s ease;
+  margin-top: -1px; 
 }
 
 .current-time-line::before {
@@ -252,7 +240,7 @@
 .dark-theme .day-body, 
 .dark-theme .day-time-column, 
 .dark-theme .day-timeline {
-  background-color: var(--card-bg); /* 어두운 카드 배경색 */
+  background-color: var(--card-bg); 
   border-color: var(--border-color);
 }
 
@@ -261,11 +249,11 @@
 }
 
 .dark-theme .day-title { color: var(--text-main); }
-.dark-theme .time-line { border-color: var(--border-color); }
+.dark-theme .time-line { border-color: #374151; } /* 다크모드 격자 강화 */
 
 /* 일정 블록 색상 대비 조정 */
 .dark-theme .day-task {
-  background-color: #1e3a8a; /* 진한 파랑 */
+  background-color: #1e3a8a; 
   border-color: #3b82f6;
   color: #f8fafc;
 }
@@ -274,7 +262,7 @@
 
 .dark-theme .nav-btn,
 .dark-theme .today-btn {
-  background-color: var(--bg-sidebar) !important; /* 다크 모드 시 어두운 배경 */
+  background-color: var(--bg-sidebar) !important;
   color: var(--text-main) !important;
   border-color: var(--border-color) !important;
 }
@@ -294,5 +282,5 @@
 
 /* 시간 라벨 텍스트 색상 */
 .dark-theme .day-time-label span {
-  color: var(--text-muted);
+  color: #9ca3af;
 }
