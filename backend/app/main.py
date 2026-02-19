@@ -86,7 +86,7 @@ from app.api.endpoints.web import (
     schedules,
     sessions,
     events as web_events,
-    feedback,
+#    feedback,
     insight,
 )
 
@@ -98,6 +98,7 @@ from app.api.endpoints.desktop import (
     auth as desktop_auth,
     events as desktop_events,
     data as desktop_data,
+    feedback as desktop_feedback,
 )
 
 # Web Auth
@@ -111,10 +112,11 @@ app.include_router(tasks.router, prefix="/api/v1", tags=["tasks"])
 app.include_router(schedules.router, prefix="/api/v1", tags=["schedules"])
 app.include_router(sessions.router, prefix="/api/v1", tags=["sessions"])
 app.include_router(web_events.router, prefix="/api/v1", tags=["events"])
-app.include_router(feedback.router, prefix="/api/v1", tags=["feedback"])
+# app.include_router(feedback.router, prefix="/api/v1", tags=["feedback"])
 app.include_router(insight.router, prefix="/api/v1", tags=["insights"])
 
 # Desktop APIs
 app.include_router(desktop_auth.router, prefix="/api/v1/auth/desktop", tags=["auth-desktop"])
 app.include_router(desktop_events.router, prefix="/api/v1/events", tags=["events"])
 app.include_router(desktop_data.router, prefix="/api/v1/desktop/data", tags=["desktop-data"])
+app.include_router(desktop_feedback.router, prefix="/api/v1/desktop/feedback", tags=["desktop-feedback"])

@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from enum import Enum
-
+from typing import Optional
 from pydantic import BaseModel, ConfigDict, field_validator
 
 
@@ -38,14 +38,15 @@ class FeedbackCreate(BaseModel):
     # ✅ 공통 strip 적용
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    event_id: str
+    # event_id: str
+    client_event_id: Optional[str] = None
     feedback_type: FeedbackTypeEnum
     timestamp: datetime
 
-    @field_validator("event_id")
+    @field_validator("client_event_id")
     @classmethod
     def validate_event_id(cls, v: str) -> str:
-        return _strip_and_reject_blank(v, "event_id")
+        return _strip_and_reject_blank(v, "client_event_id")
 
 
 class FeedbackRead(BaseModel):
@@ -54,7 +55,8 @@ class FeedbackRead(BaseModel):
     """
     id: str
     user_id: str
-    event_id: str
+    # event_id: str
+    client_event_id: Optional[str] = None
     feedback_type: FeedbackTypeEnum
     timestamp: datetime
 
