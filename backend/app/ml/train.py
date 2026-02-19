@@ -23,81 +23,62 @@ MODEL_STORAGE_PATH = os.path.join(BASE_DIR, "storage", "models")
 # 1. 기존 로직 및 설정 (Global Map & Scoring)
 # ---------------------------------------------------------
 
-# [설정] Global Map (간소화된 버전)
+# [설정] Global Map (Simplified based on Specs)
 GLOBAL_MAP = {
-    'code': 0.9, 'vs': 0.9, 'intellij': 0.9, 'rust': 0.9,
-    'slack': 0.5, 'notion': 0.7,
-    'youtube': -0.9, 'netflix': -0.9, 'chzzk': -0.9,
+    'code': 0.9, 'vs': 0.9, 'intellij': 0.9, 'rust': 0.9, 'py': 0.9,
+    'slack': 0.5, 'notion': 0.7, 'github': 0.8, 'stackoverflow': 0.8,
+    'arxiv': 0.9,
+    'youtube': -0.9, 'netflix': -0.9, 'chzzk': -0.9, 'twitch': -0.9,
+    'steam': -0.9, 'game': -0.9, 'lol': -0.9,
     'chrome': 0.1
 }
 
 def get_token_score(app_name, title):
-    """단일 앱/타이틀에 대한 점수 반환"""
-    tokens = [str(app_name).lower().replace('.exe', '')]
-    if title:
-        tokens.extend(str(title).lower().split())
+    """
+    [Simplified] 단일 앱/타이틀에 대한 점수 반환
+    - Visual Weighting 제거: Active Window만 고려
+    - Simple Tokenization: 공백/특수문자 기준 자르기
+    """
+    # 1. Combine
+    full_text = f"{app_name} {title}".lower()
     
-    score = 0.0
+    # 2. Simple Tokenization (non-alphanumeric split)
+    tokens = []
+    current_token = ""
+    for char in full_text:
+        if char.isalnum():
+            current_token += char
+        else:
+            if current_token:
+                tokens.append(current_token)
+                current_token = ""
+    if current_token:
+        tokens.append(current_token)
+    
+    # 3. Scoring
+    scale_sum = 0.0
     count = 0
     found = False
+    
     for t in tokens:
-        for key, val in GLOBAL_MAP.items():
-            if key in t:
-                score += val
-                count += 1
-                found = True
+        if not t: continue
+        # Exact Match (HashMap lookup)
+        if t in GLOBAL_MAP:
+            scale_sum += GLOBAL_MAP[t]
+            count += 1
+            found = True
+            
+    if not found: return 0.0 # Neutral (Unknown)
+    if count == 0: return 0.0
     
-    if not found: return 0.1 # Unknown
-    return score / count
+    return scale_sum / count
 
-def calculate_visual_context_score(row):
+def calculate_context_score_wrapper(row):
     """
-    [Phase 2 Upgraded] Visual Weighting 적용
-    활성 창뿐만 아니라, visible_windows의 면적을 고려하여 가중 평균 점수 산출
+    Wrapper for dataframe apply. 
+    Only uses 'app_name' and 'window_title' (Active Window).
     """
-    # 1. 활성 창 정보
-    active_app = row.get('app_name')
-    active_title = row.get('window_title')
-    
-    # 2. Visible Windows 정보 파싱
-    visible_windows = row.get('visible_windows')
-    
-    # 예외 처리: Visible 정보가 없으면 활성 창 점수만 반환
-    if not isinstance(visible_windows, list) or not visible_windows:
-        return get_token_score(active_app, active_title)
-    
-    total_area = 0.0
-    weighted_score_sum = 0.0
-    
-    for win in visible_windows:
-        # 데이터 구조: { "app_name": ..., "title": ..., "rect": { "top":..., "bottom":... } }
-        w_app = win.get('app_name')
-        w_title = win.get('title')
-        rect = win.get('rect', {})
-        
-        # 면적 계산 (Width * Height)
-        # 좌표가 음수거나 이상할 수 있으므로 절대값/max 처리
-        try:
-            width = max(0, rect.get('right', 0) - rect.get('left', 0))
-            height = max(0, rect.get('bottom', 0) - rect.get('top', 0))
-            area = width * height
-        except:
-            area = 0
-            
-        if area > 0:
-            s = get_token_score(w_app, w_title)
-            
-            # [가중치 전략] 활성 창(Active)에는 1.5배 가중치를 더 줌 (User Focus 고려)
-            if w_app == active_app and w_title == active_title:
-                area *= 1.5
-                
-            weighted_score_sum += s * area
-            total_area += area
-            
-    if total_area == 0:
-        return get_token_score(active_app, active_title)
-        
-    return weighted_score_sum / total_area
+    return get_token_score(row.get('app_name', ''), row.get('window_title', ''))
 
 # ---------------------------------------------------------
 # 2. Main Training Function (Async for FastAPI Integration)
@@ -150,7 +131,7 @@ async def train_user_model(user_id: str) -> Dict[str, Any]:
         df = raw_df
 
     # 4. Feature Engineering (Identical to original)
-    df['X_context'] = df.apply(calculate_visual_context_score, axis=1)
+    df['X_context'] = df.apply(calculate_context_score_wrapper, axis=1)
     
     df['input_count'] = df.get('meaningful_input_events', 0).fillna(0)
     df['delta_input'] = df.groupby('session_id')['input_count'].diff().fillna(0)
