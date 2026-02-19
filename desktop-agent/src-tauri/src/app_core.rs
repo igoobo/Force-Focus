@@ -15,6 +15,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::sync::Mutex;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, Runtime, State, WebviewUrl, WebviewWindowBuilder};
+use std::fs;
+use tauri::path::BaseDirectory;
 use uuid::Uuid;
 
 // ================================================================
@@ -38,18 +40,40 @@ pub struct AppCore {
 }
 
 impl AppCore {
-    pub fn new() -> Self {
-        // Step 5 전이라 모델 파일이 없을 수 있음 (Graceful Handling)
-        let model_path = "resources/models/personal_model.onnx";
-        let scaler_path = "resources/models/scaler_params.json";
+    pub fn new<R: Runtime>(app_handle: &AppHandle<R>) -> Self {
+        // 1. 쓰기 가능한 AppData 폴더 경로 확보 (예: C:\Users\User\AppData\Roaming\com.forcefocus.app\models)
+        let app_data_dir = app_handle.path().app_data_dir().expect("Failed to get AppData directory");
+        let model_dir = app_data_dir.join("models");
 
-        // 모델 로딩 시도 (실패 시 더미/에러 처리하되 앱은 안 죽게)
-        let inference_engine = match InferenceEngine::new(model_path, scaler_path) {
+        // 폴더가 없으면 생성
+        if !model_dir.exists() {
+            fs::create_dir_all(&model_dir).unwrap_or_else(|e| eprintln!("Failed to create model directory: {}", e));
+        }
+
+        let model_path = model_dir.join("personal_model.onnx");
+        let scaler_path = model_dir.join("scaler_params.json");
+
+        // 2. [Seed 로직] AppData에 모델 파일이 없다면, 내장된(Resource) 기본 파일을 복사해옵니다.
+        if !model_path.exists() {
+            if let Ok(bundled_model) = app_handle.path().resolve("resources/models/personal_model.onnx", BaseDirectory::Resource) {
+                fs::copy(&bundled_model, &model_path).unwrap_or_else(|e| { eprintln!("Failed to copy model: {}", e); 0 });
+            }
+        }
+
+        if !scaler_path.exists() {
+            if let Ok(bundled_scaler) = app_handle.path().resolve("resources/models/scaler_params.json", BaseDirectory::Resource) {
+                fs::copy(&bundled_scaler, &scaler_path).unwrap_or_else(|e| { eprintln!("Failed to copy scaler: {}", e); 0 });
+            }
+        }
+
+        // 3. ML 엔진은 이제 완벽히 권한이 보장된 AppData 경로의 파일을 사용하여 구동됩니다.
+        let inference_engine = match InferenceEngine::new(
+            model_path.to_str().unwrap_or(""), 
+            scaler_path.to_str().unwrap_or("")
+        ) {
             Ok(engine) => Some(engine),
             Err(e) => {
-                // 경고만 출력하고 앱은 살려둠
-                eprintln!("⚠️ [AppCore] Running without ML Model: {}", e);
-                eprintln!("⚠️ (This is normal if you haven't run Step 5 yet)");
+                eprintln!("⚠️ [AppCore] ML Model load failed from AppData: {}", e);
                 None 
             }
         };

@@ -1,4 +1,5 @@
 use crate::backend_communicator::BackendCommunicator;
+use crate::app_core::AppCore; 
 use crate::storage_manager::StorageManager;
 use crate::inference::InferenceEngine;
 use crate::StorageManagerArcMutex;
@@ -62,31 +63,42 @@ impl ModelUpdateManager {
             .map_err(|e| format!("Download scaler failed: {}", e))?;
 
         // 5. Atomic Swap & Reload (Critical Section)
-        if let Some(engine_state) = self.app_handle.try_state::<Mutex<InferenceEngine>>() {
-            // Mutex Lock 획득
-            let mut engine = engine_state.lock().map_err(|_| "Failed to lock InferenceEngine")?;
+        // ----------------------------------------------------------------
+        // [핵심 수정] AppCore를 Lock하고 내부의 InferenceEngine을 통째로 교체
+        // ----------------------------------------------------------------
+        if let Some(app_core_state) = self.app_handle.try_state::<Mutex<AppCore>>() {
+            let mut core = app_core_state.lock().map_err(|_| "Failed to lock AppCore")?;
 
-            // A. Unload (Windows File Lock 해제)
-            engine.unload_model();
+            // 1. 기존 엔진 제거 (메모리 해제 및 파일 락 해제)
+            core.inference_engine = None;
             
-            // B. Swap (Rename)
+            // 파일 락이 풀릴 시간을 짧게 부여 (윈도우 환경 필수)
+            std::thread::sleep(Duration::from_millis(100));
+
+            // 2. 파일 교체 (백업 후 덮어쓰기)
             if final_model_path.exists() {
                 let _ = std::fs::rename(&final_model_path, final_model_path.with_extension("bak"));
             }
             std::fs::rename(&temp_model_path, &final_model_path).map_err(|e| e.to_string())?;
             std::fs::rename(&temp_scaler_path, &final_scaler_path).map_err(|e| e.to_string())?;
 
-            // C. Reload (Wait -> Load)
-            // 비동기 컨텍스트에서 std::thread::sleep은 주의해야 하지만, 
-            // 여기서는 Mutex를 잡고 있으므로 짧은 대기는 허용 (혹은 tokio::time::sleep 사용 불가)
-            std::thread::sleep(Duration::from_millis(100)); 
-            
-            engine.load_model(&final_model_path).map_err(|e| e.to_string())?;
-            
-            println!("✅ Model updated to version {}", info.version);
-            Ok(true)
+            // 3. 새 파일로 새 엔진 객체 생성하여 AppCore에 주입
+            match InferenceEngine::new(
+                final_model_path.to_str().unwrap(), 
+                final_scaler_path.to_str().unwrap()
+            ) {
+                Ok(new_engine) => {
+                    core.inference_engine = Some(new_engine);
+                    println!("✅ Model updated and reloaded to version {}", info.version);
+                    Ok(true)
+                },
+                Err(e) => {
+                    // 새 모델 로드 실패 시, 백업 파일로 복구를 시도해야 하나 여기서는 생략하고 에러 반환
+                    Err(format!("Failed to load new model: {}", e))
+                }
+            }
         } else {
-            Err("InferenceEngine state not found".to_string())
+            Err("AppCore state not found".to_string())
         }
     }
 }

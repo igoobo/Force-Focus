@@ -367,7 +367,7 @@ pub fn run() {
             
             // AppCore 등록 (이게 있어야 commands.rs가 접근 가능)
             use crate::app_core::AppCore;
-            app.manage(std::sync::Mutex::new(AppCore::new()));
+            app.manage(std::sync::Mutex::new(AppCore::new(&app_handle)));
 
             // app_core의 '메인 루프'를 시작
             // app_handle을 복제하여 넘겨주어 스레드가 AppHandle을 소유

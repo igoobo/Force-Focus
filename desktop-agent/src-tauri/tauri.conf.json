@@ -35,8 +35,7 @@
       "icons/icon.ico"
     ],
     "resources": [
-        "resources/models/personal_model.onnx",
-        "resources/models/scaler_params.json"
+        "resources/models/*"
       ]
   },
   "plugins": {
