@@ -152,24 +152,34 @@ export default function ScheduleDay({ schedules = [], onScheduleClick }) {
             const [eh, em] = s.end_time.split(":").map((v) => parseInt(v, 10));
             const totalStart = sh * 60 + sm;
             const totalEnd = eh * 60 + em;
+            const durationMinutes = totalEnd - totalStart; // 일정 지속 시간(분) 계산
+  
             const top = (totalStart / 60) * HOUR_HEIGHT;
-            const height = ((totalEnd - totalStart) / 60) * HOUR_HEIGHT;
+            const height = (durationMinutes / 60) * HOUR_HEIGHT;
 
             return (
               <div
                 key={s.id}
                 className="day-task"
-                style={{ top: `${top}px`, height: `${height}px`, cursor: "pointer" }} // 커서 추가
-                onClick={() => onScheduleClick && onScheduleClick(s)} // 클릭 이벤트 추가
+                style={{ top: `${top}px`, height: `${height}px`, cursor: "pointer" }}
+                onClick={() => onScheduleClick && onScheduleClick(s)}
               >
                 <div className="task-title">{s.name}</div>
-                <div className="task-time">
-                  {s.start_time.slice(0, 5)} ~ {s.end_time.slice(0, 5)}
-                </div>
-                <div className="task-desc">{s.description}</div>
+      
+                {/* 20분 이상인 경우에만 시간 정보 노출 */}
+                {durationMinutes >= 20 && (
+                  <div className="task-time">
+                    {s.start_time.slice(0, 5)} ~ {s.end_time.slice(0, 5)}
+                  </div>
+                )}
+      
+                {/* 40분 이상인 경우에만 상세 설명 노출 */}
+                {durationMinutes >= 40 && (
+                  <div className="task-desc">{s.description}</div>
+                )}
               </div>
-    );
-  })}
+            );
+          })}
         </div>
       </div>
     </div>

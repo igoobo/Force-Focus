@@ -67,28 +67,35 @@ export default function ScheduleWeek({ schedules, onScheduleClick }) {
                 ))}
 
                 {daySchedules.map((s) => {
-                  const startHour = parseInt(s.start_time.split(":")[0]) + 1;
-                  const startMin = parseInt(s.start_time.split(":")[1]);
-                  const endHour = parseInt(s.end_time.split(":")[0]) + 1;
-                  const endMin = parseInt(s.end_time.split(":")[1]);
+                  const startParts = s.start_time.split(":");
+                  const endParts = s.end_time.split(":");
+  
+                  const startTotal = parseInt(startParts[0]) * 60 + parseInt(startParts[1]);
+                  const endTotal = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
+                  const durationMinutes = endTotal - startTotal; // 일정 지속 시간(분) 계산
 
-                  const startTotal = startHour * 60 + startMin;
-                  const endTotal = endHour * 60 + endMin;
-
-                  const top = (startTotal / 60) * 40; // 1시간=40px
-                  const height = ((endTotal - startTotal) / 60) * 40;
+                  const top = (startTotal / 60) * 40; // 1시간 = 40px
+                  const height = (durationMinutes / 60) * 40;
 
                   return (
                     <div
-                    key={s.id}
+                      key={s.id}
                       className="schedule-block"
-                      style={{ top: `${top}px`, height: `${height}px`, cursor: "pointer" }} // 커서 추가
-                      onClick={() => onScheduleClick && onScheduleClick(s)} // 클릭 이벤트 추가
+                      style={{ top: `${top}px`, height: `${height}px`, cursor: "pointer" }}
+                      onClick={() => onScheduleClick && onScheduleClick(s)}
                     >
-                      <div className="task-title">{s.name}</div>
-                      <div className="task-time">
-                        {s.start_time.slice(0, 5)} ~ {s.end_time.slice(0, 5)}
-                      </div>
+                      {/* 15분 이상의 높이가 확보되어야 제목 노출 */}
+                      {height >= 15 ? (
+                        <>
+                          <div className="task-title">{s.name}</div>
+                          {/* 1시간(약 40px) 이상의 높이가 확보되어야 시간 노출 */}
+                          {height >= 40 && (
+                            <div className="task-time">
+                              {s.start_time.slice(0, 5)} ~ {s.end_time.slice(0, 5)}
+                            </div>
+                          )}
+                        </>
+                      ) : null}
                     </div>
                   );
                 })}
