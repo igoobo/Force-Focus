@@ -10,7 +10,8 @@ import ScheduleWeek from "../Schedule/sub/ScheduleWeek";
 import ScheduleMonth from "../Schedule/sub/ScheduleMonth";
 
 // 활동 요약 데이터 및 로직 임포트
-import ActivityChart, { getActivitySummary } from "../ActivitySummary/ActivityChart";
+import ActivityChart from "../ActivitySummary/ActivityChart";
+import { useActivityStore } from "../ActivitySummary/ActivityStore";
 
 export default function Overview() {
   const setActiveMenu = useMainStore((state) => state.setActiveMenu);
@@ -18,6 +19,8 @@ export default function Overview() {
   const [viewMode, setViewMode] = useState("주");
   const { fetchSchedules } = useScheduleStore();
   
+  const { stats, fetchAndAnalyze } = useActivityStore();
+
   const [previewDate, setPreviewDate] = useState(new Date());
   const scrollRef = useRef(null);
 
@@ -27,17 +30,13 @@ export default function Overview() {
 
   useEffect(() => {
     const fetchFeedback = () => {
-      // API 호출 로직을 제거하고 세션 스토리지의 데이터만 확인
       const cachedFeedback = sessionStorage.getItem("last_ai_feedback");
-      
       if (cachedFeedback) {
         setFeedbackData(JSON.parse(cachedFeedback));
       }
-      
-      // 즉시 로딩 상태를 해제하여 데이터가 있으면 보여주고, 없으면 빈 상태를 유지
       setIsFeedbackLoading(false);
-    };
-    
+    };   
+
     fetchFeedback();
   }, []);
 
@@ -51,7 +50,7 @@ export default function Overview() {
   const dateString = `${year}년 ${month}월 ${date}일 (${dayOfWeek})`;
 
   const dayClassName = dayIndex === 0 ? "sunday" : dayIndex === 6 ? "saturday" : "";
-  const summary = useMemo(() => getActivitySummary(), []);
+  const summary = stats.summary;
 
   // 자동 스크롤 로직 (기존 유지)
   useEffect(() => {
@@ -80,7 +79,8 @@ export default function Overview() {
 
   useEffect(() => {
     fetchSchedules();
-  }, [fetchSchedules]); // 스케줄 정보를 가져옴
+    fetchAndAnalyze();
+  }, [fetchSchedules, fetchAndAnalyze]);
 
   const renderSchedulePreview = () => {
     switch (viewMode) {
@@ -94,8 +94,6 @@ export default function Overview() {
   const handleMoveToSchedule = () => {
     const viewMap = { "일": "day", "주": "week", "월": "month" };
     const targetView = viewMap[viewMode] || "week";
-    
-    // Overview의 현재 viewMode를 인자로 넘기며 메뉴 이동
     setActiveMenu("스케줄", targetView);
   };
 
@@ -135,8 +133,8 @@ export default function Overview() {
         {/* 우측: 요약 카드 영역 (1:1 비율) */}
         <div className="overview-right">
           <div className="card summary-card" onClick={() => setActiveMenu("활동 요약")}>
-            <h4>최근 작업</h4>
-            <p dangerouslySetInnerHTML={{ __html: summary.summarySentence }} />
+            <h4>최근 활동 요약</h4>
+            <p dangerouslySetInnerHTML={{ __html: summary.summarySentence || "최근 작업 데이터를 분석 중입니다..." }} />
           </div>
           
           <div className="card feedback-card" onClick={() => setActiveMenu("피드백")}>
@@ -166,9 +164,9 @@ export default function Overview() {
       {/* 2. 하단 섹션: 그래프 단독 배치 */}
       <div className="overview-bottom-section">
         <div className="card graph-full-card" onClick={() => setActiveMenu("활동 요약")}>
-          <h4>최근 작업 그래프</h4>
+          <h4>최근 활동 그래프</h4>
           <div className="overview-graph-wrapper">
-            <ActivityChart /> 
+            <ActivityChart data={stats.chartData} />
           </div>
         </div>
       </div>

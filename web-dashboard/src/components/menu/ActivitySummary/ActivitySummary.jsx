@@ -1,18 +1,38 @@
-import React, { useMemo } from "react";
+// src/components/Activity/ActivitySummary.jsx
+import React, { useEffect } from "react";
 import "./ActivitySummary.css";
-import ActivityChart, { getActivitySummary } from "./ActivityChart";
+import ActivityChart from "./ActivityChart";
 import useMainStore from "../../../MainStore";
+import { useActivityStore } from "./ActivityStore";
 
 export default function ActivitySummary() {
   const activityViewMode = useMainStore((state) => state.activityViewMode);
   const setActivityViewMode = useMainStore((state) => state.setActivityViewMode);
+  const { stats, loading, fetchAndAnalyze } = useActivityStore();
+
+  useEffect(() => {
+    fetchAndAnalyze();
+  }, [fetchAndAnalyze]);
 
   const toggleLayout = () => {
     const nextMode = activityViewMode === "horizontal" ? "vertical" : "horizontal";
     setActivityViewMode(nextMode);
   };
 
-  const summary = useMemo(() => getActivitySummary(), []);
+  if (loading) {
+    return (
+      <div className={`activity-summary ${activityViewMode}`}>
+        <div className="summary-header">
+          <span className="summary-title">📊 주간 활동 요약 리포트</span>
+        </div>
+        <div className="summary-content" style={{ justifyContent: 'center', alignItems: 'center' }}>
+          <p>활동 데이터를 분석 중입니다...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const { summary, chartData } = stats;
 
   return (
     <div className={`activity-summary ${activityViewMode}`}>
@@ -27,36 +47,31 @@ export default function ActivitySummary() {
         <div className="summary-graph">
           <h3>일별 활동 및 집중 강도</h3>
           <div className="graph-placeholder">
-            {/* 공통 차트 컴포넌트 사용 */}
-            <ActivityChart />
+            <ActivityChart data={chartData} />
           </div>
         </div>
 
         <div className="summary-report">
-        <h3>활동 분석 요약 보고서</h3>
-        <div className="report-list">
-          <div className="report-item">
-            <span className="label">가장 활발한 요일</span>
-            <span className="value">{summary.busiestDay}요일</span>
+          <h3>활동 분석 요약 보고서</h3>
+          <div className="report-list">
+            <ReportItem label="가장 활발한 요일" value={`${summary.busiestDay}요일`} />
+            <ReportItem label="주요 사용 앱" value={summary.mainApp} />
+            <ReportItem label="평균 집중 시간" value={summary.avgFocusTime} />
+            <ReportItem label="전체 집중 강도" value={summary.intensityLevel} highlight />
           </div>
-          <div className="report-item">
-            <span className="label">주요 사용 앱</span>
-            <span className="value">{summary.mainApp}</span>
-          </div>
-          <div className="report-item">
-            <span className="label">평균 집중 시간</span>
-            <span className="value">{summary.avgFocusTime}</span>
-          </div>
-          <div className="report-item">
-            <span className="label">전체 집중 강도</span>
-            <span className="value highlight">{summary.intensityLevel}</span>
+          <div className="report-description">
+            <p dangerouslySetInnerHTML={{ __html: summary.summarySentence }} />
           </div>
         </div>
-        <div className="report-description">
-          <p dangerouslySetInnerHTML={{ __html: summary.summarySentence }} />
-        </div>
-      </div>
       </div>
     </div>
   );
 }
+
+// 리포트 개별 항목 컴포넌트
+const ReportItem = ({ label, value, highlight }) => (
+  <div className="report-item">
+    <span className="label">{label}</span>
+    <span className={`value ${highlight ? 'highlight' : ''}`}>{value}</span>
+  </div>
+);
