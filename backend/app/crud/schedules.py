@@ -31,6 +31,7 @@ def serialize_schedule(schedule) -> ScheduleRead:
         start_time=datetime.strptime(schedule["start_time"], "%H:%M:%S").time() if schedule.get("start_time") else None,
         end_time=datetime.strptime(schedule["end_time"], "%H:%M:%S").time() if schedule.get("end_time") else None,
         days_of_week=schedule.get("days_of_week", []),
+        start_date=datetime.strptime(schedule["start_date"], "%Y-%m-%d").date() if schedule.get("start_date") else None,
         created_at=schedule.get("created_at"),
         is_active=schedule.get("is_active", True),
     )
@@ -57,6 +58,13 @@ def _normalize_schedule_update_fields(update_fields: dict) -> dict:
         except Exception:
             pass
 
+    if "start_date" in update_fields and update_fields["start_date"] is not None:
+        sd = update_fields["start_date"]
+        try:
+            update_fields["start_date"] = sd.isoformat()
+        except Exception:
+            pass
+
     return update_fields
 
 
@@ -70,6 +78,7 @@ async def create_schedule(user_id: str, schedule_data: ScheduleCreate) -> Schedu
         "start_time": schedule_data.start_time.strftime("%H:%M:%S"),  # 문자열로 변환
         "end_time": schedule_data.end_time.strftime("%H:%M:%S"),      # 문자열로 변환
         "days_of_week": schedule_data.days_of_week,
+        "start_date": schedule_data.start_date.isoformat() if schedule_data.start_date else None, # 문자열(YYYY-MM-DD)로 변환
         "created_at": datetime.now(),
         "is_active": True,
     }

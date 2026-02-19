@@ -38,6 +38,7 @@ pub struct LocalSchedule {
     pub start_time: String,    // "HH:MM:SS"
     pub end_time: String,      // "HH:MM:SS"
     pub days_of_week: Vec<u8>, // JSON Array [0, 1, ..]
+    pub start_date: Option<String>, // [New] "YYYY-MM-DD"
     pub is_active: bool,
 }
 
@@ -180,11 +181,15 @@ impl StorageManager {
                 start_time TEXT NOT NULL,
                 end_time TEXT NOT NULL,
                 days_of_week TEXT NOT NULL, 
+                start_date TEXT, -- [New] Optional Date
                 is_active INTEGER NOT NULL
             )",
             [],
         )
         .map_err(|e| format!("Failed to create schedules table: {}", e))?;
+
+        // [Migration] 기존 테이블에 start_date 컬럼이 없을 수 있으므로 추가 시도 (실패 시 무시)
+        let _ = conn.execute("ALTER TABLE schedules ADD COLUMN start_date TEXT", []);
 
         // 6. Tasks 테이블
         // target_arguments는 이제 단순 TEXT (NULL 허용)입니다.
@@ -466,10 +471,10 @@ impl StorageManager {
                 .map_err(|e| format!("Failed to serialize days: {}", e))?;
 
             tx.execute(
-                "INSERT INTO schedules (id, user_id, task_id, name, start_time, end_time, days_of_week, is_active)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                "INSERT INTO schedules (id, user_id, task_id, name, start_time, end_time, days_of_week, start_date, is_active)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
                 rusqlite::params![
-                    s.id, s.user_id, s.task_id, s.name, s.start_time, s.end_time, days_json, s.is_active as i32
+                    s.id, s.user_id, s.task_id, s.name, s.start_time, s.end_time, days_json, s.start_date, s.is_active as i32
                 ],
             ).map_err(|e| e.to_string())?;
         }
@@ -481,7 +486,7 @@ impl StorageManager {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         let mut stmt = conn
             .prepare(
-                "SELECT id, user_id, task_id, name, start_time, end_time, days_of_week, is_active 
+                "SELECT id, user_id, task_id, name, start_time, end_time, days_of_week, is_active, start_date 
              FROM schedules WHERE is_active = 1",
             )
             .map_err(|e| e.to_string())?;
@@ -491,6 +496,7 @@ impl StorageManager {
                 let days_str: String = row.get(6)?;
                 let days_vec: Vec<u8> = serde_json::from_str(&days_str).unwrap_or_default();
                 let is_active_int: i32 = row.get(7)?;
+                let start_date: Option<String> = row.get(8).unwrap_or(None);
 
                 Ok(LocalSchedule {
                     id: row.get(0)?,
@@ -500,6 +506,7 @@ impl StorageManager {
                     start_time: row.get(4)?,
                     end_time: row.get(5)?,
                     days_of_week: days_vec,
+                    start_date, // [Mapped]
                     is_active: is_active_int == 1,
                 })
             })

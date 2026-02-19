@@ -1,7 +1,7 @@
 # backend/app/schemas/schedule.py
 
 from pydantic import BaseModel, Field
-from datetime import datetime, time
+from datetime import datetime, time, date
 from typing import Optional, Annotated
 
 # --- 타입 별칭 (Pylance 경고 제거 + 검증 규칙 유지) ---
@@ -23,6 +23,8 @@ class ScheduleCreate(BaseModel):
     end_time: time
     # 리스트 내부 요소는 0~6, 최소 1개 이상
     days_of_week: DaysOfWeekCreate
+    # [New] 특정 날짜 실행을 위한 필드 (Optional)
+    start_date: Optional[date] = None
 
 
 class ScheduleUpdate(BaseModel):
@@ -36,6 +38,7 @@ class ScheduleUpdate(BaseModel):
     start_time: Optional[time] = None
     end_time: Optional[time] = None
     days_of_week: Optional[DaysOfWeekUpdate] = None
+    start_date: Optional[date] = None
     is_active: Optional[bool] = None
 
 
@@ -53,6 +56,7 @@ class ScheduleRead(BaseModel):
     start_time: time
     end_time: time
     days_of_week: list[int]
+    start_date: Optional[date] = None # Return as date object (YYYY-MM-DD)
     created_at: datetime
     is_active: bool
 

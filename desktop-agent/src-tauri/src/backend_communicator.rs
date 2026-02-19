@@ -112,6 +112,7 @@ struct ApiSchedule {
     start_time: String, // "HH:MM:SS" (Time 객체는 문자열로 옴)
     end_time: String,
     days_of_week: Vec<u8>,
+    pub start_date: Option<String>, // [New] "YYYY-MM-DD" (Optional)
     is_active: bool,
 }
 
@@ -390,6 +391,7 @@ impl BackendCommunicator {
                     start_time: s.start_time,
                     end_time: s.end_time,
                     days_of_week: s.days_of_week,
+                    start_date: s.start_date, // [Mapped]
                     is_active: s.is_active,
                 })
                 .collect();
