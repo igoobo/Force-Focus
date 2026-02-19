@@ -59,10 +59,10 @@ export default function TaskView() {
 
   useEffect(() => {
     // 스토어 데이터가 로드되면 로컬 상태로 복사
-    if (storeTasks && storeTasks.length > 0 && !isDirty) {
+    if (!loading && storeTasks && storeTasks.length > 0 && !isDirty) {
       setLocalTasks(JSON.parse(JSON.stringify(storeTasks)));
     }
-  }, [storeTasks, isDirty]);
+  }, [storeTasks, isDirty, loading]);
 
   const markAsDirty = () => { if (!isDirty) setIsDirty(true); };
 
@@ -141,7 +141,7 @@ export default function TaskView() {
     }
 
     try {
-      // 1. 삭제 예정인 것들 처리
+      // 1. 삭제 처리
       if (deletedIds.length > 0) {
         await Promise.all(deletedIds.map(id => deleteTask(id)));
       }
@@ -149,16 +149,20 @@ export default function TaskView() {
       // 2. 추가 및 수정 처리
       await Promise.all(localTasks.map(async (t) => {
         if (t.isNew) {
-          await addTask(t.label); 
+          // [수정] 입력된 프로그램 경로를 함께 전송
+          const pathsString = t.appPaths.filter(p => p.trim() !== "").join(',');
+          await addTask(t.label, pathsString); 
         } else {
           await updateTaskApps(t.id, t.appPaths);
         }
       }));
 
       alert("모든 설정이 서버에 성공적으로 저장되었습니다.");
+    
+      // 저장 완료 후 dirty 해제 및 상태 완전 동기화
       setIsDirty(false);
       setDeletedIds([]);
-      fetchTasks(); // 최종 싱크
+      await fetchTasks(); // 서버 데이터와 싱크
     } catch (err) {
       alert("데이터 저장 중 오류가 발생했습니다.");
     }

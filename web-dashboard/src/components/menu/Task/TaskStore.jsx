@@ -81,18 +81,19 @@ export const useTaskStore = create((set, get) => ({
     }
   },
 
-  addTask: async (name) => {
+  addTask: async (name, paths = "") => {
     try {
       const payload = {
         name: name,
         description: "사용자 추가 작업", 
         status: "pending",
-        target_executable: "" 
+        target_executable: paths
       };
       await taskApi.create(payload);
       await get().fetchTasks(); 
     } catch (err) {
-      alert("작업 추가 실패");
+      console.error("작업 추가 실패:", err);
+      throw err;
     }
   },
 
