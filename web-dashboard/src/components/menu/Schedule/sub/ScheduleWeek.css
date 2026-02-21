@@ -105,7 +105,7 @@
 }
 
 /* 본문 */
-.day-body {
+.week-calendar .day-body {
   flex: 1;
   position: relative;
   background: transparent;
