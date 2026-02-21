@@ -144,7 +144,7 @@
 .current-time-line::before {
     content: '';
     position: absolute;
-    left: 55px;
+    left: 0;
     top: -4px;
     width: 10px;
     height: 10px;
@@ -167,6 +167,7 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   overflow: hidden;
   line-height: 1.3;
+  z-index: 5;
 }
 
 .day-task:hover {
