@@ -21,7 +21,7 @@ export default function ScheduleWeek({ schedules, onScheduleClick }) {
     return d;
   }); // 이번 주에 해당하는 7일 배열 생성
 
-  const hours = Array.from({ length: 23 }, (_, i) => i); // 하루에 해당하는 1시부터 23시까지 시간 배열
+  const hours = Array.from({ length: 24 }, (_, i) => i); // 하루에 해당하는 1시부터 24시까지 시간 배열
 
   // 현재 시간 선의 상단 위치 계산 (1시간 = 40px 기준)
   const currentTimeTop = (now.getHours() * 60 + now.getMinutes()) / 60 * 40;
@@ -36,7 +36,7 @@ export default function ScheduleWeek({ schedules, onScheduleClick }) {
         {/* 시간 레이블 */}
         {hours.map((h) => (
           <div key={h} className="time-label">
-            <span>{h + 1}</span>
+            {h !== 23 && <span>{h + 1}</span>}
           </div>
         ))}
       </div>

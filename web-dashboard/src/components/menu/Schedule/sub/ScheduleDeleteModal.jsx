@@ -18,14 +18,23 @@ export default function ScheduleDeleteModal({ onClose }) {
     return task ? task.label : "연결된 작업 없음";
   };
 
-  // [추가] 체크박스 선택/해제 핸들러
+  // 체크박스 선택/해제 핸들러
   const handleCheckboxChange = (id) => {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
 
-  // [수정] 일괄 삭제 로직으로 변경
+  // 전체 선택/해제 핸들러
+  const handleSelectAll = () => {
+    if (selectedIds.length === schedules.length) {
+      setSelectedIds([]); // 이미 모두 선택된 경우 전체 해제
+    } else {
+      setSelectedIds(schedules.map((s) => s.id)); // 모든 ID 선택
+    }
+  };
+
+  // 일괄 삭제 로직 적용
   const handleDelete = async () => {
     if (selectedIds.length === 0) {
       alert("삭제할 일정을 각각 선택하세요.");
@@ -59,16 +68,16 @@ export default function ScheduleDeleteModal({ onClose }) {
             schedules.map((s) => (
               <label
                 key={s.id}
-                // [수정] 선택 여부 확인 로직 변경
+                // 선택 여부 확인 로직 변경
                 className={`delete-schedule-card ${selectedIds.includes(s.id) ? "selected" : ""}`}
               >
                 <div className="delete-card-left">
                   <input
-                    // [수정] radio -> checkbox로 변경
+                    // radio -> checkbox로 변경
                     type="checkbox"
                     name="selectedSchedule"
                     value={s.id}
-                    // [수정] 체크 여부 확인 로직 변경
+                    // 체크 여부 확인 로직 변경
                     checked={selectedIds.includes(s.id)}
                     onChange={() => handleCheckboxChange(s.id)}
                     className="delete-radio"
@@ -92,7 +101,16 @@ export default function ScheduleDeleteModal({ onClose }) {
         </div>
 
         <div className="delete-modal-footer">
-          {/* [수정] 버튼 텍스트 및 비활성화 조건 변경 */}
+          <button 
+            className="delete-select-all-btn" 
+            onClick={handleSelectAll}
+            disabled={schedules.length === 0}
+          >
+            {selectedIds.length === schedules.length && schedules.length > 0 ? "전체 해제" : "전체 선택"}
+          </button>
+          
+          <div className="delete-footer-right"></div>
+
           <button 
             className="delete-main-btn" 
             onClick={handleDelete} 

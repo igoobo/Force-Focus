@@ -135,21 +135,55 @@
   margin-top: 4px;
 }
 
-/* 하단 버튼 영역 */
+/* [수정] 하단 버튼 영역 - 이미지 가이드에 맞춰 배치 조정 */
 .delete-modal-footer {
   display: flex;
-  justify-content: center;
   align-items: center;
-  gap: 12px;
   margin-top: 20px;
+  position: relative;
+  width: 100%;
 }
 
+.delete-footer-right {
+  display: flex;
+  gap: 12px;
+  /* 버튼 그룹을 푸터의 중앙부로 밀어넣기 위해 auto margin 사용 */
+  margin: 0 auto; 
+}
+
+/* [추가] 전체 선택 버튼 스타일 - 좌측 끝 고정 */
+.delete-select-all-btn {
+  background: transparent !important;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: absolute; /* 좌측 끝에 고정 */
+  left: 0;
+}
+
+.delete-select-all-btn:hover:not(:disabled) {
+  background: #f3f4f6 !important;
+  color: #374151;
+  border-color: #9ca3af;
+}
+
+.delete-select-all-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 빨간색 네모 위치 (삭제 버튼) */
 .delete-main-btn {
-  background: #ef4444 !important;
+  background: #ff5a5a !important; /* 이미지의 붉은 계열 색상 반영 */
   color: white;
   border: none;
   border-radius: 6px;
-  padding: 8px 20px;
+  padding: 10px 30px; /* 크기 조정 */
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
@@ -165,12 +199,13 @@
   background: #dc2626;
 }
 
+/* 회색 네모 위치 (닫기 버튼) */
 .delete-cancel-btn {
-  background: #e5e7eb !important;
+  background: #e2e8f0 !important; /* 이미지의 회색 계열 반영 */
   border: none;
   border-radius: 6px;
   color: #111827;
-  padding: 8px 20px;
+  padding: 10px 30px; /* 크기 조정 */
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
@@ -178,7 +213,7 @@
 }
 
 .delete-cancel-btn:hover {
-  background: #d1d5db !important;
+  background: #cbd5e1 !important;
 }
 
 /* 확인 섹션 */
@@ -257,7 +292,7 @@
   }
 }
 
-/*  다크 모드 대응 보완 (.dark-theme 클래스 기준) */
+/* 다크 모드 대응 보완 (.dark-theme 클래스 기준) */
 
 .dark-theme .delete-modal-overlay {
   background-color: rgba(0, 0, 0, 0.7);
@@ -301,6 +336,17 @@
 
 .dark-theme .delete-empty-text {
   color: #64748b;
+}
+
+/* [추가] 다크모드 전체 선택 버튼 */
+.dark-theme .delete-select-all-btn {
+  color: #94a3b8;
+  border-color: #4b5563;
+}
+
+.dark-theme .delete-select-all-btn:hover:not(:disabled) {
+  background: #334155 !important;
+  color: #f1f5f9;
 }
 
 .dark-theme .delete-cancel-btn,
