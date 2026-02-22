@@ -110,6 +110,14 @@ export default function Overview() {
     setActiveMenu("스케줄", targetView);
   };
 
+  // 마크다운 텍스트를 HTML로 변환하는 함수 (굵게, 기울임만 지원)
+  const formatMarkdown = (text) => {
+    if (!text) return "";
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>') // 굵게
+      .replace(/\*(.*?)\*/g, '<i>$1</i>');    // 기울임
+  };
+
   return (
     <div className="overview-container">
       {/* 1. 상단 섹션: 스케줄(좌) + 카드 2개(우) */}
@@ -162,7 +170,7 @@ export default function Overview() {
                   <p 
                     className="feedback-text"
                     dangerouslySetInnerHTML={{ 
-                    __html: feedbackData.summary_description || "데이터 분석 결과가 존재합니다." 
+                    __html: formatMarkdown(feedbackData.summary_description) || "데이터 분석 결과가 존재합니다." 
                     }}
                   />
                 </>
