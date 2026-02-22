@@ -159,10 +159,12 @@ export default function Overview() {
                     {/* Feedback.jsx의 summary_title 필드 사용 */}
                     {feedbackData.summary_title || "종합 피드백"}
                   </span>
-                  <p className="feedback-text">
-                    {/* Feedback.jsx의 summary_description 필드 사용 */}
-                    {feedbackData.summary_description|| "데이터 분석 결과가 존재합니다."}
-                  </p>
+                  <p 
+                    className="feedback-text"
+                    dangerouslySetInnerHTML={{ 
+                    __html: feedbackData.summary_description || "데이터 분석 결과가 존재합니다." 
+                    }}
+                  />
                 </>
               ) : (
                 <p className="feedback-text empty-feedback">

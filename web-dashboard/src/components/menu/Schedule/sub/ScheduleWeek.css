@@ -53,7 +53,7 @@
   justify-content: center;
   width: 100%;
   box-sizing: border-box;
-  border-bottom: 1px solid transparent;
+  border-bottom: none !important;
 }
 
 .time-label span {
@@ -71,9 +71,8 @@
 .day-column {
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #e5e7eb;
+  border-right: 1px solid #d1d5db !important;
   box-sizing: border-box;
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 /* 요일 헤더 */
@@ -112,11 +111,11 @@
   display: block;
 }
 
-/* 시간 라인 (눈금) [수정]: 가시성을 위해 색상을 조금 더 진하게 조정하고 레이블과 위치 동기화 */
+/* 시간 라인 (눈금) : 가시성을 위해 색상을 조금 더 진하게 조정하고 레이블과 위치 동기화 */
 .time-line {
   height: 40px;
   width: 100%;
-  border-bottom: 1px solid #eff0f0 !important; 
+  border-bottom: 1.5px dashed #dde2eb !important;
   box-sizing: border-box;
   z-index: 1;
 }
@@ -196,7 +195,7 @@
 }
 
 .dark-theme .day-column {
-  border-right: 1px solid var(--border-color) !important; 
+ border-right: 1px solid #4b5563 !important;
 }
 
 .dark-theme .day-column:last-child {
@@ -209,7 +208,7 @@
 
 .dark-theme .time-label, 
 .dark-theme .time-line { 
-  border-color: var(--border-color) !important; 
+  border-color: #263140 !important;
   color: var(--text-muted);
 }
 
