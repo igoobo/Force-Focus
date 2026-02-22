@@ -12,8 +12,23 @@ export default function ActivitySummary() {
   const { stats, loading, fetchAndAnalyze } = useActivityStore();
 
   useEffect(() => {
-    fetchAndAnalyze();
-  }, [fetchAndAnalyze]);
+    const CACHE_KEY = "last_activity_fetch_time";
+    const ONE_HOUR = 60 * 60 * 1000; // 1시간 (밀리초)
+    
+    const lastFetch = sessionStorage.getItem(CACHE_KEY);
+    const now = Date.now();
+
+    // 1시간 이내에 데이터를 불러온 기록이 있고, 현재 스토어에 데이터가 있다면 재호출 방지
+    if (lastFetch && (now - parseInt(lastFetch)) < ONE_HOUR && stats.chartData.length > 0) {
+      console.log("최근 1시간 이내 기록이 있어 캐시된 데이터를 유지합니다.");
+      return;
+    }
+
+    // 1시간이 경과한 경우 서버로부터 데이터를 새로 불러오고 타임스탬프 갱신
+    fetchAndAnalyze().then(() => {
+      sessionStorage.setItem(CACHE_KEY, now.toString());
+    });
+  }, [fetchAndAnalyze, stats.chartData.length]);
 
   const toggleLayout = () => {
     const nextMode = activityViewMode === "horizontal" ? "vertical" : "horizontal";

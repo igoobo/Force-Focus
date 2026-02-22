@@ -77,11 +77,24 @@ export default function Overview() {
     return () => clearTimeout(timer);
   }, [viewMode]);
 
+  // 활동 데이터 fetch 및 캐싱 로직
   useEffect(() => {
-    fetchSchedules();
-    fetchAndAnalyze();
-  }, [fetchSchedules, fetchAndAnalyze]);
+    const CACHE_KEY = "last_activity_fetch_time";
+    const ONE_HOUR = 60 * 60 * 1000;
+    
+    const lastFetch = sessionStorage.getItem(CACHE_KEY);
+    const now = Date.now();
 
+    // 1시간 이내 기록이 있고 스토어에 데이터가 이미 있다면 API 호출 건너뜀
+    if (lastFetch && (now - parseInt(lastFetch)) < ONE_HOUR && stats.chartData.length > 0) {
+      return;
+    }
+
+    fetchAndAnalyze().then(() => {
+      sessionStorage.setItem(CACHE_KEY, now.toString());
+    });
+  }, [fetchAndAnalyze, stats.chartData.length]);
+  
   const renderSchedulePreview = () => {
     switch (viewMode) {
       case "일": return <ScheduleDay schedules={schedules} isPreview={true} currentDate={previewDate} setCurrentDate={setPreviewDate}/>;

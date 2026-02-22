@@ -89,6 +89,7 @@
   flex: 1; /* 1:1 비율로 가로 너비 차지 */
   height: 100%; /* 세로 화면을 전부 채우도록 설정 */
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .summary-graph h3, .summary-report h3 {
