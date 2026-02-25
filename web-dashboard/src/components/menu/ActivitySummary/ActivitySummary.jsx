@@ -69,20 +69,29 @@ export default function ActivitySummary() {
 
         <div className="summary-report">
           <h3>활동 분석 요약 보고서</h3>
-          <div className="report-list">
-            <ReportItem label="가장 활발한 요일" value={`${summary.busiestDay}요일`} />
-            <ReportItem label="주요 사용 앱" value={summary.mainApp} />
-            <ReportItem label="평균 집중 시간" value={summary.avgFocusTime} />
-            <ReportItem label="전체 집중 강도" value={summary.intensityLevel} highlight />
-          </div>
-          <div className="report-description">
-            <p dangerouslySetInnerHTML={{ __html: summary.summarySentence }} />
+          {hasNoData ? (
+            // 데이터가 없을 때 출력할 대체 문구
+            <div className="report-description empty">
+              <p>아직 활동 데이터가 존재하지 않습니다. 지금 바로 세션을 시작해 보세요!</p>
+            </div>
+          ) : (
+            <>
+              <div className="report-list">
+                <ReportItem label="가장 활발한 요일" value={`${summary.busiestDay}요일`} />
+                <ReportItem label="주요 사용 앱" value={summary.mainApp} />
+                <ReportItem label="평균 집중 시간" value={summary.avgFocusTime} />
+                <ReportItem label="전체 집중 강도" value={summary.intensityLevel} highlight />
+              </div>
+              <div className="report-description">
+                <p dangerouslySetInnerHTML={{ __html: summary.summarySentence }} />
+              </div>
+              </>
+              )}
+            </div>
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
+      );
+    }
 
 // 리포트 개별 항목 컴포넌트
 const ReportItem = ({ label, value, highlight }) => (

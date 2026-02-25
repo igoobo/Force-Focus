@@ -25,7 +25,12 @@ export default function ScheduleWeek({ schedules, onScheduleClick }) {
 
   // 현재 시간 선의 상단 위치 계산 (1시간 = 40px 기준)
   const currentTimeTop = (now.getHours() * 60 + now.getMinutes()) / 60 * 40;
-  const currentDayStr = now.toISOString().split('T')[0];
+  
+  // 현재 날짜를 YYYY-MM-DD 형식으로 변환 (로컬 시간대 기준)
+  const currentYear = now.getFullYear();
+  const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+  const currentDate = String(now.getDate()).padStart(2, '0');
+  const currentDayStr = `${currentYear}-${currentMonth}-${currentDate}`;
 
   return (
     <div className="week-calendar">

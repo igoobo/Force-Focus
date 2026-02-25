@@ -112,7 +112,7 @@
 }
 
 /* 시간 라인 (눈금) : 가시성을 위해 색상을 조금 더 진하게 조정하고 레이블과 위치 동기화 */
-.time-line {
+.week-calendar .time-line {
   height: 40px;
   width: 100%;
   border-bottom: 1.5px dashed #dde2eb !important;

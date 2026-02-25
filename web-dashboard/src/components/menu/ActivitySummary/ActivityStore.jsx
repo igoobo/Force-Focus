@@ -109,7 +109,7 @@ export const useActivityStore = create((set, get) => ({
             mainApp: topApp,
             avgFocusTime: `${Math.floor(avgMinutes / 60)}시간 ${avgMinutes % 60}분`,
             intensityLevel: avgMinutes > 180 ? "매우 높음" : avgMinutes > 120 ? "높음" : avgMinutes > 60 ? "보통" : "낮음",
-            summarySentence: `지난 7일간 <strong>${topApp}</strong>을 가장 많이 활용하셨으며, <strong>${busiestDayObj?.dayName || '특정'}요일</strong>에 가장 높은 몰입도를 보이셨습니다.`
+            summarySentence: `최근 7일간 <strong>${topApp}</strong>을(를) 중심으로 총 <strong>${Math.floor(avgMinutes / 60)}시간 ${avgMinutes % 60}분</strong>의 일평균 집중 시간을 기록하셨습니다. 특히 <strong>${busiestDayObj?.dayName || '특정'}요일</strong>에 가장 높은 몰입도를 보였으며, 전반적인 집중 강도는 <strong>'${avgMinutes > 180 ? "매우 높은" : avgMinutes > 120 ? "높은" : avgMinutes > 60 ? "보통" : "낮은"}'</strong> 수준으로 분석되었습니다.`
           }
         },
         loading: false
