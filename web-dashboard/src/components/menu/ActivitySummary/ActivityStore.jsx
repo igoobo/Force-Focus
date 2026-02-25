@@ -93,6 +93,8 @@ export const useActivityStore = create((set, get) => ({
       const totalDuration = analysisMap.reduce((acc, curr) => acc + curr.duration, 0);
       const avgMinutes = Math.floor((totalDuration / 7) / 60);
 
+      const isActualDataEmpty = topApp === "데이터 없음" || totalDuration === 0;
+
       // 차트 데이터 및 상태 업데이트
       const chartData = analysisMap.map(d => ({
         day: d.dayName,
@@ -103,13 +105,15 @@ export const useActivityStore = create((set, get) => ({
 
       set({
         stats: {
-          chartData,
+          chartData: isActualDataEmpty ? [] : chartData, // 데이터가 없으면 차트 배열 비움
           summary: {
-            busiestDay: busiestDayObj?.dayName || "-",
+            busiestDay: isActualDataEmpty ? "-" : (busiestDayObj?.dayName || "-"),
             mainApp: topApp,
-            avgFocusTime: `${Math.floor(avgMinutes / 60)}시간 ${avgMinutes % 60}분`,
-            intensityLevel: avgMinutes > 180 ? "매우 높음" : avgMinutes > 120 ? "높음" : avgMinutes > 60 ? "보통" : "낮음",
-            summarySentence: `최근 7일간 <strong>${topApp}</strong>을(를) 중심으로 총 <strong>${Math.floor(avgMinutes / 60)}시간 ${avgMinutes % 60}분</strong>의 일평균 집중 시간을 기록하셨습니다. 특히 <strong>${busiestDayObj?.dayName || '특정'}요일</strong>에 가장 높은 몰입도를 보였으며, 전반적인 집중 강도는 <strong>'${avgMinutes > 180 ? "매우 높은" : avgMinutes > 120 ? "높은" : avgMinutes > 60 ? "보통" : "낮은"}'</strong> 수준으로 분석되었습니다.`
+            avgFocusTime: isActualDataEmpty ? "0시간 0분" : `${Math.floor(avgMinutes / 60)}시간 ${avgMinutes % 60}분`,
+            intensityLevel: isActualDataEmpty ? "-" : (avgMinutes > 180 ? "매우 높음" : avgMinutes > 120 ? "높음" : avgMinutes > 60 ? "보통" : "낮음"),
+            summarySentence: isActualDataEmpty 
+              ? "" 
+              : `최근 7일간 <strong>${topApp}</strong>을(를) 중심으로 총 <strong>${Math.floor(avgMinutes / 60)}시간 ${avgMinutes % 60}분</strong>의 일평균 집중 시간을 기록하셨습니다. 특히 <strong>${busiestDayObj?.dayName || '특정'}요일</strong>에 가장 높은 몰입도를 보였으며, 전반적인 집중 강도는 <strong>'${avgMinutes > 180 ? "매우 높음" : avgMinutes > 120 ? "높음" : avgMinutes > 60 ? "보통" : "낮음"}'</strong> 수준으로 분석되었습니다.`
           }
         },
         loading: false

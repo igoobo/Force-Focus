@@ -13,7 +13,7 @@ const useMainStore = create(
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('userEmail');
         set({ isLoggedIn: false, activeMenu: 'Overview' });
-        sessionStorage.removeItem("last_ai_feedback");
+        sessionStorage.clear();
       },
 
       // 3. 로그인 액션

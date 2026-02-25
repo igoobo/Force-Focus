@@ -1,4 +1,3 @@
-// src/components/Activity/ActivitySummary.jsx
 import React, { useEffect } from "react";
 import "./ActivitySummary.css";
 import ActivityChart from "./ActivityChart";
@@ -18,13 +17,11 @@ export default function ActivitySummary() {
     const lastFetch = sessionStorage.getItem(CACHE_KEY);
     const now = Date.now();
 
-    // 1시간 이내에 데이터를 불러온 기록이 있고, 현재 스토어에 데이터가 있다면 재호출 방지
     if (lastFetch && (now - parseInt(lastFetch)) < ONE_HOUR && stats.chartData.length > 0) {
       console.log("최근 1시간 이내 기록이 있어 캐시된 데이터를 유지합니다.");
       return;
     }
 
-    // 1시간이 경과한 경우 서버로부터 데이터를 새로 불러오고 타임스탬프 갱신
     fetchAndAnalyze().then(() => {
       sessionStorage.setItem(CACHE_KEY, now.toString());
     });
@@ -50,8 +47,10 @@ export default function ActivitySummary() {
 
   const { summary, chartData } = stats;
 
+  const hasNoData = !chartData || chartData.length === 0 || summary.mainApp === "데이터 없음";
+
   return (
-    <div className={`activity-summary ${activityViewMode}`}>
+    <div className={`activity-summary ${activityViewMode} ${isDarkMode ? "dark-theme" : ""}`}>
       <div className="summary-header">
         <span className="summary-title">📊 주간 활동 요약 리포트</span>
         <button onClick={toggleLayout} className="toggle-btn">
@@ -70,7 +69,6 @@ export default function ActivitySummary() {
         <div className="summary-report">
           <h3>활동 분석 요약 보고서</h3>
           {hasNoData ? (
-            // 데이터가 없을 때 출력할 대체 문구
             <div className="report-description empty">
               <p>아직 활동 데이터가 존재하지 않습니다. 지금 바로 세션을 시작해 보세요!</p>
             </div>
@@ -85,13 +83,13 @@ export default function ActivitySummary() {
               <div className="report-description">
                 <p dangerouslySetInnerHTML={{ __html: summary.summarySentence }} />
               </div>
-              </>
-              )}
-            </div>
-          </div>
+            </>
+          )}
         </div>
-      );
-    }
+      </div>
+    </div>
+  );
+}
 
 // 리포트 개별 항목 컴포넌트
 const ReportItem = ({ label, value, highlight }) => (

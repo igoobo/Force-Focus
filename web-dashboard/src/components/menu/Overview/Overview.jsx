@@ -19,7 +19,7 @@ export default function Overview() {
   const [viewMode, setViewMode] = useState("주");
   const { fetchSchedules } = useScheduleStore();
   
-  const { stats, fetchAndAnalyze } = useActivityStore();
+  const { stats, fetchAndAnalyze, loading } = useActivityStore();
 
   const [previewDate, setPreviewDate] = useState(new Date());
   const scrollRef = useRef(null);
@@ -51,6 +51,9 @@ export default function Overview() {
 
   const dayClassName = dayIndex === 0 ? "sunday" : dayIndex === 6 ? "saturday" : "";
   const summary = stats.summary;
+
+  // 활동 데이터 존재 여부 판단 (차트 데이터가 없거나 주요 앱이 "데이터 없음"으로 표시되는 경우)
+  const hasNoData = !loading && (!stats.chartData || stats.chartData.length === 0 || summary.mainApp === "데이터 없음");
 
   // 자동 스크롤 로직 (기존 유지)
   useEffect(() => {
@@ -155,7 +158,16 @@ export default function Overview() {
         <div className="overview-right">
           <div className="card summary-card" onClick={() => setActiveMenu("활동 요약")}>
             <h4>최근 활동 요약</h4>
-            <p dangerouslySetInnerHTML={{ __html: summary.summarySentence || "최근 작업 데이터를 분석 중입니다..." }} />
+              {loading ? (
+              // 1. 로딩 중일 때 표시
+              <p>최근 작업 데이터를 분석 중입니다...</p>
+            ) : hasNoData ? (
+              // 2. 로딩 완료 후 데이터가 없을 때 표시
+              <p className="empty-message">아직 활동 데이터가 존재하지 않습니다. 지금 바로 세션을 시작해 보세요!</p>
+            ) : (
+              // 3. 데이터가 있을 때 표시
+              <p dangerouslySetInnerHTML={{ __html: summary.summarySentence }} />
+            )}
           </div>
           
           <div className="card feedback-card" onClick={() => setActiveMenu("피드백")}>
