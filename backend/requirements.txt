@@ -16,3 +16,4 @@ pymongo
 packaging
 onnx
 onnxruntime
+google-genai

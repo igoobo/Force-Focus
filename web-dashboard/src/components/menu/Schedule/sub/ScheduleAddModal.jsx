@@ -1,19 +1,15 @@
 import React, { useState, useEffect } from "react";
 import "./ScheduleAddModal.css";
 import { useScheduleStore } from '../ScheduleStore';
+import { useTaskStore } from '../../Task/TaskStore';
 
 export default function ScheduleAddModal({ onClose }) {
   const addSchedule = useScheduleStore((state) => state.addSchedule);
-  const [taskSessions, setTaskSessions] = useState([]);
+  const { tasks, fetchTasks } = useTaskStore();
 
   useEffect(() => {
-    const savedSessions = localStorage.getItem('task-db-sessions');
-    if (savedSessions) {
-      setTaskSessions(JSON.parse(savedSessions));
-    } else {
-      setTaskSessions([]);
-    }
-  }, []);
+    fetchTasks(); // 컴포넌트 마운트 시 최신 작업 목록 로드
+  }, [fetchTasks]);
 
   const [form, setForm] = useState({
     name: "",
@@ -27,7 +23,16 @@ export default function ScheduleAddModal({ onClose }) {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm({ ...form, [name]: value });
+    
+    setForm((prev) => {
+      const nextForm = { ...prev, [name]: value };
+      
+      if (name === "start_date") {
+        nextForm.end_date = value;
+      }
+      
+      return nextForm;
+    });
   };
 
   const handleSubmit = (e) => {
@@ -69,7 +74,7 @@ export default function ScheduleAddModal({ onClose }) {
               required
             >
               <option value="">-- 작업 종류를 선택하세요 --</option>
-              {taskSessions.map(task => (
+              {tasks.map(task => (
                 <option key={task.id} value={task.id}>{task.label}</option>
               ))}
             </select>

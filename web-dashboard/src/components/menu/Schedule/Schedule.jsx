@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import "./Schedule.css";
 import { useScheduleStore } from './ScheduleStore';
 import useMainStore from "../../../MainStore";
@@ -20,6 +21,8 @@ export default function Schedule() {
   const [selectedSchedule, setSelectedSchedule] = useState(null); // 수정할 일정 정보 상태
   const scheduleInitialView = useMainStore((state) => state.scheduleInitialView); // 스케줄 초기 뷰 모드
   const clearScheduleInitialView = useMainStore((state) => state.clearScheduleInitialView); // 초기 뷰 모드 클리어 함수
+
+  const isDarkMode = useMainStore((state) => state.isDarkMode); // 다크모드 상태
 
   const viewMode = useMainStore((state) => state.scheduleViewMode); // 현재 뷰 모드 상태
   const setViewMode = useMainStore((state) => state.setScheduleViewMode); // 뷰 모드 설정 함수
@@ -59,9 +62,10 @@ export default function Schedule() {
   // 로딩 중일 때 표시할 화면
   if (loading) {
     return (
-      <div className="schedule-loading-container">
-        <div className="loader"></div>
-        <p>일정 정보를 불러오는 중입니다...</p>
+      <div className={`schedule-container ${isDarkMode ? "dark-theme" : ""}`}>
+        <div className="loading-area">
+          일정 정보를 불러오는 중입니다...
+        </div>
       </div>
     );
   }
@@ -112,15 +116,28 @@ export default function Schedule() {
       {viewMode === "month" && <ScheduleMonth key="month" schedules={schedules} onScheduleClick={openEditModal} />}
       {viewMode === "list" && <ScheduleList key="list" schedules={schedules} onScheduleClick={openEditModal} />}
 
-      {isAddOpen && <ScheduleAddModal onClose={closeAddModal} />}
-      {isDeleteOpen && <ScheduleDeleteModal onClose={closeDeleteModal} />}
+      {isAddOpen && createPortal(
+        <div className={isDarkMode ? "dark-theme" : ""}>
+          <ScheduleAddModal onClose={closeAddModal} />
+        </div>,
+        document.body
+      )}
       
-      {/* 수정 모달 렌더링 */}
-      {isEditOpen && selectedSchedule && (
-        <ScheduleEditModal 
-          schedule={selectedSchedule} 
-          onClose={closeEditModal} 
-        />
+      {isDeleteOpen && createPortal(
+        <div className={isDarkMode ? "dark-theme" : ""}>
+          <ScheduleDeleteModal onClose={closeDeleteModal} />
+        </div>,
+        document.body
+      )}
+      
+      {isEditOpen && selectedSchedule && createPortal(
+        <div className={isDarkMode ? "dark-theme" : ""}>
+          <ScheduleEditModal 
+            schedule={selectedSchedule} 
+            onClose={closeEditModal} 
+          />
+        </div>,
+        document.body
       )}
     </div>
   );

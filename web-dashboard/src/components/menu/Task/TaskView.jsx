@@ -227,7 +227,7 @@ export default function TaskView() {
     return () => window.removeEventListener('scroll', handleScrollClose);
   }, [isProgramModalOpen]);
 
-  if (loading && storeTasks.length === 0) return <div className="loading-area">데이터를 불러오는 중...</div>;
+  if (loading && storeTasks.length === 0) return <div className="loading-area">작업 정보를 불러오는 중입니다...</div>;
 
   return (
     <div className={`task-container ${isDarkMode ? 'dark-theme' : ''}`}>

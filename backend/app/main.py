@@ -86,7 +86,8 @@ from app.api.endpoints.web import (
     schedules,
     sessions,
     events as web_events,
-    feedback,
+#    feedback,
+    insight,
 )
 
 # User
@@ -110,9 +111,10 @@ app.include_router(me.router)
 # Web Core
 app.include_router(tasks.router, prefix="/api/v1", tags=["tasks"])
 app.include_router(schedules.router, prefix="/api/v1", tags=["schedules"])
-app.include_router(sessions.router)
-app.include_router(web_events.router)
-app.include_router(feedback.router)
+app.include_router(sessions.router, prefix="/api/v1", tags=["sessions"])
+app.include_router(web_events.router, prefix="/api/v1", tags=["events"])
+# app.include_router(feedback.router, prefix="/api/v1", tags=["feedback"])
+app.include_router(insight.router, prefix="/api/v1", tags=["insights"])
 
 # Desktop APIs
 app.include_router(desktop_auth.router, prefix="/api/v1/auth/desktop", tags=["auth-desktop"])

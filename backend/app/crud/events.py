@@ -1,3 +1,5 @@
+# backend/app/crud/events.py
+
 from datetime import datetime
 from typing import List, Optional
 import uuid
@@ -10,6 +12,15 @@ def get_events_collection():
     if db is None:
         raise RuntimeError("MongoDB not initialized. Did you call connect_to_mongo()?")
     return db["events"]
+
+
+def _strip_or_none(v: Optional[str]) -> Optional[str]:
+    if v is None:
+        return None
+    if not isinstance(v, str):
+        return v
+    s = v.strip()
+    return s or None
 
 
 def serialize_event(doc) -> EventRead:
@@ -35,11 +46,11 @@ async def create_event(event: EventCreate) -> str:
     event_id = str(uuid.uuid4())
     new_doc = {
         "_id": event_id,  
-        "user_id": event.user_id,
-        "session_id": event.session_id,
+        "user_id": _strip_or_none(event.user_id),
+        "session_id": _strip_or_none(event.session_id),
         "timestamp": event.timestamp,
-        "app_name": event.app_name,
-        "window_title": event.window_title,
+        "app_name": _strip_or_none(event.app_name),
+        "window_title": _strip_or_none(event.window_title),
         "activity_vector": event.activity_vector or {},
     }
 
@@ -58,11 +69,11 @@ async def create_event_for_user(user_id: str, event: EventCreate) -> str:
     event_id = str(uuid.uuid4())
     new_doc = {
         "_id": event_id,  
-        "user_id": user_id,
-        "session_id": event.session_id,
+        "user_id": _strip_or_none(user_id) or user_id,
+        "session_id": _strip_or_none(event.session_id),
         "timestamp": event.timestamp,
-        "app_name": event.app_name,
-        "window_title": event.window_title,
+        "app_name": _strip_or_none(event.app_name),
+        "window_title": _strip_or_none(event.window_title),
         "activity_vector": event.activity_vector or {},
     }
 
@@ -73,6 +84,9 @@ async def create_event_for_user(user_id: str, event: EventCreate) -> str:
 # READ ONE
 async def get_event(event_id: str) -> Optional[EventRead]:
     events = get_events_collection()
+
+    if isinstance(event_id, str):
+        event_id = event_id.strip()
 
     doc = await events.find_one({"_id": event_id})
     if not doc:
@@ -92,6 +106,8 @@ async def get_events(
 
     query = {"user_id": user_id}
 
+    # ✅ 공백/빈값은 None 취급해서 필터가 이상하게 걸리는 걸 방지
+    session_id = _strip_or_none(session_id)
     if session_id is not None:
         query["session_id"] = session_id
 

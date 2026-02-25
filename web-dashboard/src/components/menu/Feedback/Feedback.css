@@ -1,13 +1,35 @@
 /* 1. 전체 영역 및 레이아웃 */
+:root {
+  --bg-main: #f8fafc;
+  --card-bg: #ffffff;
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --border-color: #e5e7eb;
+  --primary-color: #4f46e5;
+  --secondary-bg: #e2e8f0;
+  --transition-standard: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 다크 모드 변수 정의 */
+.dark-theme {
+  --bg-main: #0f172a;
+  --card-bg: #1e293b;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+  --primary-color: #818cf8;
+  --secondary-bg: #0f172a;
+}
+
 .feedback-container {
   display: flex;
   flex-direction: column;
   padding: 30px 30px;
-  background: #f8fafc;
+  background: var(--bg-main);
   height: calc(100vh - 56px);
   box-sizing: border-box;
   gap: 0;
-  transition: all 0.3s ease;
+  transition: var(--transition-standard);
   word-break: keep-all;
 }
 
@@ -18,7 +40,7 @@
   align-items: center;
   margin-bottom: 25px;
   width: 100%;
-  transition: all 0.3s ease;
+  transition: var(--transition-standard);
 }
 
 .section-header h3 {
@@ -28,12 +50,12 @@
   text-align: center;
   padding-bottom: 12px;
   color: #1e3a8a;
-  transition: all 0.3s ease;
+  transition: var(--transition-standard);
 }
 
 .section-header .highlight {
   color: #2563eb;
-  transition: all 0.3s ease;
+  transition: var(--transition-standard);
 }
 
 /* 배지 및 구분선 컨테이너 */
@@ -44,7 +66,7 @@
   justify-content: flex-end; 
   align-items: center;
   margin-top: 5px;
-  transition: all 0.3s ease;
+  transition: var(--transition-standard);
 }
 
 .badge {
@@ -56,10 +78,10 @@
   font-weight: 800;
   text-transform: uppercase;
   font-family: "Pretendard", sans-serif;
-  transition: all 0.3s ease;
   box-shadow: 0 2px 4px rgba(30, 64, 175, 0.1);
   z-index: 2;
   position: relative;
+  transition: var(--transition-standard);
 }
 
 .badge-wrapper::after {
@@ -70,17 +92,17 @@
   height: 1px;
   background-color: #e5e7eb;
   z-index: 1;
-  transition: all 0.3s ease;
+  transition: var(--transition-standard);
 }
 
-/* 2. 상단 메뉴바 (책갈피/탭 디자인) */
+/* 2. 상단 메뉴바 */
 .feedback-menu {
   background: transparent !important;
   padding: 0 0 0 20px;
   margin-bottom: -1px;
   position: relative;
   z-index: 10;
-  transition: all 0.3s ease;
+  transition: var(--transition-standard);
 }
 
 .feedback-menu ul {
@@ -89,7 +111,6 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  transition: all 0.3s ease;
 }
 
 .feedback-menu li {
@@ -102,7 +123,7 @@
   border: 1px solid #e5e7eb;
   border-bottom: 1px solid #e5e7eb;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition: var(--transition-standard);
 }
 
 .feedback-menu li.active {
@@ -112,9 +133,10 @@
   margin-top: -4px;
   padding-top: 12px;
   z-index: 11;
+  transition: var(--transition-standard);
 }
 
-/* 3. 콘텐츠 영역 (본체 카드) */
+/* 3. 콘텐츠 영역 */
 .feedback-content {
   flex: 1;
   background: #ffffff;
@@ -125,47 +147,42 @@
   overflow-y: auto;
   position: relative;
   z-index: 1;
-  transition: all 0.3s ease !important;
+  transition: var(--transition-standard);
 }
 
-/* 탭 전환 애니메이션 설정 [추가 부분] */
 @keyframes tabFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .feedback-section.active {
   animation: tabFadeIn 0.4s ease-out forwards;
 }
 
-/* 4. 피로도 프로세스 바 스타일 */
+/* 4. 피로도 프로세스 바 */
 .distraction-bar-container {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 20px;
   margin-top: 20px;
+  transition: var(--transition-standard);
 }
 
 .distraction-bar-container .label {
   font-size: 0.9rem;
   font-weight: 600;
   color: #4b5563;
-  transition: all 0.3s ease;
+  transition: var(--transition-standard);
 }
 
 .progress-bar {
-  width: 100%;
+  width: 90%;
   height: 12px;
   background-color: #e5e7eb;
   border-radius: 6px;
   overflow: hidden;
-  transition: all 0.3s ease;
+  transition: var(--transition-standard);
 }
 
 .progress-fill {
@@ -180,7 +197,8 @@
   flex-direction: column;
   gap: 15px;
   margin-top: 20px;
-  transition: all 0.3s ease;
+  transition: var(--transition-standard);
+  align-items: flex-start; 
 }
 
 .detail-card {
@@ -189,14 +207,10 @@
   background-color: #ffffff;
   border: 1px solid #f1f5f9;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
-  transition: background-color 0.3s ease, border-color 0.3s ease, transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease !important;
+  transition: var(--transition-standard);
   width: 100%;
   box-sizing: border-box;
-}
-
-.detail-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.08);
+  text-align: left; 
 }
 
 .detail-card h4 {
@@ -204,15 +218,25 @@
   font-size: 1.1rem;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 8px;
-  transition: color 0.3s ease !important;
+  transition: var(--transition-standard);
+  text-align: left;
+}
+
+.detail-card ul {
+  margin: 0;
+  padding-left: 20px;
+  list-style-type: disc;
+  text-align: left;
 }
 
 .detail-card li {
   margin-bottom: 8px;
   line-height: 1.5;
   color: #4b5563;
-  transition: color 0.3s ease !important;
+  transition: var(--transition-standard);
+  text-align: left; 
 }
 
 .detail-card.summary { background-color: #f0f9ff; border-left: 6px solid #0ea5e9; }
@@ -224,6 +248,7 @@
   line-height: 1.7;
   color: #374151;
   text-align: justify;
+  transition: var(--transition-standard);
 }
 
 .stats-box.centered {
@@ -236,7 +261,7 @@
   background: #f8fafc;
   border-radius: 15px;
   border: 1px solid #f1f5f9;
-  transition: all 0.3s ease;
+  transition: var(--transition-standard);
 }
 
 .stat-item .label {
@@ -244,7 +269,7 @@
   color: #64748b;
   margin-bottom: 8px;
   display: block;
-  transition: all 0.3s ease;
+  transition: var(--transition-standard);
 }
 
 .stat-item .value { 
@@ -252,7 +277,7 @@
   font-weight: 800; 
   color: #1e293b; 
   letter-spacing: -1px; 
-  transition: all 0.3s ease;
+  transition: var(--transition-standard);
 }
 
 .insight-box.highlight-border {
@@ -261,147 +286,120 @@
   background: #f1f5f9;
   border-left: 5px solid #2563eb;
   border-radius: 10px;
-  transition: all 0.3s ease;
+  transition: var(--transition-standard);
 }
 
 .insight-box.highlight-border p {
   margin: 0;
   color: #374151;
   line-height: 1.6;
-  transition: all 0.3s ease;
+  transition: var(--transition-standard);
 }
 
 .insight-box h4 {
   margin-top: 0;
   margin-bottom: 12px;
   color: #1c4bcd;
-  transition: all 0.3s ease;
+  transition: var(--transition-standard);
+}
+
+.strategy-item {
+  padding: 24px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  text-align: left; /* 좌측 정렬 */
+  transition: var(--transition-standard);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start; /* 내부 요소 왼쪽 정렬 */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+.strategy-item .icon {
+  font-size: 2.5rem;
+  margin-bottom: 15px;
+  display: block;
+  transition: var(--transition-standard);
+  align-self: flex-start; /* 아이콘 좌측 정렬 */
 }
 
 .strategy-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 15px;
+  /* 2개 카드가 나란히 출력되도록 고정 */
+  grid-template-columns: 1fr 1fr; 
+  gap: 20px;
   margin-top: 20px;
-}
-
-.strategy-item {
-  padding: 20px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  text-align: center;
-  transition: all 0.3s ease;
-}
-
-.strategy-item .icon {
-  font-size: 2rem;
-  margin-bottom: 10px;
-  display: block;
 }
 
 .strategy-item h5 {
   margin: 10px 0;
-  font-size: 1.1rem;
+  font-size: 1.15rem;
+  font-weight: 700;
   color: #1e293b;
-  transition: all 0.3s ease;
+  text-align: left;
+  transition: var(--transition-standard);
 }
 
-.strategy-item p {
-  font-size: 0.9rem;
+.strategy-item ul {
+  padding: 0 0 0 20px;
+  margin: 0;
+  list-style-type: disc;
+  text-align: left;
+}
+
+.strategy-item li {
+  font-size: 0.95rem;
   color: #64748b;
-  line-height: 1.5;
-  transition: all 0.3s ease;
+  line-height: 1.6;
+  margin-bottom: 6px;
+  text-align: left;
+  transition: var(--transition-standard);
+}
+
+.loader {
+  width: 48px;
+  height: 48px;
+  border: 5px solid var(--secondary-bg);
+  border-left-color: var(--primary-color);
+  border-radius: 50%;
+  display: inline-block;
+  box-sizing: border-box;
+  transition: var(--transition-standard);
+  animation: rotation 1s linear infinite;
+}
+
+/* 회전 애니메이션 정의 */
+@keyframes rotation {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 /* 7. 다크 모드 대응 보강 */
-.dark-theme .feedback-container {
-  background: var(--bg-main);
-}
-
-/* 상단 메뉴바 (책갈피) */
-.dark-theme .feedback-menu li {
-  background: #1e293b;
-  border-color: var(--border-color);
-  color: var(--text-muted);
-}
-
-.dark-theme .feedback-menu li.active {
-  background: var(--card-bg) !important;
-  border-bottom: 1px solid var(--card-bg) !important;
-  color: #a5b4fc !important;
-}
-
-/* 콘텐츠 영역 카드 */
-.dark-theme .feedback-content {
-  background: var(--card-bg);
-  border-color: var(--border-color);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-}
-
-/* 텍스트 요소 */
+.dark-theme .feedback-container { background: var(--bg-main); }
+.dark-theme .feedback-menu li { background: #1e293b; border-color: var(--border-color); color: var(--text-muted); }
+.dark-theme .feedback-menu li.active { background: var(--card-bg) !important; border-bottom: 1px solid var(--card-bg) !important; color: #a5b4fc !important; }
+.dark-theme .feedback-content { background: var(--card-bg); border-color: var(--border-color); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); }
 .dark-theme .section-header h3 { color: var(--text-main); }
 .dark-theme .highlight { color: #60a5fa; }
-.dark-theme .description, 
-.dark-theme .feedback-content-body p { 
-  color: var(--text-muted); 
-}
-
-/* [종합] 탭 카드 디자인 */
-.dark-theme .detail-card { 
-  background-color: #1e293b; 
-  border-color: var(--border-color); 
-  transition: background-color 0.3s ease, border-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease !important;
-}
-
+.dark-theme .description, .dark-theme .feedback-content-body p { color: var(--text-muted); }
+.dark-theme .detail-card { background-color: #1e293b; border-color: var(--border-color); }
 .dark-theme .detail-card h4 { color: #f1f5f9; }
 .dark-theme .detail-card li { color: var(--text-muted); }
-
 .dark-theme .detail-card.summary { background-color: rgba(14, 165, 233, 0.15); border-left-color: #38bdf8; }
 .dark-theme .detail-card.evaluation { background-color: rgba(34, 197, 94, 0.15); border-left-color: #4ade80; }
 .dark-theme .detail-card.improvement { background-color: rgba(239, 68, 68, 0.15); border-left-color: #f87171; }
-
-/* 배지 및 구분선 */
-.dark-theme .badge { 
-  background: var(--card-bg) !important; 
-  color: #a5b4fc; 
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-}
-.dark-theme .badge-wrapper::after { 
-  background-color: var(--border-color); 
-}
-
-/* 집중도 통계 박스 */
-.dark-theme .stats-box.centered { 
-  background: rgba(15, 23, 42, 0.6); 
-  border-color: var(--border-color); 
-}
+.dark-theme .badge { background: var(--card-bg) !important; color: #a5b4fc; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4); }
+.dark-theme .badge-wrapper::after { background-color: var(--border-color); }
+.dark-theme .stats-box.centered { background: rgba(15, 23, 42, 0.6); border-color: var(--border-color); }
 .dark-theme .stat-item .label { color: var(--text-muted); }
 .dark-theme .stat-item .value { color: var(--text-main); }
-
-/* 인사이트 박스 */
-.dark-theme .insight-box.highlight-border { 
-  background: rgba(30, 58, 138, 0.15); 
-  border-left-color: #3b82f6; 
-}
-.dark-theme .insight-box.highlight-border p {
-  color: var(--text-muted); 
-}
-
+.dark-theme .insight-box.highlight-border { background: rgba(30, 58, 138, 0.15); border-left-color: #3b82f6; }
+.dark-theme .insight-box.highlight-border p { color: var(--text-muted); }
 .dark-theme .insight-box h4 { color: #60a5fa; }
-
-/* 전략 그리드 */
-.dark-theme .strategy-item { 
-  background: #1e293b; 
-  border-color: var(--border-color); 
-}
+.dark-theme .strategy-item { background: #1e293b; border-color: var(--border-color); }
 .dark-theme .strategy-item h5 { color: var(--text-main); }
-.dark-theme .strategy-item p { color: var(--text-muted); }
-
-/* 피로도 프로세스 바 */
-.dark-theme .progress-bar { 
-  background-color: #0f172a; 
-}
-.dark-theme .distraction-bar-container .label {
-  color: var(--text-muted);
-}
+.dark-theme .strategy-item li { color: var(--text-muted); }
+.dark-theme .progress-bar { background-color: #0f172a; }
+.dark-theme .distraction-bar-container .label { color: var(--text-muted); }
+.dark-theme .loader { border-color: #334155; border-left-color: #3b82f6; }

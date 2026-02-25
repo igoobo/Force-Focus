@@ -12,15 +12,23 @@ const DEFAULT_TASK_MAPPING = {
 
 const DEFAULT_TASK_NAMES = Object.keys(DEFAULT_TASK_MAPPING);
 
+// [수정] t.description 및 t.name을 모두 활용하여 isCustom을 더 정확하게 판별
 const normalizeTask = (t) => {
   if (!t) return null;
   const name = t.name || "제목 없음";
+  const desc = t.description || "";
+  
+  // 기본 작업 이름 목록에 포함되어 있지 않거나, 설명이 명시적으로 "사용자 추가 작업"인 경우 true
+  const isCustomTask = !DEFAULT_TASK_NAMES.includes(name) || desc === "사용자 추가 작업";
+  // 단, 이름은 기본 목록에 있는데 설명이 "시스템"인 경우는 명백히 false (이중 검증)
+  const finalIsCustom = DEFAULT_TASK_NAMES.includes(name) && desc === "시스템 기본 제공 작업" ? false : isCustomTask;
+
   return {
     id: t.id || t._id,
     label: name,
     appPaths: t.target_executable ? t.target_executable.split(',').filter(p => p.trim() !== "") : [],
-    description: t.description || "",
-    isCustom: !DEFAULT_TASK_NAMES.includes(name), 
+    description: desc,
+    isCustom: finalIsCustom, 
     status: t.status || "pending"
   };
 };
@@ -32,7 +40,6 @@ export const useTaskStore = create((set, get) => ({
   initializeDefaultTasks: async () => {
     set({ loading: true });
     try {
-      // 모든 기본 작업을 서버에 생성 요청
       await Promise.all(
         DEFAULT_TASK_NAMES.map(name => 
           taskApi.create({
@@ -43,13 +50,12 @@ export const useTaskStore = create((set, get) => ({
           })
         )
       );
-      // 생성 완료 후 데이터 다시 불러오기
       const response = await taskApi.getAll();
       const mapped = response.data.map(normalizeTask).filter(Boolean);
       set({ tasks: mapped, loading: false });
     } catch (err) {
       console.error("초기화 실패:", err);
-      set({ loading: false, error: "기본 작업 초기화에 실패했습니다." });
+      set({ loading: false });
     }
   },
 
@@ -57,7 +63,6 @@ export const useTaskStore = create((set, get) => ({
     set({ tasks: [], loading: false });
   },
 
-  // 서버에서 작업 목록 가져오기
   fetchTasks: async () => {
     set({ loading: true });
     try {
@@ -76,28 +81,28 @@ export const useTaskStore = create((set, get) => ({
     }
   },
 
-  // 새 작업 추가 (사용자 정의 작업은 항상 isCustom: true)
   addTask: async (name) => {
     try {
       const payload = {
         name: name,
-        description: "사용자 추가 작업",
+        description: "사용자 추가 작업", 
         status: "pending",
         target_executable: "" 
       };
       await taskApi.create(payload);
-      await get().fetchTasks(); // 목록 새로고침
+      await get().fetchTasks(); 
     } catch (err) {
       alert("작업 추가 실패");
     }
   },
 
-  // 특정 작업의 프로그램 리스트 업데이트 (저장하기 버튼용)
+  // [중요 수정] 업데이트 시 description이 소실되지 않도록 페이로드에 포함
   updateTaskApps: async (id, paths) => {
     try {
       const task = get().tasks.find(t => t.id === id);
       const payload = {
         name: task.label,
+        description: task.description, // 기존 설명을 유지하여 isCustom 판별 유지
         target_executable: paths.filter(p => p.trim() !== "").join(','), 
       };
       await taskApi.update(id, payload);
@@ -107,7 +112,6 @@ export const useTaskStore = create((set, get) => ({
     }
   },
 
-  // 작업 삭제 (isCustom이 true인 경우만 호출됨)
   deleteTask: async (id) => {
     try {
       await taskApi.delete(id);
@@ -117,7 +121,6 @@ export const useTaskStore = create((set, get) => ({
     }
   },
 
-  // 로컬 상태 업데이트 (입력 중인 값을 UI에 즉시 반영)
   setLocalPaths: (id, newPaths) => {
     set((state) => ({
       tasks: state.tasks.map(t => t.id === id ? { ...t, appPaths: newPaths } : t)
