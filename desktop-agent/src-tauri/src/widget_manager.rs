@@ -76,13 +76,37 @@ fn show_widget_window<R: Runtime>(app_handle: &AppHandle<R>) {
         #[cfg(not(debug_assertions))]
         let url = WebviewUrl::App("widget.html".into());
 
+        // [Fix] 화면 해상도에 따른 동적 위치 계산
+        // 기본값 (FHD 기준 우측 상단)
+        let mut pos_x = 1680.0;
+        let mut pos_y = 20.0;
+        
+        let width = 220.0;
+        let margin = 20.0;
+
+        if let Ok(Some(monitor)) = app_handle.primary_monitor() {
+            let size = monitor.size(); // PhysicalSize
+            let scale_factor = monitor.scale_factor(); // f64
+            
+            // Physical -> Logical 변환
+            let screen_logical_width = size.width as f64 / scale_factor;
+            
+            // 우측 상단 좌표 계산: (화면 너비 - 위젯 너비 - 마진)
+            pos_x = screen_logical_width - width - margin;
+            pos_y = margin;
+            
+            println!("Calculated Widget Position: ({}, {}) for Screen Width: {}", pos_x, pos_y, screen_logical_width);
+        } else {
+             println!("Failed to detect monitor. Using default position.");
+        }
+
         if let Err(e) = WebviewWindowBuilder::new(app_handle, "widget", url)
             .always_on_top(true)
             .decorations(false)
             .resizable(false)
             .skip_taskbar(true)
-            .inner_size(220.0, 70.0)
-            .position(1680.0, 20.0) // [임시]
+            .inner_size(width, 70.0)
+            .position(pos_x, pos_y) // [Modified] 동적 좌표 적용
             .visible(true)
             .build()
         {

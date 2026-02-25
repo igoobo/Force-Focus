@@ -19,6 +19,7 @@ class ScheduleInDB(BaseModel):
     start_time: time  # HH:MM 형식을 위해 'time' 객체 사용
     end_time: time    # HH:MM 형식을 위해 'time' 객체 사용
     days_of_week: List[int]  # 0:월요일 ~ 6:일요일
+    start_date: Optional[datetime.date] = None # YYYY-MM-DD (Optional)
     created_at: datetime = Field(default_factory=datetime.now)
     is_active: bool = True
 

@@ -20,8 +20,6 @@ use sysinfo::System;
 use rdev::{listen, Event, EventType};
 use std::thread;
 
-use regex::Regex;
-use std::collections::HashSet;
 use std::path::Path;
 
 // [추가] Windows API 사용을 위한 모듈 import (Windows 환경에서만 컴파일)
@@ -42,6 +40,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     EnumWindows, GetForegroundWindow, GetWindow, GetWindowRect, GetWindowTextLengthW,
     GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindowVisible, GW_OWNER,
 };
+use crate::app_core::AppCore;
+use crate::model_update_manager::ModelUpdateManager;
 
 #[cfg(target_os = "windows")]
 use std::ffi::OsString;
@@ -488,6 +488,21 @@ pub fn _get_all_visible_windows_internal() -> Vec<WindowInfo> {
     }
 }
 
+#[tauri::command]
+pub fn get_system_stats(state: State<Mutex<AppCore>>) -> Result<serde_json::Value, String> {
+    let app = state.lock().map_err(|_| "Failed to lock AppCore")?;
+
+    let stats = serde_json::json!({
+        "current_state": format!("{:?}", app.state_engine.get_state_string()), 
+        "gauge_ratio": app.state_engine.get_gauge_ratio(),
+        // 게이지가 꽉 찼으면 오버레이 활성화
+        // (Threshold 값은 state_engine 상수를 참고하거나 1.0 기준)
+        "is_overlay_active": app.state_engine.get_gauge_ratio() >= 1.0 
+    });
+
+    Ok(stats)
+}
+
 /// [Tauri 커맨드] 프론트엔드나 app_core에서 호출 가능한 래퍼
 #[command]
 pub fn get_visible_windows() -> Result<Vec<WindowInfo>, String> {
@@ -496,102 +511,39 @@ pub fn get_visible_windows() -> Result<Vec<WindowInfo>, String> {
 }
 
 // --- 토큰화 및 숫자 필터링 = 시맨틱 태깅 ---
-// 목표:
-// 1. 네이티브 앱 -> 파일 확장자만 추출
-// 2. 웹 브라우저 -> 제목 전체를 토큰화한 뒤, '숫자가 포함된 토큰'만 제거하여 맥락 보존
-// 전략: 복잡한 파싱 대신, 단순히 띄어쓰기로 나누고 숫자가 섞인 '위험한 토큰'을 모두 버림.
+// 목표: ML 모델과 동일한 'Simple Tokenization' (Spec: ML_models.md)
+// 1. App Name + Window Title 결합
+// 2. Non-alphanumeric 기준 분리
+// 3. 소문자 변환
 pub fn extract_semantic_keywords(app_name: &str, window_title: &str) -> Vec<String> {
-    let mut tokens = Vec::new();
-    let lower_app = app_name.to_lowercase();
-    let lower_title = window_title.to_lowercase();
-
-    // 1. [공통] 파일 확장자 추출 (가장 안전한 식별자)
-    let ext_re = Regex::new(r"\.([a-z0-9]{2,4})\b").unwrap();
-    for cap in ext_re.captures_iter(&lower_title) {
-        if let Some(match_) = cap.get(1) {
-            tokens.push(format!(".{}", match_.as_str()));
-        }
-    }
-
-    // 2. 브라우저 감지
-    let browsers = [
-        "chrome", "edge", "firefox", "whale", "brave", "opera", "safari", "browser",
-    ];
-    let is_browser = browsers.iter().any(|&b| lower_app.contains(b));
-
-    if is_browser {
-        // 3. [단순화] 구분자를 공백으로 치환하여 '문장'을 '단어열'로 만듦
-        // 예: "방송 - CHZZK" -> "방송   CHZZK"
-        let cleaner_re = Regex::new(r"[\-\|:\[\]\(\)]").unwrap();
-        let clean_title = cleaner_re.replace_all(&lower_title, " ");
-
-        // 4. 불용어 목록
-        let stopwords: HashSet<&str> = [
-            "google",
-            "microsoft",
-            "chrome",
-            "edge",
-            "firefox",
-            "whale",
-            "profile",
-            "프로필",
-            "guest",
-            "게스트",
-            "search",
-            "검색",
-            "새 탭",
-            "new tab",
-            "loading",
-            "로딩",
-            "sign in",
-            "login",
-            "로그인",
-            "window",
-            "application",
-            "site",
-            "page",
-            "web",
-            "browser",
-            "view",
-        ]
-        .iter()
-        .cloned()
-        .collect();
-
-        // 5. 공백 기준 분리 및 필터링
-        for token in clean_title.split_whitespace() {
-            // [핵심] 숫자가 하나라도 포함되면 개인정보(ID, 날짜, 버전)로 간주하여 제거
-            if token.chars().any(char::is_numeric) {
-                continue;
-            }
-
-            // 특수문자만 있는 경우 제거 (한글/영어만 남김)
-            // (간단히 길이나 알파벳/한글 여부 체크)
-            let is_valid_word = token.chars().any(|c| c.is_alphabetic()); // 알파벳/한글이 하나라도 있어야 함
-            if !is_valid_word || token.chars().count() < 2 {
-                continue;
-            }
-
-            // 불용어 제거
-            if !stopwords.contains(token) {
-                tokens.push(token.to_string());
-            }
-        }
-    }
-
-    // 6. 중복 제거 및 정렬
-    tokens.sort();
-    tokens.dedup();
-
-    // 7. 토큰 제한
-    if tokens.len() > 15 {
-        tokens.truncate(15);
-    }
-
-    tokens
+    let full_text = format!("{} {}", app_name, window_title).to_lowercase();
+    
+    full_text.split(|c: char| !c.is_alphanumeric())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect()
 }
 
-// [중복: 헬퍼 함수 및 나머지 코드]
+// [Wrapper] 기존 코드 호환성 유지
 pub fn get_semantic_tokens(app_name: &str, window_title: &str) -> Vec<String> {
     extract_semantic_keywords(app_name, window_title)
+}
+
+// ================================================================
+// ML 모델 수동 업데이트 트리거
+// ================================================================
+
+/// 프론트엔드 UI에서 "업데이트 확인" 버튼 클릭 시 호출
+/// - token: 프론트엔드 AuthContext의 JWT 토큰
+/// - manager: main.rs에서 .manage()로 등록된 ModelUpdateManager 인스턴스 (자동 주입)
+#[tauri::command]
+pub async fn check_model_update(
+    token: String,
+    manager: State<'_, ModelUpdateManager>, 
+) -> Result<bool, String> {
+    println!("🖱️ [Command] Manual update requested.");
+    
+    // 비동기 작업 수행 (UI 스레드 차단 방지)
+    // check_and_update는 Result<bool, String>을 반환하므로 그대로 사용 가능
+    manager.check_and_update(&token).await
 }

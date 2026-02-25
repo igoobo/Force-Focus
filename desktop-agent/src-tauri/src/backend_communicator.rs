@@ -2,7 +2,7 @@
 
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use tauri::{command, State};
+use tauri::{command, State, AppHandle};
 
 // 백그라운드 동기화를 위해 tokio::spawn과 Arc, Mutex를 사용
 use std::sync::{Arc, Mutex};
@@ -11,6 +11,13 @@ use tokio::spawn;
 use dotenv::dotenv;
 use std::env;
 
+// 파일 I/O 및 스트림 처리
+use std::path::PathBuf;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
+use futures_util::StreamExt;
+use anyhow::Result;
+
 // lib.rs에서 정의한 전역 상태 타입들
 use crate::{
     ActiveSessionInfo, InputStatsArcMutex, SessionStateArcMutex, StorageManagerArcMutex, Task,
@@ -18,6 +25,7 @@ use crate::{
 
 // StorageManager의 메서드를 호출하기 위해 모듈 import
 use crate::storage_manager::{self, CachedEvent, LocalSchedule, LocalTask}; // LocalTask, LocalSchedule import
+use crate::app_core::AppCore;
 
 use std::time::{SystemTime, UNIX_EPOCH}; // 세션 시작 시간 생성용
 use uuid::Uuid; // 로컬에서 임시 세션 ID 생성용
@@ -41,17 +49,13 @@ fn get_api_base_url() -> String {
 
 // --- 2. API 요청/응답을 위한 구조체 ---
 
-/// `POST /feedback` API의 Request Body 스키마
-/// (API 명세서: event_id, feedback_type)
-#[derive(Debug, Serialize)]
-struct FeedbackRequest<'a> {
-    event_id: &'a str,      // 이벤트 ID (임시)
-    feedback_type: &'a str, // "is_work" 또는 "distraction_ignored"
+// 피드백 데이터 구조체 (서버 전송용)
+#[derive(Debug, Serialize, Clone)]
+pub struct FeedbackPayload {
+    pub client_event_id: String,
+    pub feedback_type: String,
+    pub timestamp: String,
 }
-
-// (API 응답을 위한 Deserialize 구조체도 필요시 추가)
-// #[derive(Debug, Deserialize)]
-// struct FeedbackResponse { ... }
 
 // --- 세션 API 요청/응답 모델 ---
 #[derive(Debug, Serialize)]
@@ -78,6 +82,7 @@ struct EventBatchRequest {
 #[derive(Debug, Serialize)]
 struct EventData {
     session_id: String,
+    pub client_event_id: String,
     timestamp: i64,
     app_name: String,
     window_title: String,
@@ -107,7 +112,25 @@ struct ApiSchedule {
     start_time: String, // "HH:MM:SS" (Time 객체는 문자열로 옴)
     end_time: String,
     days_of_week: Vec<u8>,
+    pub start_date: Option<String>, // [New] "YYYY-MM-DD" (Optional)
     is_active: bool,
+}
+
+// ================================================================
+// ML 모델 업데이트를 위한 DTO 및 메서드 확장
+// ================================================================
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ModelVersionResponse {
+    pub status: String,
+    pub version: String,
+    pub download_urls: ModelDownloadUrls,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ModelDownloadUrls {
+    pub model: String,
+    pub scaler: String,
 }
 
 // --- 3. BackendCommunicator 상태 정의 ---
@@ -126,6 +149,117 @@ impl BackendCommunicator {
         }
     }
 
+    /// 최신 모델 버전 메타데이터 조회
+    pub async fn check_latest_model_version(&self, token: &str) -> Result<ModelVersionResponse> {
+        // 기존 스타일 준수: 헬퍼 함수로 URL 조합
+        let url = format!("{}/desktop/models/latest", get_api_base_url());
+        
+        let resp = self.client.get(&url)
+            .bearer_auth(token)
+            .send()
+            .await?;
+            
+        // 상태 코드 확인 (에러 시 anyhow::Error로 변환)
+        let resp = resp.error_for_status()?;
+        
+        let info: ModelVersionResponse = resp.json().await?;
+        Ok(info)
+    }
+
+    /// 범용 파일 다운로드 (모델 .onnx 및 스케일러 .json 공용)
+    /// - endpoint: "/api/..." (상대경로) 또는 "https://..." (절대경로) 모두 처리
+    pub async fn download_file(&self, endpoint: &str, save_path: &PathBuf, token: &str) -> Result<()> {
+        // 유연한 URL 처리: endpoint가 http로 시작하면 그대로, 아니면 Base URL 결합
+        let url = if endpoint.starts_with("http") {
+            endpoint.to_string()
+        } else {
+            format!("{}{}", get_api_base_url(), endpoint)
+        };
+        
+        println!("[BackendCommunicator] Downloading stream from: {}", url);
+
+        let resp = self.client.get(&url)
+            .bearer_auth(token)
+            .send()
+            .await?
+            .error_for_status()?;
+
+        // 스트리밍 다운로드 구현 (메모리 효율적)
+        let mut file = File::create(save_path).await?;
+        let mut stream = resp.bytes_stream();
+
+        while let Some(item) = stream.next().await {
+            let chunk = item?; // 네트워크 에러 전파
+            file.write_all(&chunk).await?;
+        }
+        
+        file.flush().await?;
+        Ok(())
+    }
+
+    // 피드백 배치 전송
+    pub async fn send_feedback_batch(
+        &self,
+        feedbacks: Vec<FeedbackPayload>,
+        token: &str,
+    ) -> Result<(), String> {
+        let url = format!("{}/desktop/feedback/batch", get_api_base_url());
+
+        if feedbacks.is_empty() { return Ok(()); }
+
+        println!("Sending {} feedback items to {}", feedbacks.len(), url);
+
+        let response = self.client.post(&url)
+            .bearer_auth(token)
+            .json(&feedbacks)
+            .send()
+            .await
+            .map_err(|e| format!("Request failed: {}", e))?;
+
+        if response.status().is_success() {
+            println!("✅ Feedback batch sent successfully.");
+            Ok(())
+        } else {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            Err(format!("Server returned error {}: {}", status, text))
+        }
+    }
+
+    // 최신 모델 다운로드 (스트리밍)
+    pub async fn download_latest_model(
+        &self,
+        save_path: PathBuf,
+        token: &str,
+    ) -> Result<(), String> {
+        let url = format!("{}/desktop/models/latest", get_api_base_url());
+        println!("Downloading model from {}", url);
+
+        let response = self.client.get(&url)
+            .bearer_auth(token)
+            .send()
+            .await
+            .map_err(|e| format!("Request failed: {}", e))?;
+
+        if !response.status().is_success() {
+            return Err(format!("Download failed: {}", response.status()));
+        }
+
+        let mut file = File::create(&save_path).await
+            .map_err(|e| format!("File create error: {}", e))?;
+
+        let mut stream = response.bytes_stream();
+        while let Some(item) = stream.next().await {
+            let chunk = item.map_err(|e| format!("Chunk error: {}", e))?;
+            file.write_all(&chunk).await
+                .map_err(|e| format!("Write error: {}", e))?;
+        }
+
+        file.flush().await.map_err(|e| format!("Flush error: {}", e))?;
+        println!("✅ Model downloaded to {:?}", save_path);
+        Ok(())
+    }
+
     // [핵심 추가] sync_manager가 호출할 동기화 메서드
     pub async fn sync_events_batch(
         &self,
@@ -142,6 +276,7 @@ impl BackendCommunicator {
                 match serde_json::from_str(&e.activity_vector) {
                     Ok(json_val) => Some(EventData {
                         session_id: e.session_id,
+                        client_event_id: e.client_event_id,
                         timestamp: e.timestamp,
                         app_name: e.app_name,
                         window_title: e.window_title,
@@ -256,6 +391,7 @@ impl BackendCommunicator {
                     start_time: s.start_time,
                     end_time: s.end_time,
                     days_of_week: s.days_of_week,
+                    start_date: s.start_date, // [Mapped]
                     is_active: s.is_active,
                 })
                 .collect();
@@ -299,28 +435,94 @@ pub fn logout(storage_manager_mutex: State<'_, StorageManagerArcMutex>) -> Resul
     Ok(())
 }
 
-/// '개입'에 대한 사용자 피드백을 서버로 전송하는 비동기(async) 커맨드
-///
-/// # Arguments
-/// * `feedback_type` - 프론트엔드에서 받은 피드백 (예: "is_work")
+/// '개입'에 대한 사용자 피드백을 서버로 전송하고, 즉시 로컬 상태를 리셋하는 커맨드
 #[command]
 pub async fn submit_feedback(
     feedback_type: String,
-    // [수정] 네트워크 클라이언트(BackendCommunicator) 대신 LSN(StorageManager) 주입
+    // 통신 객체 및 세션 상태
+    comm_state: State<'_, Arc<BackendCommunicator>>,
+    session_state_mutex: State<'_, SessionStateArcMutex>,
+    // LSN 저장용
     storage_manager_mutex: State<'_, StorageManagerArcMutex>,
+    // FSM 리셋용 AppCore 상태 추가
+    app_core_state: State<'_, Mutex<AppCore>>, 
 ) -> Result<(), String> {
-    // 1. 고유 이벤트 ID 생성
-    let event_id = format!("event-{}", Uuid::new_v4());
+    
+    // 1. 현재 모니터링 중인 이벤트 ID 조회 (AppCore에서 가져옴)
+    let client_event_id = {
+        let app = app_core_state.lock().map_err(|_| "Failed to lock AppCore")?;
+        // 만약 모니터링 시작 전이라 ID가 없다면, 새로 생성하거나 에러 처리
+        app.current_event_id.clone().unwrap_or_else(|| format!("evt-fallback-{}", Uuid::new_v4()))
+    };
+    
 
-    println!("Submitting feedback (to LSN): type={}", feedback_type);
+    // 세션 ID를 가장 먼저 조회 (LSN 저장과 백그라운드 전송 모두에 사용하기 위함)
+    let session_id = {
+        let session_state = session_state_mutex.lock().map_err(|e| e.to_string())?;
+        session_state.as_ref()
+            .map(|s| s.session_id.clone())
+            .unwrap_or_else(|| "unknown-session".to_string()) // 세션이 없을 때의 처리
+    };
 
-    // 2. LSN 락 획득
-    let storage_manager = storage_manager_mutex.lock().map_err(|e| e.to_string())?;
+    
 
-    // 3. 로컬 DB에 저장
-    storage_manager.cache_feedback(&event_id, &feedback_type)?;
+    // 2. LSN(로컬 DB)에 저장 (기존 로직 유지)
+    {
+        let storage_manager = storage_manager_mutex.lock().map_err(|e| e.to_string())?;
+        storage_manager.cache_feedback(&client_event_id, &feedback_type)?;
+        println!("Feedback cached to LSN successfully.");
+    }
 
-    println!("Feedback cached successfully: {}", event_id);
+    // 3. FSM 즉시 리셋 (오버레이 해제)
+    // 사용자 경험(UX)을 위해 UI를 즉시 평화 상태로 복구
+    {
+        // lock 범위를 최소화하기 위해 별도 블록 사용
+        let mut app = app_core_state.lock().map_err(|_| "Failed to lock AppCore")?;
+        
+        if feedback_type == "is_work" {
+            // 현재 활성 창 이름 가져오기 (AppCore 내부 메서드 활용 권장)
+            // 임시로 "Unknown" 처리하거나, commands.rs의 헬퍼 함수 활용 가능
+            // 여기서는 단순 리셋에 집중
+            app.state_engine.manual_reset();
+            println!("🔄 FSM State Reset by User Feedback");
+            
+            // (선택 사항) Local Cache 업데이트 로직도 여기에 추가 가능
+            // app.inference_engine.update_local_cache(...);
+        } else {
+            // "distraction_ignored" 등 다른 피드백일 경우에도
+            // 일단 오버레이는 꺼주는 게 UX상 좋음 (또는 유지 정책에 따라 결정)
+            app.state_engine.manual_reset();
+        }
+    }
+
+    // 4. 백그라운드 전송 (Communicator 활용)
+    // UI 스레드를 차단하지 않기 위해 spawn 사용
+    let comm = comm_state.inner().clone();
+    let feedback_type_clone = feedback_type.clone();
+    let client_event_id_clone = client_event_id.clone();
+
+    // 토큰 조회
+    let token = {
+        let storage = storage_manager_mutex.lock().map_err(|e| e.to_string())?;
+        storage.load_auth_token().unwrap_or(None).map(|t| t.0)
+    };
+
+    if let Some(auth_token) = token {
+        spawn(async move {
+            let payload = FeedbackPayload {
+                client_event_id: client_event_id_clone,
+                feedback_type: feedback_type_clone,
+                timestamp: chrono::Utc::now().to_rfc3339(),
+            };
+            
+            // 공용 메서드 호출
+            if let Err(e) = comm.send_feedback_batch(vec![payload], &auth_token).await {
+                eprintln!("Background Feedback Sync Failed: {}", e);
+            } else {
+                println!("Background Feedback Sync Success");
+            }
+        });
+    }
 
     Ok(())
 }
@@ -447,11 +649,13 @@ pub async fn start_session(
 // --- 세션 종료 커맨드 ---
 #[command]
 pub async fn end_session(
+    app_handle: AppHandle,
     user_evaluation_score: u8,
     // comm_state도 백그라운드 동기화를 위해 Arc<BackendCommunicator>를 받도록 변경
     comm_state: State<'_, Arc<BackendCommunicator>>,
     session_state_mutex: State<'_, SessionStateArcMutex>,
     storage_manager_mutex: State<'_, StorageManagerArcMutex>,
+    app_core_state: State<'_, Mutex<AppCore>>, // [Fix] FSM 리셋을 위해 추가
 ) -> Result<(), String> {
     // 1. '쓰기' 락: .await 전에 LSN과 전역 상태를 즉시 업데이트
     // 반환값: (session_id, auth_token)
@@ -473,6 +677,13 @@ pub async fn end_session(
         // LSN 및 전역 상태 정리 (먼저 실행)
         storage_manager.delete_active_session()?;
         *session_state = None; // 전역 상태 초기화
+
+        // [Fix] 세션 종료 시 오버레이 숨기기 및 FSM 리셋 (UX: 즉시 반응)
+        // hide_overlay는 내부적으로 AppCore.manual_reset()을 호출합니다.
+        use crate::window_commands;
+        if let Err(e) = window_commands::hide_overlay(app_handle.clone(), app_core_state) {
+            eprintln!("Warning: Failed to hide overlay on session end: {}", e);
+        }
 
         println!(
             "Session ID {} successfully ended locally (score: {}).",

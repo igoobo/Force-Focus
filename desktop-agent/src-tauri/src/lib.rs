@@ -14,10 +14,14 @@ pub mod sync_manager;
 pub mod tray_manager;
 pub mod widget_manager;
 pub mod window_commands;
-
+pub mod inference;
+pub mod feature_extractor;
+pub mod model_update_manager;
+use crate::model_update_manager::ModelUpdateManager; 
 // --- 2. 전역 use ---
 
 use crate::storage_manager::StorageManager;
+use crate::inference::InferenceEngine;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use sysinfo::System;
@@ -25,6 +29,7 @@ use tauri::{AppHandle, Builder, Emitter, Manager, State, Url, WindowEvent};
 use tauri_plugin_deep_link::DeepLinkExt; //  딥 링크 확장 트레이트
 use tauri_plugin_autostart::MacosLauncher;
 use std::env; //  환경 변수 및 인자 수집용
+use std::path::PathBuf;
 
 // --- 3. 전역 상태 타입 정의 ---
 
@@ -154,6 +159,23 @@ pub fn run() {
     // Offline-First를 위한 상태 생성
     let backend_communicator_state = Arc::new(backend_communicator::BackendCommunicator::new());
 
+    // ML 추론 엔진 초기화
+    let model_path = "resources/models/personal_model.onnx";
+    let scaler_path = "resources/models/scaler_params.json";
+
+    // (주의: Tauri Resource 경로 해결은 setup 훅 안에서 path_resolver로 하는 게 정석이나,
+    // 일단 상대 경로로 시도하고 실패 시 로그만 남깁니다.)
+    let inference_engine_opt = match InferenceEngine::new(model_path, scaler_path) {
+        Ok(engine) => {
+            println!("✅ ML Inference Engine Loaded.");
+            Some(Mutex::new(engine))
+        },
+        Err(e) => {
+            eprintln!("⚠️ Failed to load ML Engine (Run will continue without ML): {}", e);
+            None
+        }
+    };
+
     tauri::Builder::default()
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent, 
@@ -213,7 +235,63 @@ pub fn run() {
         // BackendCommunicator를 전역 상태로 등록
         .manage(backend_communicator_state)
         .setup(move |app| {
+            //  추론 엔진이 있으면 여기서 등록
+            if let Some(engine) = inference_engine_opt {
+                app.manage(engine); // AppHandle을 통해 동적 등록
+            }
+
             let app_handle = app.handle().clone();
+
+            // --- 1. 모델 경로 결정 전략 (AppData 우선 -> Resource 폴백) ---
+            let app_data_dir = app_handle.path().app_data_dir().ok();
+            
+            // A. AppData 경로 시도 (업데이트된 모델)
+            let mut model_path_buf = PathBuf::new();
+            if let Some(ref dir) = app_data_dir {
+                model_path_buf.push(dir);
+                model_path_buf.push("models");
+                model_path_buf.push("personal_model.onnx");
+            }
+
+            // B. 경로 결정
+            let final_model_path = if model_path_buf.exists() {
+                // 업데이트된 모델이 존재하면 사용
+                println!("Using updated model from AppData: {:?}", model_path_buf);
+                model_path_buf.to_string_lossy().to_string()
+            } else {
+                // 없으면 내장 리소스 사용 (기존 방식)
+                println!("Using default embedded model (resources).");
+                // 주의: 배포 시 resource_dir()을 써야 하지만, 개발 환경 호환을 위해 상대 경로 유지
+                "resources/models/personal_model.onnx".to_string()
+            };
+
+            // 스케일러도 동일한 로직 적용 가능 (여기서는 생략하고 리소스 사용)
+            let scaler_path = "resources/models/scaler_params.json".to_string();
+
+            // --- 2. 추론 엔진 초기화 및 등록 ---
+            // (run 함수 밖에서 했던 초기화를 setup 안으로 이동하여 app_handle 경로 활용)
+            let inference_engine_opt = match InferenceEngine::new(&final_model_path, &scaler_path) { 
+                Ok(engine) => {
+                    println!("✅ ML Inference Engine Loaded.");
+                    Some(Mutex::new(engine))
+                }
+                Err(e) => {
+                    eprintln!("⚠️ Failed to load ML Engine: {}", e);
+                    None
+                }
+            };
+
+            if let Some(engine) = inference_engine_opt {
+                app.manage(engine);
+            }
+
+            // --- 2. [ML] 모델 업데이트 매니저 등록 (핵심) ---
+            // 구조체를 생성하여 State로 등록 (commands.rs에서 사용)
+            let update_manager = ModelUpdateManager::new(app_handle.clone());
+            app.manage(update_manager);
+
+            // 백그라운드 자동 업데이트 루프 시작
+            model_update_manager::start_update_loop(app_handle.clone());
 
             // --- LSN 초기화 및 등록 ---
             let storage_manager = StorageManager::new_from_path(app_handle.clone())
@@ -286,13 +364,19 @@ pub fn run() {
             // // 데이터 수집 및 로깅 기능 시작
             // let input_stats_arc_mutex_for_logging = Arc::clone(app_handle.state::<InputStatsArcMutex>().inner());
             // logging::start_data_collection_and_logging(input_stats_arc_mutex_for_logging, 10); // 10초마다 로깅
+            
+            // AppCore 등록 (이게 있어야 commands.rs가 접근 가능)
+            use crate::app_core::AppCore;
+            app.manage(std::sync::Mutex::new(AppCore::new(&app_handle)));
 
             // app_core의 '메인 루프'를 시작
             // app_handle을 복제하여 넘겨주어 스레드가 AppHandle을 소유
+            // Core Loop 시작
             app_core::start_core_loop(
-                app_handle.clone(),
-                session_manager_state.clone(), // 세션 상태 전달
-                storage_manager_state.clone(), // LSN 전달
+                app.handle().clone(),
+                app.state::<SessionStateArcMutex>().inner().clone(),
+                app.state::<StorageManagerArcMutex>().inner().clone(),
+                app.state::<InputStatsArcMutex>().inner().clone(),
             );
 
             tray_manager::setup_tray_menu(app.handle())?;
@@ -320,6 +404,7 @@ pub fn run() {
             commands::get_all_processes_summary,
             commands::get_input_frequency_stats,
             commands::get_visible_windows, // 시각 센서 커맨드 등록
+            commands::check_model_update,
             // backend_communicator 모듈의 커맨드를 핸들러에 등록
             backend_communicator::submit_feedback,
             backend_communicator::start_session,
@@ -329,7 +414,9 @@ pub fn run() {
             backend_communicator::login,             //  로그인 커맨드
             backend_communicator::logout,            //  로그아웃 커맨드
             backend_communicator::check_auth_status, // 자동 로그인 커맨드 등록
-            window_commands::hide_overlay
+            window_commands::hide_overlay,
+            window_commands::show_overlay,                   
+            window_commands::set_overlay_ignore_cursor_events, 
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,5 +1,6 @@
 # backend/app/schemas/schedule.py
 
+from pydantic import BaseModel, Field
 from datetime import datetime, time, date
 from typing import Optional, Annotated
 
@@ -69,6 +70,8 @@ class ScheduleCreate(BaseModel):
 
     # 리스트 내부 요소는 0~6, 최소 1개 이상
     days_of_week: DaysOfWeekCreate
+    # [New] 특정 날짜 실행을 위한 필드 (Optional)
+    start_date: Optional[date] = None
 
     @field_validator("name")
     @classmethod
@@ -108,6 +111,7 @@ class ScheduleUpdate(BaseModel):
     start_time: Optional[time] = None
     end_time: Optional[time] = None
     days_of_week: Optional[DaysOfWeekUpdate] = None
+    start_date: Optional[date] = None
     is_active: Optional[bool] = None
 
     @field_validator("name", mode="before")
@@ -150,6 +154,7 @@ class ScheduleRead(BaseModel):
     start_time: time
     end_time: time
     days_of_week: list[int]
+    start_date: Optional[date] = None # Return as date object (YYYY-MM-DD)
     created_at: datetime
     is_active: bool
 

@@ -124,6 +124,7 @@ async def create_schedule(user_id: str, schedule_data: ScheduleCreate) -> Schedu
         "start_time": schedule_data.start_time.strftime("%H:%M:%S"),  # 문자열로 변환
         "end_time": schedule_data.end_time.strftime("%H:%M:%S"),      # 문자열로 변환
         "days_of_week": schedule_data.days_of_week,
+        "start_date": schedule_data.start_date.isoformat() if schedule_data.start_date else None, # 문자열(YYYY-MM-DD)로 변환
         "created_at": datetime.now(),
         "is_active": True,
     }

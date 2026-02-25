@@ -1,387 +1,298 @@
-// 파일 위치: src-tauri/src/state_engine.rs
+use serde::{Deserialize, Serialize};
+use crate::inference::InferenceResult;
 
-use crate::commands::{ActiveWindowInfo, InputStats};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-// --- 1. 상수 정의 ---
+// --- 1. 설정값 (시간 단위: 초) ---
+// 문서 Phase 4-2.A: 상태 정의 및 임계값
+const THRESHOLD_NOTIFY_SEC: f64 = 30.0;  // 30초: DRIFT 진입 (알림)
+const THRESHOLD_BLOCK_SEC: f64 = 60.0;   // 60초: DISTRACTED 진입 (차단)
+const SNOOZE_SEC: f64 = 10.0;            // 개입 후 10초간 대기 (피로도 관리)
 
-/// '방해 앱'으로 간주되는 키워드 목록
-/// StateEngine은 이 목록을 기반으로 '이탈 점수'를 계산
-const DISTRACTION_KEYWORDS: &[&str] = &[
-    "youtube",
-    "netflix",
-    "facebook",
-    "discord",
-    "steam.exe",
-    "slack",
-];
-
-/// 점수 임계값: 이탈 점수가 이 값에 도달하면 '알림'을 트리거
-const THRESHOLD_NOTIFICATION: u16 = 10;
-/// 점수 임계값: 이탈 점수가 이 값에 도달하면 '강한 개입(오버레이)'을 트리거
-const THRESHOLD_OVERLAY: u16 = 20;
-
-/// 점수 계산 규칙: 방해 키워드 발견 시 추가할 점수
-const SCORE_DISTRACTION_APP: u16 = 5;
-/// 점수 계산 규칙: 3분 (180초) 이상 입력이 없을 시 추가할 점수
-const SCORE_INACTIVITY_MILD: u16 = 3;
-/// 점수 계산 규칙: 10분 (600초) 이상 입력이 없을 시 추가할 점수
-const SCORE_INACTIVITY_SEVERE: u16 = 10;
-
-/// 비활성(Inactivity) 판단 기준 시간 (초 단위)
-const INACTIVITY_THRESHOLD_MILD_S: u64 = 180; // 3분
-const INACTIVITY_THRESHOLD_SEVERE_S: u64 = 600; // 10분
-
-// '업무'로 점수를 감소시키는 데 필요한 시간 (초)
-const DECAY_INTERVAL_S: u64 = 10; // 10초마다 1점 감소
-
-// 다시 개입하기 위한 대기 시간
-const SNOOZE_DURATION_S: u64 = 10;
-
-// --- 2. StateEngine 상태 및 로직 ---
-
-/// State Engine이 반환할 개입(Intervention) 명령의 종류
-#[derive(Debug, PartialEq)]
+// --- 2. 개입 트리거 (3단계) ---
+#[derive(Debug, Clone, PartialEq)]
 pub enum InterventionTrigger {
-    DoNothing,           // 아무것도 하지 않음
-    TriggerNotification, // 가벼운 알림 (예: OS 알림)
-    TriggerOverlay,      // 강한 개입 (예: 화면 오버레이)
+    DoNothing,          // 평화
+    TriggerNotification, // 주의 환기
+    TriggerOverlay,      // 강제 차단
 }
 
-/// State Engine의 현재 상태를 관리하는 구조체
-/// 이 구조체는 세션이 시작될 때 생성
-#[derive(Debug)]
+// --- 3. FSM 상태 정의 ---
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum FSMState {
+    IDLE,       // (초기 상태)
+    FOCUS,      // 몰입 상태 (게이지 < 30)
+    DRIFT,      // 유예 상태 (30 <= 게이지 < 60)
+    DISTRACTED, // 이탈 상태 (게이지 >= 60)
+}
+
+// --- 4. 상태 엔진 구조체 ---
 pub struct StateEngine {
-    /// 현재 누적된 '이탈 점수'
-    deviation_score: u16,
-
-    //  마지막 점수 감소 시점
-    last_decay_timestamp_s: u64,
-
-    // '스누즈' 타이머 (마지막 개입 시간)
-    last_intervention_level: u16, // 0=None, 1=Notification, 2=Overlay
-    last_intervention_timestamp_s: u64,
+    current_state: FSMState,
+    
+    // [Core] 누적 이탈 시간 (초 단위 게이지)
+    // 0.0 에서 시작하여 조건에 따라 차오르거나 줄어듦
+    drift_gauge: f64,
+    
+    // Delta Time 계산용
+    last_tick_ts: u64,
+    
+    // 스누즈(재알림 방지) 타이머 (마지막 개입 시각)
+    last_intervention_ts: f64, 
 }
 
 impl StateEngine {
-    /// 새로운 세션을 위한 StateEngine을 생성
     pub fn new() -> Self {
-        StateEngine {
-            deviation_score: 0,
-
-            // 타이머 초기화
-            last_decay_timestamp_s: current_timestamp_s(),
-
-            // 스누즈 타이머 초기화 (0으로 설정하여 앱 시작 시 즉시 개입 가능하도록)
-            last_intervention_level: 0,
-            last_intervention_timestamp_s: 0,
+        Self {
+            current_state: FSMState::IDLE,
+            drift_gauge: 0.0,
+            last_tick_ts: 0,
+            last_intervention_ts: 0.0,
         }
     }
 
-    /// 현재 점수를 반환 (UI 표시 등에 사용)
-    pub fn get_current_score(&self) -> u16 {
-        self.deviation_score
-    }
-
-    /// Activity Monitor로부터 받은 최신 데이터를 처리하고,
-    /// '이탈 점수'를 갱신한 뒤, 필요한 개입 명령을 반환
-    ///
-    /// 이 함수는 주기적으로 (예: 매 5초) 또는 이벤트 발생 시 호출
-    ///
-    /// # Arguments
-    /// * `window_info` - 현재 활성 창 정보
-    /// * `input_stats` - 현재까지의 누적 입력 통계
-    ///
-    /// # Returns
-    /// * `InterventionTrigger` - 계산 결과에 따른 개입 명령
-    pub fn process_activity(
-        &mut self,
-        window_info: &ActiveWindowInfo,
-        input_stats: &InputStats,
+    /// [Process] 매 틱(Tick)마다 호출되어 상태를 갱신하고 행동을 결정
+    /// - inference: ML 모델의 판단
+    /// - now_ts: 현재 시스템 시간
+    /// - is_mouse_active: Safety 2 적용을 위한 마우스 상태
+    /// - has_recent_input: Safety 2 적용을 위한 입력 여부 (키보드 등)
+    pub fn process(
+        &mut self, 
+        inference: &InferenceResult, 
+        now_ts: u64,
+        is_mouse_active: bool,
+        has_recent_input: bool
     ) -> InterventionTrigger {
-        let now_s = current_timestamp_s();
+        
+        // 1. Delta Time (dt) 계산
+        let dt = if self.last_tick_ts == 0 { 
+            0.0 
+        } else { 
+            (now_ts.saturating_sub(self.last_tick_ts)) as f64 
+        };
+        self.last_tick_ts = now_ts;
+        let now_sec = now_ts as f64;
 
-        // --- 규칙 1: 방해 키워드 검사 ---
-        // 창 제목과 앱 이름을 모두 소문자로 변환하여 검사
-        let title_lower = window_info.title.to_lowercase();
-        let app_name_lower = window_info.app_name.to_lowercase();
+        // 2. 게이지 업데이트 (Time Integration)
+        let multiplier = self.calculate_multiplier(inference, is_mouse_active, has_recent_input);
+        
+        // 게이지 누적/감소 (최소 0.0, 최대 차단 임계값 + 여유분까지 허용)
+        self.drift_gauge = (self.drift_gauge + (dt * multiplier)).max(0.0);
+        
+        // (Optional) 디버깅용: 게이지 상태 출력
+        // println!("Gauge: {:.2}s (x{:.1}) | State: {:?}", self.drift_gauge, multiplier, self.current_state);
 
-        let is_distraction = DISTRACTION_KEYWORDS
-            .iter()
-            .any(|&keyword| title_lower.contains(keyword) || app_name_lower.contains(keyword));
+        // 3. 상태 전이 (Threshold Check)
+        self.update_state();
+        
+        // [디버깅용 로그 추가] 현재 게이지 상태 출력
+        println!("🔥 Gauge: {:.1} / 60.0 (State: {:?})", self.drift_gauge, self.current_state);
 
-        // --- 규칙 2: 비활성(Inactivity) 검사 ---
-        if is_distraction {
-            // --- 2a. 딴짓 중인 경우 ---
-            let mut score_to_add: u16 = 0;
+        // 4. 행동 결정 (Snooze Logic)
+        self.decide_intervention(now_sec)
+    }
 
-            // '딴짓' 자체 점수
-            score_to_add += SCORE_DISTRACTION_APP;
-
-            // '딴짓' 중 '비활성' 가중
-            let last_input_s = input_stats.last_meaningful_input_timestamp_ms / 1000;
-            let inactivity_duration_s = now_s.saturating_sub(last_input_s);
-
-            if inactivity_duration_s >= INACTIVITY_THRESHOLD_SEVERE_S {
-                score_to_add += SCORE_INACTIVITY_SEVERE;
-            } else if inactivity_duration_s >= INACTIVITY_THRESHOLD_MILD_S {
-                score_to_add += SCORE_INACTIVITY_MILD;
-            }
-
-            // 점수를 누적
-            self.deviation_score = (self.deviation_score + score_to_add).min(100);
-
-            // 딴짓 중일 때는 '점수 감소 타이머'를 현재 시간으로 리셋
-            self.last_decay_timestamp_s = now_s;
-
-            // 2b. '개입 결정' 로직:  '스누즈 타이머' 검사
-            // 마지막 개입 이후 '스누즈 시간'(10초)이 지났는지 확인
-            let time_since_last_intervention =
-                now_s.saturating_sub(self.last_intervention_timestamp_s);
-            let is_snooze_over = time_since_last_intervention >= SNOOZE_DURATION_S;
-
-            if self.deviation_score >= THRESHOLD_OVERLAY {
-                // [수준 2: Overlay]
-                // '이전 개입'이 'Overlay'(수준 2) 미만이었거나, 스누즈가 끝났다면
-                if self.last_intervention_level < 2 || is_snooze_over {
-                    self.last_intervention_level = 2;
-                    self.last_intervention_timestamp_s = now_s; // 스누즈 타이머 리셋
-                    return InterventionTrigger::TriggerOverlay;
+    /// [Internal] 상황별 시간 가중치 계산 (문서 Phase 4-2.B & 4-3)
+    fn calculate_multiplier(
+        &self, 
+        inference: &InferenceResult, 
+        is_mouse_active: bool, 
+        has_recent_input: bool
+    ) -> f64 {
+        match inference {
+            InferenceResult::StrongOutlier => {
+                // 문서: StrongOutlier는 급박한 이탈 -> 1.0배속 (또는 더 빠르게 설정 가능)
+                1.0 
+            },
+            InferenceResult::WeakOutlier => {
+                // 기본 WeakOutlier는 0.5배속 (시간 지연)
+                let mut speed = 0.5;
+                
+                // [Safety 2: Active Thinking Protection]
+                // 문서: "Input은 0이지만 Mouse는 움직임" -> 속도를 절반으로 줄임
+                if !has_recent_input && is_mouse_active {
+                    speed *= 0.5; // 즉, 0.25배속이 됨
                 }
-            } else if self.deviation_score >= THRESHOLD_NOTIFICATION {
-                // [수준 1: Notification]
-                // '이전 개입'이 'Notification'(수준 1) 미만이었거나, 스누즈가 끝났다면
-                if self.last_intervention_level < 1 || is_snooze_over {
-                    self.last_intervention_level = 1;
-                    self.last_intervention_timestamp_s = now_s; // 스누즈 타이머 리셋
-                    return InterventionTrigger::TriggerNotification;
-                }
+                speed
+            },
+            InferenceResult::Inlier => {
+                // [Fast Recovery]
+                // 문서: 업무 복귀 시 빠르게 게이지 감소 (-2.0배속)
+                -2.0
             }
+        }
+    }
 
-            // 아직 임계값 미만이면 DoNothing
-            return InterventionTrigger::DoNothing;
+    /// [Internal] 게이지 수위에 따른 상태 변경
+    fn update_state(&mut self) {
+        let next_state = if self.drift_gauge >= THRESHOLD_BLOCK_SEC {
+            FSMState::DISTRACTED
+        } else if self.drift_gauge >= THRESHOLD_NOTIFY_SEC {
+            FSMState::DRIFT
         } else {
-            // --- 3. 업무 중인 경우 (is_distraction == false) ---
+            FSMState::FOCUS
+        };
 
-            // '시간 기반'으로 점수를 감소
-            let time_since_last_decay = now_s.saturating_sub(self.last_decay_timestamp_s);
+        if next_state != self.current_state {
+            // println!("🔄 State Transition: {:?} -> {:?}", self.current_state, next_state);
+            self.current_state = next_state;
+        }
+    }
 
-            if time_since_last_decay >= DECAY_INTERVAL_S {
-                self.deviation_score = self.deviation_score.saturating_sub(1);
-                // 점수 감소 타이머를 리셋
-                self.last_decay_timestamp_s = now_s;
-            }
-
-            // '쿨다운' 로직: 점수가 낮아지면 '개입 수준'을 리셋
-            if self.deviation_score < THRESHOLD_NOTIFICATION && self.last_intervention_level > 0 {
-                self.last_intervention_level = 0;
-                self.last_intervention_timestamp_s = 0; // 스누즈 타이머 리셋
-            }
-
-            // 3b. '업무 중'일 때는 절대 개입하지 않고 DoNothing을 반환
+    /// [Internal] 개입 여부 결정 (Snooze 적용)
+    fn decide_intervention(&mut self, now_sec: f64) -> InterventionTrigger {
+        // 스누즈 체크: 마지막 개입 후 10초가 지났는가?
+        if (now_sec - self.last_intervention_ts) < SNOOZE_SEC {
             return InterventionTrigger::DoNothing;
         }
+
+        match self.current_state {
+            FSMState::DISTRACTED => {
+                // 차단 단계
+                self.last_intervention_ts = now_sec;
+                InterventionTrigger::TriggerOverlay
+            },
+            FSMState::DRIFT => {
+                // 알림 단계
+                self.last_intervention_ts = now_sec;
+                InterventionTrigger::TriggerNotification
+            },
+            _ => InterventionTrigger::DoNothing,
+        }
+    }
+
+    /// 사용자 피드백 시 강제로 상태를 초기화하는 메서드
+    pub fn manual_reset(&mut self) {
+        self.drift_gauge = 0.0;
+        self.current_state = FSMState::FOCUS;
+        println!("✨ State Manually Reset by User Feedback");
+    }
+    
+    // UI 표시용 Getter
+    pub fn get_gauge_ratio(&self) -> f64 {
+        (self.drift_gauge / THRESHOLD_BLOCK_SEC).min(1.0)
+    }
+
+    // commands.rs 에서 호출하는 헬퍼 메서드 추가
+    pub fn get_state_string(&self) -> String {
+        // Enum 상태를 문자열로 변환 (Debug 트레이트 활용)
+        format!("{:?}", self.current_state)
+    }
+
+    // [Fix] app_core.rs에서 상태 확인용 Getter 추가
+    pub fn get_state(&self) -> FSMState {
+        self.current_state.clone()
     }
 }
 
-// --- 3. 유틸리티 함수 ---
 
-/// 현재 시간을 초 단위 Unix 타임스탬프로 반환
-fn current_timestamp_s() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs()
-}
 
-// --- 4. 유닛 테스트 ---
-// 이 모듈이 독립적으로 잘 작동하는지 테스트
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::{ActiveWindowInfo, InputStats};
-    use std::time::Duration; // [추가] 10초 쿨다운을 시뮬레이션
+    use crate::inference::InferenceResult;
 
-    // 테스트용 목업(Mock) 데이터 생성
-    fn mock_window_info(title: &str, app_name: &str) -> ActiveWindowInfo {
-        ActiveWindowInfo {
-            timestamp_ms: 0, // 테스트에서는 중요하지 않음
-            title: title.to_string(),
-            process_path: "".to_string(),
-            app_name: app_name.to_string(),
-            window_id: "".to_string(),
-            process_id: 0,
-            x: 0.0,
-            y: 0.0,
-            width: 0.0,
-            height: 0.0,
+    // 테스트 헬퍼: 엔진을 만들고 특정 상태로 틱(Tick)을 진행시킴
+    fn simulate_ticks(
+        engine: &mut StateEngine, 
+        seconds: u64, 
+        inference: InferenceResult,
+        mouse: bool,
+        input: bool
+    ) -> InterventionTrigger {
+        let start_time = engine.last_tick_ts.max(1000); // 0 방지
+        let mut last_trigger = InterventionTrigger::DoNothing;
+
+        for i in 1..=seconds {
+            // 1초씩 시간 증가 시뮬레이션
+            last_trigger = engine.process(
+                &inference, 
+                start_time + i, 
+                mouse, 
+                input
+            );
         }
-    }
-
-    // 'InputStats' 맞게 목업 데이터 생성
-    fn mock_input_stats(last_input_ago_s: u64) -> InputStats {
-        let now_ms = current_timestamp_s() * 1000;
-        InputStats {
-            meaningful_input_events: 1,
-            last_meaningful_input_timestamp_ms: now_ms.saturating_sub(last_input_ago_s * 1000),
-            last_mouse_move_timestamp_ms: now_ms,
-            start_monitoring_timestamp_ms: 0,
-            visible_windows: Vec::new(),
-        }
-    }
-    #[test]
-    fn test_distraction_score_increases() {
-        let mut engine = StateEngine::new();
-        let window_info = mock_window_info("Working on Document", "word.exe");
-        let input_stats = mock_input_stats(10); // 10초 전 입력
-
-        // 처음에는 점수가 0
-        assert_eq!(engine.get_current_score(), 0);
-
-        // 방해 앱 실행
-        let distraction_window = mock_window_info("YouTube - Google Chrome", "chrome.exe");
-        let trigger = engine.process_activity(&distraction_window, &input_stats);
-
-        // 점수가 오르고, 알림 트리거 확인 (규칙에 따라 다름)
-        assert!(engine.get_current_score() > 0);
-        assert_eq!(engine.get_current_score(), SCORE_DISTRACTION_APP);
-        // (점수가 THRESHOLD_NOTIFICATION보다 낮다는 가정 하에)
-        // assert_eq!(trigger, InterventionTrigger::DoNothing); // 또는 TriggerNotification
+        last_trigger
     }
 
     #[test]
-    fn test_inactivity_score_only_if_distraction() {
+    fn test_strong_outlier_accumulation() {
         let mut engine = StateEngine::new();
+        engine.last_tick_ts = 1000; // 초기화
 
-        // 1. 업무 중 + 비활성 (생각하는 시간)
-        let window_info_work = mock_window_info("Working on Document", "word.exe");
-        let input_stats_inactive = mock_input_stats(240); // 4분
-        engine.process_activity(&window_info_work, &input_stats_inactive);
-        // 점수가 오르지 않아야 함 (오히려 0이거나 감소)
-        assert_eq!(engine.get_current_score(), 0);
-
-        // 2. 딴짓 중 + 비활성
-        let window_info_distraction = mock_window_info("YouTube", "chrome.exe");
-        engine.process_activity(&window_info_distraction, &input_stats_inactive);
-        // 딴짓 점수 + 비활성 점수
-        assert_eq!(
-            engine.get_current_score(),
-            SCORE_DISTRACTION_APP + SCORE_INACTIVITY_MILD
-        );
+        // 1. Strong Outlier 30초 지속 -> 게이지 30 (1.0배속)
+        // -> DRIFT 진입 -> Notification 발생
+        let trigger = simulate_ticks(&mut engine, 30, InferenceResult::StrongOutlier, false, false);
+        
+        assert_eq!(engine.current_state, FSMState::DRIFT);
+        assert_eq!(trigger, InterventionTrigger::TriggerNotification);
+        assert!((engine.drift_gauge - 30.0).abs() < 0.1); // 부동소수점 오차 허용 비교
     }
 
     #[test]
-    fn test_score_decays_when_productive() {
+    fn test_weak_outlier_time_dilation() {
         let mut engine = StateEngine::new();
+        engine.last_tick_ts = 1000;
 
-        // 1. 점수를 먼저 올림 (방해 앱)
-        let distraction_window = mock_window_info("YouTube", "chrome.exe");
-        let input_stats = mock_input_stats(10);
-        engine.process_activity(&distraction_window, &input_stats);
-        let initial_score = engine.get_current_score();
-        assert_eq!(initial_score, SCORE_DISTRACTION_APP); // 점수: 5
-
-        // 2. 'DECAY_INTERVAL_S' (10초) 이상 시간이 흐르도록 시뮬레이션
-        std::thread::sleep(Duration::from_secs(DECAY_INTERVAL_S + 1));
-
-        // 3. '업무 중' 함수를 1회 호출
-        let productive_window = mock_window_info("Productive Task", "code.exe");
-        let productive_stats_inactive = mock_input_stats(30); // (생각 중)
-        engine.process_activity(&productive_window, &productive_stats_inactive);
-
-        //  10초가 지났으므로 점수가 1 감소해야 함
-        assert_eq!(engine.get_current_score(), initial_score.saturating_sub(1)); // 점수: 4
-
-        // 4. 10초가 흐르기 *전*에 '업무 중' 함수를 다시 호출
-        engine.process_activity(&productive_window, &productive_stats_inactive);
-
-        //  쿨다운이 갱신되지 않았으므로 점수가 4점으로 유지되어야 함
-        assert_eq!(engine.get_current_score(), initial_score.saturating_sub(1));
+        // 1. Weak Outlier 30초 지속 -> 게이지 15 (0.5배속)
+        // -> 아직 FOCUS 상태여야 함 (임계값 30 미만)
+        let trigger = simulate_ticks(&mut engine, 30, InferenceResult::WeakOutlier, false, false);
+        
+        assert_eq!(engine.current_state, FSMState::FOCUS);
+        assert_eq!(trigger, InterventionTrigger::DoNothing);
+        assert!((engine.drift_gauge - 15.0).abs() < 0.1);
     }
 
-    //  업무 복귀 시 알림이 즉시 멈추는지 테스트
     #[test]
-    fn test_intervention_stops_immediately_on_work_and_escalates() {
+    fn test_safety_net_active_thinking() {
         let mut engine = StateEngine::new();
-        let input_stats = mock_input_stats(10);
-        let distraction_window = mock_window_info("YouTube", "chrome.exe");
+        engine.last_tick_ts = 1000;
 
-        // 1. 점수를 20점 (Overlay)까지 강제로 증가
-        engine.process_activity(&distraction_window, &input_stats); // 5 (Lvl 0)
-        let trigger_notify = engine.process_activity(&distraction_window, &input_stats); // 10 (Lvl 1)
-        let trigger_nothing = engine.process_activity(&distraction_window, &input_stats); // 15 (Lvl 1, Snooze)
-        let trigger_overlay = engine.process_activity(&distraction_window, &input_stats); // 20 (Lvl 2)
-
-        // Notify(Lvl 1)는 Overlay(Lvl 2)를 막지 못해야 함
-        assert_eq!(trigger_notify, InterventionTrigger::TriggerNotification);
-        assert_eq!(trigger_nothing, InterventionTrigger::DoNothing);
-        assert_eq!(trigger_overlay, InterventionTrigger::TriggerOverlay);
-        assert_eq!(engine.get_current_score(), 20);
-        assert_eq!(engine.last_intervention_level, 2);
-
-        // 2. 업무 앱으로 전환
-        let productive_window = mock_window_info("Productive Task", "code.exe");
-        let trigger_work = engine.process_activity(&productive_window, &input_stats);
-
-        // 3. 점수는 20으로 *유지* (쿨다운 전)
-        assert_eq!(engine.get_current_score(), 20);
-        // 4. 하지만 반환값은 DoNothing (개입 즉시 멈춤)
-        assert_eq!(trigger_work, InterventionTrigger::DoNothing);
-
-        // 5.  쿨다운 로직이 '개입 수준'을 리셋하는지 검증 (루프 사용)
-        // (점수를 20점에서 9점으로, 총 11점 감소시켜야 함)
-        for i in 0..11 {
-            // [!] 10초(DECAY_INTERVAL_S) 이상 시간이 흐르도록 시뮬레이션
-            std::thread::sleep(Duration::from_secs(DECAY_INTERVAL_S + 1));
-
-            // [!] 쿨다운 로직을 1회 실행
-            engine.process_activity(&productive_window, &input_stats);
-
-            //  점수가 1점 감소했는지 확인 (20->19, 19->18 ...)
-            assert_eq!(engine.get_current_score(), 20 - (i + 1));
-        }
-
-        // 11번의 루프 후 점수가 9점이 되었는지 확인
-        assert_eq!(engine.get_current_score(), 9);
-        // 점수가 10점 미만이 되었으므로, 개입 수준이 0으로 리셋되었는지 확인
-        assert_eq!(engine.last_intervention_level, 0);
+        // 1. Weak Outlier지만 마우스가 움직임 (Safety 2) -> 0.25배속
+        // 40초 흐름 -> 게이지 10 증가 (40 * 0.25)
+        simulate_ticks(&mut engine, 40, InferenceResult::WeakOutlier, true, false);
+        
+        assert!((engine.drift_gauge - 10.0).abs() < 0.1);
     }
 
-    //  알림이 '한 번만'이 아니라 '10초 스누즈' 후에
-    // 다시 발생하는지 검증
     #[test]
-    fn test_notification_snoozes_and_resets() {
+    fn test_fast_recovery() {
         let mut engine = StateEngine::new();
-        let input_stats = mock_input_stats(10);
-        let distraction_window = mock_window_info("YouTube", "chrome.exe");
+        engine.last_tick_ts = 1000;
+        engine.drift_gauge = 30.0; // 이미 DRIFT 상태라고 가정
+        engine.current_state = FSMState::DRIFT;
 
-        // 1. 10점 도달 -> 알림 1회 발생
-        engine.process_activity(&distraction_window, &input_stats); // 5
-        let trigger_notify = engine.process_activity(&distraction_window, &input_stats); // 10
+        // 1. 업무 복귀(Inlier) 10초 -> 게이지 20 감소 (2.0배속) -> 10 남음
+        simulate_ticks(&mut engine, 10, InferenceResult::Inlier, false, true);
+        
+        assert!((engine.drift_gauge - 10.0).abs() < 0.1);
+        
+        // 2. 추가 5초 -> 게이지 0 (음수 방지 확인)
+        simulate_ticks(&mut engine, 5, InferenceResult::Inlier, false, true);
+        assert_eq!(engine.drift_gauge, 0.0);
+    }
 
-        assert_eq!(trigger_notify, InterventionTrigger::TriggerNotification); // 알림 발생
-        let first_intervention_time = engine.last_intervention_timestamp_s;
-        assert_eq!(engine.last_intervention_level, 1);
+    #[test]
+    fn test_transition_and_snooze() {
+        let mut engine = StateEngine::new();
+        engine.last_tick_ts = 1000;
 
-        // 2. 딴짓을 계속 (점수 15점)
-        let trigger_nothing = engine.process_activity(&distraction_window, &input_stats); // 15
+        // 1. 30초 딴짓 -> Notification 발동 (시각: 1030)
+        let t1 = simulate_ticks(&mut engine, 30, InferenceResult::StrongOutlier, false, false);
+        assert_eq!(t1, InterventionTrigger::TriggerNotification);
 
-        assert_eq!(engine.get_current_score(), 15);
-        // [!] 스누즈(10초)가 활성 중이고, 레벨(1)이 오르지 않았으므로 DoNothing
-        assert_eq!(trigger_nothing, InterventionTrigger::DoNothing);
-        assert_eq!(
-            engine.last_intervention_timestamp_s,
-            first_intervention_time
-        );
+        // 2. 바로 다음 1초 딴짓 -> Snooze 때문에 DoNothing (시각: 1031, 경과: 1초)
+        let t2 = simulate_ticks(&mut engine, 1, InferenceResult::StrongOutlier, false, false);
+        assert_eq!(t2, InterventionTrigger::DoNothing);
 
-        // 3. 'SNOOZE_DURATION_S' (10초) 이상 시간이 흐르도록 시뮬레이션
-        std::thread::sleep(Duration::from_secs(SNOOZE_DURATION_S + 1));
+        // 3. 8초 더 딴짓 -> 총 9초 경과 (시각: 1039, 경과: 9초)
+        simulate_ticks(&mut engine, 8, InferenceResult::StrongOutlier, false, false);
 
-        // 4. 딴짓을 계속 (점수 20점 -> Overlay로 에스컬레이션)
-        let trigger_notify_again = engine.process_activity(&distraction_window, &input_stats);
-
-        assert_eq!(engine.get_current_score(), 20);
-        // [!] 10초가 지났으므로, 스누즈가 풀리고 '다시' 개입해야 함
-        assert_eq!(trigger_notify_again, InterventionTrigger::TriggerOverlay);
-        assert!(engine.last_intervention_timestamp_s > first_intervention_time);
+        // 4. 1초 더 딴짓 -> 총 10초 경과 (시각: 1040, 경과: 10초) -> Snooze 만료, Notification 발동
+        let t3 = simulate_ticks(&mut engine, 1, InferenceResult::StrongOutlier, false, false);
+        assert_eq!(t3, InterventionTrigger::TriggerNotification);
+        
+        // 5. 20초 더 딴짓 -> 게이지 60 도달 -> Overlay 발동
+        // (현재 게이지 약 40초 + 20초 = 60초)
+        let t4 = simulate_ticks(&mut engine, 20, InferenceResult::StrongOutlier, false, false);
+        assert_eq!(t4, InterventionTrigger::TriggerOverlay);
     }
 }

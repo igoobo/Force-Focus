@@ -41,7 +41,7 @@ active-win-pos-rs = "0.9.1"
 chrono = "0.4.42"
 
 # 6. higher level HTTP client library
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", features = ["json", "stream", "multipart"] }
 
 # 7. notification
 tauri-plugin-notification = "2"
@@ -54,6 +54,12 @@ lazy_static = "1.5.0"
 
 # 10. 비동기 연결
 tokio = { version = "1.48.0", features = ["full"] }
+
+# 스트림 처리를 위한 유틸리티
+futures-util = "0.3.31"
+
+# 에러 처리를 위한 모던 스탠다드 (기존 코드에 없다면 추가)
+anyhow = "1.0"
 
 # .env
 dotenv = "0.15.0"
@@ -92,3 +98,8 @@ features = ["std"]
 tauri-plugin-autostart = "2"
 tauri-plugin-single-instance = "2"
 
+# [ML Inference]
+# ort: ONNX Runtime의 Rust 바인딩. (삭제-'load-dynamic'은 시스템 라이브러리 의존성을 줄여줌.)
+# ort 2.0부터는 download-binaries만 선언해도 자동으로 동적 링크(Dynamic Linking)가 활성화
+ort = { version = "2.0.0-rc.11", features = ["download-binaries", "ndarray"] }
+ndarray = "0.17.2" # 행렬 연산용
