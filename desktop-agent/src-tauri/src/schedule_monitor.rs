@@ -58,23 +58,22 @@ async fn check_and_execute_schedules(app: &AppHandle) -> Result<(), String> {
     let current_time_str = now.format("%H:%M").to_string(); // "14:00" 형식
 
     for schedule in schedules {
-        // [조건 1] 요일 일치 여부
-        // [Modified] 날짜/요일 매칭 로직
-        // 1. Specific Date가 있으면 -> 날짜가 일치해야 함 (요일 무시)
-        // 2. Specific Date가 없으면 -> 요일(days_of_week)이 일치해야 함
-        let is_date_match = if let Some(target_date) = &schedule.start_date {
-            if target_date.is_empty() {
-                // 빈 문자열이면 요일 체크로 fallback
-                schedule.days_of_week.contains(&current_weekday)
-            } else {
-                // "YYYY-MM-DD" 형식 비교
-                let today_str = now.format("%Y-%m-%d").to_string();
-                target_date == &today_str
+        // [조건 1] 요일 및 날짜 조건 매칭 로직
+        // 1. target_date가 설정되어 있고, 오늘 날짜가 시작 날짜보다 이전이면 실행 안 함
+        // 2. 이후, days_of_week에 오늘의 요일(0~6)이 포함되어 있어야만 실행됨 
+        let mut is_date_match = schedule.days_of_week.contains(&current_weekday);
+
+        if is_date_match {
+            if let Some(target_date) = &schedule.start_date {
+                if !target_date.is_empty() {
+                    let today_str = now.format("%Y-%m-%d").to_string();
+                    // 문자열 비교로 간단히 '오늘이 시작일 이전인지' 체크 (YYYY-MM-DD 형식이므로 사전순 비교 가능)
+                    if today_str < *target_date {
+                        is_date_match = false;
+                    }
+                }
             }
-        } else {
-            // 날짜 지정 없으면 요일 체크
-            schedule.days_of_week.contains(&current_weekday)
-        };
+        }
 
         if !is_date_match {
             continue;
