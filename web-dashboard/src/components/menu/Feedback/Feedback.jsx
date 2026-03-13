@@ -6,13 +6,23 @@ import "./Feedback.css";
 export default function Feedback() {
   const feedbackViewMode = useMainStore((state) => state.feedbackViewMode);
   const setFeedbackViewMode = useMainStore((state) => state.setFeedbackViewMode);
-  const isDarkMode = useMainStore((state) => state.isDarkMode); // 전역 상태에서 다크모드 여부 확인
+  const isDarkMode = useMainStore((state) => state.isDarkMode); 
   
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [progressWidth, setProgressWidth] = useState(0); // 애니메이션용 상태
+  // 전역 스토어 캐시 상태 및 업데이트 액션 구독
+  const feedbackCache = useMainStore((state) => state.feedbackCache);
+  const setFeedbackCache = useMainStore((state) => state.setFeedbackCache);
 
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false); 
+  const [error, setError] = useState(null);
+  const [progressWidth, setProgressWidth] = useState(0); 
+
+  // --- 세션 목록 및 선택 관련 상태 ---
+  const [sessionList, setSessionList] = useState([]);
+  const [sessionLoading, setSessionLoading] = useState(true);
+  const [selectedSessionId, setSelectedSessionId] = useState("");
+
+  // old_feedback.jsx의 텍스트 포맷팅 함수
   const formatText = (text) => {
     if (!text) return "";
     return text
@@ -20,7 +30,7 @@ export default function Feedback() {
       .replace(/\n/g, "<br/>");
   };
 
-  // [수정] 제목 키워드에 따른 동적 아이콘 지정 함수 추가
+  // old_feedback.jsx의 아이콘 지정 함수
   const getStrategyIcon = (title) => {
     if (!title) return "💡";
     if (title.includes("시각") || title.includes("눈") || title.includes("화면")) return "👁️";
@@ -32,27 +42,77 @@ export default function Feedback() {
     return "💡";
   };
 
+  // 1. 컴포넌트 마운트 시 세션 목록 로드
+  const fetchSessionList = async (isMounted) => {
+    setSessionLoading(true);
+
+    // 20초 타임아웃 설정
+    const timeoutId = setTimeout(() => {
+      if (isMounted.current) {
+        setSessionLoading(false);
+        console.warn("세션 로드 타임아웃: 20초 경과");
+      }
+    }, 20000);
+
+    try {
+      // 캐시 방지를 위한 타임스탬프 추가
+      const response = await authApi.get(`/api/v1/sessions/?limit=20&t=${new Date().getTime()}`);
+      const sessions = Array.isArray(response.data) ? response.data : (response.data.sessions || []);
+    
+      if (isMounted.current) {
+        clearTimeout(timeoutId);
+        setSessionList(sessions);
+      }
+    } catch (err) {
+      console.error("세션 목록 로드 실패:", err);
+      if (isMounted.current) clearTimeout(timeoutId);
+    } finally {
+      if (isMounted.current) setSessionLoading(false);
+    }
+  };
+
+  // 컴포넌트 마운트 시 실행되는 Hook
+  const isMounted = React.useRef(true);
+
   useEffect(() => {
-    const fetchFeedback = async () => {
-      const cachedFeedback = sessionStorage.getItem("last_ai_feedback");
-      
-      if (cachedFeedback) {
-        const parsed = JSON.parse(cachedFeedback);
-        setData(parsed);
+    isMounted.current = true;
+
+    // 1 & 2번 조건: 전체 새로고침 시 컴포넌트가 재마운트되므로 항상 이 로직이 실행됨
+    // 이전에 타임아웃이 났었더라도 새로고침하면 다시 호출함
+    fetchSessionList(isMounted);
+
+    return () => {
+      isMounted.current = false; // 언마운트 시 처리
+    };
+  }, []);
+
+  // 2. 선택된 세션 ID 변경 시 데이터 페칭 (캐싱 포함)
+  useEffect(() => {
+    if (!selectedSessionId) return;
+
+    const fetchFeedbackData = async () => {
+      // 캐시 확인
+      if (feedbackCache[selectedSessionId]) {
+        const cachedData = feedbackCache[selectedSessionId];
+        setData(cachedData);
         setLoading(false);
-        // 캐시 데이터 로드 시에도 약간의 지연 후 게이지 애니메이션 실행
-        setTimeout(() => setProgressWidth(parsed.distraction_ratio || 0), 100);
+        setTimeout(() => setProgressWidth(cachedData.distraction_ratio || 0), 100);
         return;
       }
 
       setLoading(true);
       setError(null);
       try {
-        const response = await authApi.get("/api/v1/insight/last-session");
-        setData(response.data);
-        sessionStorage.setItem("last_ai_feedback", JSON.stringify(response.data));
-        // 데이터 수신 후 애니메이션 실행
-        setTimeout(() => setProgressWidth(response.data.distraction_ratio || 0), 100);
+        // 백엔드 엔드포인트: /insight/analyze/{id}
+        const response = await authApi.get(`/api/v1/insight/analyze/${selectedSessionId}`);
+        const freshData = response.data;
+        
+        setData(freshData);
+        // 전역 스토어 캐시 업데이트
+        setFeedbackCache({ ...feedbackCache, [selectedSessionId]: freshData });
+        
+        // 애니메이션 실행
+        setTimeout(() => setProgressWidth(freshData.distraction_ratio || 0), 100);
       } catch (err) {
         console.error("AI Insight Fetch Error:", err);
         setError("데이터를 불러오는 중 오류가 발생했습니다.");
@@ -61,40 +121,41 @@ export default function Feedback() {
       }
     };
 
-    fetchFeedback();
-  }, []);
+    fetchFeedbackData();
+  }, [selectedSessionId]);
 
+  // old_feedback.jsx의 탭 클릭 로직
   const handleTabClick = (tabName) => {
     setFeedbackViewMode(tabName);
-    // 탭 전환 시 피로도 탭이면 게이지 애니메이션 재초기화
     if (tabName === "피로도" && data) {
       setProgressWidth(0);
       setTimeout(() => setProgressWidth(data.distraction_ratio || 0), 50);
     }
   };
 
-  if (loading) {
-    return (
-      <div className={`feedback-container ${isDarkMode ? "dark-theme" : ""}`}>
-        <div className="feedback-content" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-          <div className="loader"></div>
-          <p style={{ marginLeft: '15px', color: 'var(--text-muted)' }}>최근 세션 활동을 분석하고 있습니다...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !data) {
-    return (
-      <div className={`feedback-container ${isDarkMode ? "dark-theme" : ""}`}>
-        <div className="feedback-content">
-          <p style={{ color: 'var(--text-muted)' }}>{error || "표시할 분석 데이터가 없습니다."}</p>
-        </div>
-      </div>
-    );
-  }
-
+  // old_feedback.jsx의 렌더링 로직 (데이터 구조 변경 없음)
   const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="feedback-content">
+          <div className="feedback-loading-container">
+            <div className="loader"></div>
+            <p>세션 활동을 분석하고 있습니다...</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (error || !data) {
+      return (
+        <div className="feedback-content">
+          <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '40px' }}>
+            {error || "표시할 분석 데이터가 없습니다."}
+          </p>
+        </div>
+      );
+    }
+
     switch (feedbackViewMode) {
       case "종합":
         return (
@@ -150,7 +211,6 @@ export default function Feedback() {
           </div>
         );
       case "피로도":
-        // [수정] 반드시 2개의 카드가 출력되도록 데이터 보완 로직 추가
         const displayStrategies = [...(data.recovery_strategies || [])];
         if (displayStrategies.length < 1) {
           displayStrategies.push({ title: "시각적 휴식", items: ["20-20-20 규칙을 실천하세요.", "먼 곳을 바라보며 눈의 근육을 이완시키세요."] });
@@ -185,7 +245,6 @@ export default function Feedback() {
               <div className="strategy-grid">
                 {finalStrategies.map((strategy, index) => (
                   <div key={index} className="strategy-item">
-                    {/* [수정] getStrategyIcon 함수를 통한 동적 아이콘 할당 */}
                     <div className="icon" style={{textAlign: 'center', width: '100%'}}>
                       {getStrategyIcon(strategy.title)}
                     </div>
@@ -214,22 +273,87 @@ export default function Feedback() {
 
   return (
     <div className={`feedback-container ${isDarkMode ? "dark-theme" : ""}`}>
-      <div className="feedback-menu">
-        <ul>
-          {["종합", "집중도", "피로도"].map((tab) => (
-            <li 
-              key={tab}
-              className={feedbackViewMode === tab ? "active" : ""} 
-              onClick={() => handleTabClick(tab)}
-            >
-              {tab}
-            </li>
-          ))}
-        </ul>
-      </div>
-      <div className="feedback-content">
-        {renderContent()}
-      </div>
+      {/* 세션 선택 모달 UI */}
+      {!selectedSessionId && (
+        <div className="modal-overlay">
+          <div className="session-selection-modal fade-in">
+            <div className="modal-header">
+              <h2>피드백 대상 세션 선택</h2>
+              <p>AI 기반 피드백을 확인하고 싶은 작업 세션을 선택해 주세요.</p>
+            </div>
+            <div className="session-list-wrapper">
+              {sessionLoading ? (
+                <div className="session-status-container">
+                  <div className="loader"></div>
+                  <p className="empty-msg">세션 데이터를 불러오는 중입니다...</p>
+                </div>
+              ) : sessionList.length > 0 ? (
+                sessionList.map((session, index) => (
+                  <div 
+                    key={session.id} 
+                    /* 첫 번째 아이템(가장 최근)에 'latest' 클래스 부여 */
+                    className={`session-item-card ${index === 0 ? 'latest' : ''}`}
+                    onClick={() => setSelectedSessionId(session.id)}
+                  >
+                    <div className="session-info-group">
+                      {/* 가장 최근 세션일 경우 [최근] 문구 표시 */}
+                      {index === 0 && <span className="latest-badge">최근</span>}
+                      <span className="session-date">
+                        {new Date(session.start_time).toLocaleString('ko-KR', { 
+                          month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+                        })} 세션
+                      </span>
+                    </div>
+                    <span className="arrow-icon">→</span>
+                  </div>
+                ))
+              ) : (
+                // 3. 세션 기록이 아예 없는 경우
+                <div className="session-status-container">
+                  <p className="empty-msg">불러올 사용자 세션 기록이 없습니다.</p>
+                  <button 
+                    className="general-feedback-btn"
+                    onClick={() => setSelectedSessionId("general")}
+                  >
+                    기본 가이드(범용 피드백) 열람하기
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 선택 후 보여질 피드백 레이아웃 */}
+      {selectedSessionId && (
+        <>
+          {/* 버튼을 메뉴 바 안으로 이동하여 높이를 통일함 */}
+          <div className="feedback-menu-container">
+            <div className="feedback-menu">
+              <ul>
+                {["종합", "집중도", "피로도"].map((tab) => (
+                  <li 
+                    key={tab}
+                    className={feedbackViewMode === tab ? "active" : ""} 
+                    onClick={() => handleTabClick(tab)}
+                  >
+                    {tab}
+                  </li>
+                ))}
+              </ul>
+            </div>
+      
+            {/* 우측 정렬된 다른 세션 선택 버튼 */}
+            <button className="back-to-list-btn" onClick={() => setSelectedSessionId("")}>
+              <span className="icon">↺</span> 다른 세션 선택
+            </button>
+          </div>
+
+          <div className="feedback-content">
+            {renderContent()}
+          </div>
+        </>
+      )}
     </div>
   );
 }
