@@ -13,7 +13,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager, Runtime}; // cache_event 함수에 필요한 use 문
 
 // lib.rs
-use crate::commands::InputStats;
+use crate::commands::input::InputStats;
 use crate::ActiveSessionInfo;
 use crate::LoggableEventData;
 

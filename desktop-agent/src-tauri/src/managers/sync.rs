@@ -5,7 +5,7 @@ use tokio::time::sleep;
 use serde_json::json;
 use chrono::{DateTime, Utc}; // 날짜 변환용
 
-use crate::backend_communicator::{BackendCommunicator, FeedbackPayload};
+use crate::utils::backend_comm::{BackendCommunicator, FeedbackPayload};
 use crate::StorageManagerArcMutex;
 
 /// 백그라운드 동기화 루프 시작

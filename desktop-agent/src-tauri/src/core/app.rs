@@ -1,21 +1,17 @@
 // 파일 위치: src-tauri/src/app_core.rs
 
 use crate::{
-    commands::{self, ActiveWindowInfo, WindowInfo}, // commands 모듈 활용
-    state_engine::{self, StateEngine, InterventionTrigger},
-    window_commands,
-    InputStatsArcMutex,     // lib.rs에서 정의한 타입
-    SessionStateArcMutex,   // 전역 세션 상태 import
-    StateEngineArcMutex,    // lib.rs에서 정의할 타입
-    StorageManagerArcMutex, // LSN import (이벤트 캐싱을 위해)
-    inference::InferenceEngine // 추론 엔진
+    commands::{self, vision::{ActiveWindowInfo, WindowInfo}},
+    core::state::{self, StateEngine, InterventionTrigger},
+    commands::input::InputStatsArcMutex,
+    SessionStateArcMutex,
+    StorageManagerArcMutex,
+    ai::inference::InferenceEngine
 };
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::sync::Mutex;
-use std::sync::Arc;
-use tauri::{AppHandle, Emitter, Manager, Runtime, State, WebviewUrl, WebviewWindowBuilder};
-use std::fs;
+use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewUrl, WebviewWindowBuilder};
 use tauri::path::BaseDirectory;
 use uuid::Uuid;
 use std::collections::{HashMap, VecDeque};
@@ -34,7 +30,7 @@ pub struct AppCore {
     pub last_event_count: u64,
     
     // 4. ML의 최근 판단 결과를 기억 (5초간 유지용)
-    pub last_inference_result: crate::inference::InferenceResult,
+    pub last_inference_result: crate::ai::inference::InferenceResult,
 
     // 현재 모니터링 중인 이벤트의 ID (피드백 연결용)
     pub current_event_id: Option<String>,
@@ -110,7 +106,7 @@ impl AppCore {
             inference_engine,
             state_engine: StateEngine::new(),
             last_event_count: 0,
-            last_inference_result: crate::inference::InferenceResult::Inlier,
+            last_inference_result: crate::ai::inference::InferenceResult::Inlier,
             current_event_id: None,
             global_map,
             delta_history: VecDeque::with_capacity(12),
@@ -213,15 +209,15 @@ pub fn start_core_loop<R: Runtime>(
                     tick_counter = 0; // 카운터 리셋
 
                     // 1. 활성 창 정보 수집
-                    if let Ok(window_info) = commands::_get_active_window_info_internal() {
+                    if let Ok(window_info) = crate::commands::vision::_get_active_window_info_internal() {
                         
                         // 시각 센서 (Visible Windows) 수집
-                        let mut visible_windows_raw = commands::_get_all_visible_windows_internal();
+                        let mut visible_windows_raw = commands::vision::_get_all_visible_windows_internal();
 
                         // 시맨틱 태깅 (Semantic Tagging)
                         // 원본 제목을 '토큰화 + 숫자 필터링'된 문자열로 세탁
                         for window in &mut visible_windows_raw {
-                            let tokens = commands::get_semantic_tokens(&window.app_name, &window.title);
+                            let tokens = commands::vision::get_semantic_tokens(&window.app_name, &window.title);
                             if !tokens.is_empty() {
                                 window.title = tokens.join(" ");
                             } else {
@@ -231,7 +227,7 @@ pub fn start_core_loop<R: Runtime>(
 
                         // 활성 창(Active Window) 태깅
                         // 활성 창 역시 동일한 로직으로 토큰을 추출합니다.
-                        let active_tokens = commands::get_semantic_tokens(&window_info.app_name, &window_info.title);
+                        let active_tokens = commands::vision::get_semantic_tokens(&window_info.app_name, &window_info.title);
                         let sanitized_active_title = active_tokens.join(" ");
 
                         // UUID 생성 (Flag 발급)
@@ -292,7 +288,7 @@ pub fn start_core_loop<R: Runtime>(
                         } else { 0.0 };
 
                         let sig_x = 1.0 / (delta_f64 + 0.1);
-                        let sigmoid = 1.0 / (1.0 + (-sig_x).exp());
+                        let sigmoid = 1.0 / (1.0 + (-sig_x as f64).exp());
                         let x_interaction = sigmoid * context_score;
 
                         // 3. 완벽히 일치하는 ML 벡터 구성
@@ -375,10 +371,10 @@ pub fn start_core_loop<R: Runtime>(
 
                         if let Some(overlay_window) = app_handle_clone.get_webview_window("overlay") {
                             // 1. 투명 모드(Click-Through) 활성화
-                            let _ = window_commands::set_overlay_ignore_cursor_events(app_handle_clone.clone(), true);
+                            let _ = commands::window::set_overlay_ignore_cursor_events(app_handle_clone.clone(), true);
                             
                             // 2. 창 표시
-                            let _ = window_commands::show_overlay(app_handle_clone.clone());
+                            let _ = commands::window::show_overlay(app_handle_clone.clone());
                             
                             // 3. [핵심 수정] 특정 윈도우에 직접 발송
                             // 문자열 대신 확실한 JSON 형태 전송 권장하지만, 기존 호환성을 위해 문자열 유지하되 타겟팅 변경
@@ -393,10 +389,10 @@ pub fn start_core_loop<R: Runtime>(
 
                         if let Some(overlay_window) = app_handle_clone.get_webview_window("overlay") {
                             // 1. 차단 모드(Block Input) 활성화
-                            let _ = window_commands::set_overlay_ignore_cursor_events(app_handle_clone.clone(), false);
+                            let _ = commands::window::set_overlay_ignore_cursor_events(app_handle_clone.clone(), false);
                             
                             // 2. 창 표시
-                            let _ = window_commands::show_overlay(app_handle_clone.clone());
+                            let _ = commands::window::show_overlay(app_handle_clone.clone());
                             
                             // 3. [핵심 수정] 특정 윈도우에 직접 발송
                             println!("➡️ Sending 'overlay' event directly to window...");
@@ -413,13 +409,13 @@ pub fn start_core_loop<R: Runtime>(
                         // [Fix] 게이지가 줄어들어 FOCUS 상태(30 미만)로 돌아오면 오버레이 숨김
                         // (기존에는 0.0일 때만 숨겨서 29초여도 오버레이가 안 꺼지는 문제 발생)
                         let should_hide = core.state_engine.get_gauge_ratio() <= 0.0 
-                            || core.state_engine.get_state() == state_engine::FSMState::FOCUS;
+                            || core.state_engine.get_state() == crate::core::state::FSMState::FOCUS;
 
                         if should_hide {
                              if let Some(window) = app_handle_clone.get_webview_window("overlay") {
                                  if window.is_visible().unwrap_or(false) {
-                                     // [Fix] Deadlock 방지: window_commands::hide_overlay 호출 대신 직접 로직 수행
-                                     // (window_commands::hide_overlay는 AppCore lock을 다시 시도하므로 교착상태 발생)
+                                     // [Fix] Deadlock 방지: commands::window::hide_overlay 호출 대신 직접 로직 수행
+                                     // (commands::window::hide_overlay는 AppCore lock을 다시 시도하므로 교착상태 발생)
                                      
                                      // 1. 상태 리셋 (제거함: 자연스러운 회복에서는 게이지를 0으로 초기화하면 안 됨)
                                      // core.state_engine.manual_reset(); 

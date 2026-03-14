@@ -1,35 +1,24 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
 // --- 1. 모듈 선언 ---
-pub mod app_core;
-pub mod backend_communicator;
-mod commands;
-pub mod input_monitor;
-mod logging;
-pub mod schedule_monitor;
-pub mod state_engine;
-#[allow(dead_code)]
-pub mod storage_manager;
-pub mod sync_manager;
-pub mod tray_manager;
-pub mod widget_manager;
-pub mod window_commands;
-pub mod inference;
-pub mod feature_extractor;
-pub mod model_update_manager;
-use crate::model_update_manager::ModelUpdateManager; 
-// --- 2. 전역 use ---
+pub mod ai;
+pub mod commands;
+pub mod core;
+pub mod managers;
+pub mod utils;
 
-use crate::storage_manager::StorageManager;
-use crate::inference::InferenceEngine;
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use sysinfo::System;
-use tauri::{AppHandle, Builder, Emitter, Manager, State, Url, WindowEvent};
-use tauri_plugin_deep_link::DeepLinkExt; //  딥 링크 확장 트레이트
-use tauri_plugin_autostart::MacosLauncher;
-use std::env; //  환경 변수 및 인자 수집용
+// --- 2. 전역 use ---
+use crate::ai::inference::InferenceEngine;
+use crate::ai::model_update::ModelUpdateManager;
+use crate::managers::storage::StorageManager;
+
+use std::env; // 환경 변수 및 인자 수집용
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use sysinfo::System;
+use tauri::{AppHandle, Emitter, Manager, Url, WindowEvent};
+use tauri_plugin_autostart::MacosLauncher;
+use tauri_plugin_deep_link::DeepLinkExt; // 딥 링크 확장 트레이트
 
 // --- 3. 전역 상태 타입 정의 ---
 
@@ -59,7 +48,7 @@ pub struct Task {
 pub struct LoggableEventData<'a> {
     pub app_name: &'a str,
     pub window_title: &'a str,
-    pub input_stats: &'a commands::InputStats,
+    pub input_stats: &'a commands::input::InputStats,
     // [추후] pub current_url: Option<&'a str>,
 }
 
@@ -67,10 +56,10 @@ pub struct LoggableEventData<'a> {
 pub struct SysinfoState(pub Mutex<System>);
 
 // 사용자 입력 통계 추적을 위한 공유 상태
-pub type InputStatsArcMutex = Arc<Mutex<commands::InputStats>>;
+pub type InputStatsArcMutex = Arc<Mutex<commands::input::InputStats>>;
 
 // StateEngine을 전역 상태로 관리하기 위한 타입 정의
-pub type StateEngineArcMutex = Arc<Mutex<state_engine::StateEngine>>;
+pub type StateEngineArcMutex = Arc<Mutex<core::state::StateEngine>>;
 
 // 전역 LSN(StorageManager) 상태 타입
 pub type StorageManagerArcMutex = Arc<Mutex<StorageManager>>;
@@ -144,20 +133,20 @@ fn handle_deep_link(app: &AppHandle, url: &Url) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // InputStats 초기화 데이터를 먼저 생성
-    let initial_input_stats = commands::InputStats::default();
+    let initial_input_stats = commands::input::InputStats::default();
 
     // InputStatsArcMutex 타입을 직접 manage
     let input_stats_manager_state: InputStatsArcMutex = Arc::new(Mutex::new(initial_input_stats));
 
     // BackendCommunicator 인스턴스를 생성
-    let backend_communicator_state = backend_communicator::BackendCommunicator::new();
+    let backend_communicator_state = utils::backend_comm::BackendCommunicator::new();
 
     // StateEngine 인스턴스를 생성
     let state_engine_manager_state: StateEngineArcMutex =
-        Arc::new(Mutex::new(state_engine::StateEngine::new()));
+        Arc::new(Mutex::new(core::state::StateEngine::new()));
 
     // Offline-First를 위한 상태 생성
-    let backend_communicator_state = Arc::new(backend_communicator::BackendCommunicator::new());
+    let backend_communicator_state = Arc::new(utils::backend_comm::BackendCommunicator::new());
 
     // ML 추론 엔진 초기화
     let model_path = "resources/models/personal_model.onnx";
@@ -224,11 +213,11 @@ pub fn run() {
             }
         })
 
-        .manage(commands::SysinfoState(
-            // commands::SysinfoState로 경로 명시
+        .manage(commands::system::SysinfoState(
+            // commands::system::SysinfoState로 경로 명시
             Mutex::new(System::new_all()),
         ))
-        // Arc<Mutex<commands::InputStats>> 타입을 관리
+        // Arc<Mutex<commands::input::InputStats>> 타입을 관리
         .manage(input_stats_manager_state.clone()) // 초기화된 Arc를 manage에 전달
         // StateEngine을 전역 상태로 등록
         .manage(state_engine_manager_state.clone())
@@ -291,7 +280,7 @@ pub fn run() {
             app.manage(update_manager);
 
             // 백그라운드 자동 업데이트 루프 시작
-            model_update_manager::start_update_loop(app_handle.clone());
+            ai::model_update::start_update_loop(app_handle.clone());
 
             // --- LSN 초기화 및 등록 ---
             let storage_manager = StorageManager::new_from_path(app_handle.clone())
@@ -337,7 +326,7 @@ pub fn run() {
                     // [케이스 A] 자동 시작 (Silent)
                     println!("App started in silent mode (Tray only).");
                     // 창을 띄우지 않음 (visible: false 상태 유지)
-                    // 트레이 아이콘은 tray_manager::setup_tray_menu에 의해 생성됨
+                    // 트레이 아이콘은 managers::tray::setup_tray_menu에 의해 생성됨
                 } else {
                     // [케이스 B] 사용자가 직접 실행 (Double Click)
                     println!("App started normally. Showing main window.");
@@ -359,30 +348,30 @@ pub fn run() {
             });
 
             // rdev 이벤트 리스너를 별도의 스레드에서 시작하는 함수
-            input_monitor::start_input_listener(input_stats_manager_state.clone());
+            core::input::start_input_listener(input_stats_manager_state.clone());
 
             // // 데이터 수집 및 로깅 기능 시작
             // let input_stats_arc_mutex_for_logging = Arc::clone(app_handle.state::<InputStatsArcMutex>().inner());
-            // logging::start_data_collection_and_logging(input_stats_arc_mutex_for_logging, 10); // 10초마다 로깅
+            // utils::logging::start_data_collection_and_logging(input_stats_arc_mutex_for_logging, 10); // 10초마다 로깅
             
             // AppCore 등록 (이게 있어야 commands.rs가 접근 가능)
-            use crate::app_core::AppCore;
+            use crate::core::app::AppCore;
             app.manage(std::sync::Mutex::new(AppCore::new(&app_handle)));
 
             // app_core의 '메인 루프'를 시작
             // app_handle을 복제하여 넘겨주어 스레드가 AppHandle을 소유
             // Core Loop 시작
-            app_core::start_core_loop(
+            core::app::start_core_loop(
                 app.handle().clone(),
                 app.state::<SessionStateArcMutex>().inner().clone(),
                 app.state::<StorageManagerArcMutex>().inner().clone(),
                 app.state::<InputStatsArcMutex>().inner().clone(),
             );
 
-            tray_manager::setup_tray_menu(app.handle())?;
+            managers::tray::setup_tray_menu(app.handle())?;
 
             // --- [추가] Task 4.10: '위젯 관리' 모듈 초기화 ---
-            widget_manager::setup_widget_listeners(
+            managers::widget::setup_widget_listeners(
                 app_handle.clone(),
                 session_manager_state.clone(),
             );
@@ -390,33 +379,33 @@ pub fn run() {
             // --- 백그라운드 데이터 동기화 시작 ---
             // 1분마다 LSN 데이터를 서버로 전송하는 루프를 시작
             // (내부적으로 토큰이 없으면 건너뛰므로 안전)
-            sync_manager::start_sync_loop(app.handle().clone());
+            managers::sync::start_sync_loop(app.handle().clone());
 
             // --- 스케줄 모니터링 시작 ---
             // 1분마다 로컬 DB를 확인하여 스케줄을 실행
-            schedule_monitor::start_monitor_loop(app.handle().clone());
+            managers::schedule::start_monitor_loop(app.handle().clone());
 
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             greet,
-            commands::get_current_active_window_info,
-            commands::get_all_processes_summary,
-            commands::get_input_frequency_stats,
-            commands::get_visible_windows, // 시각 센서 커맨드 등록
-            commands::check_model_update,
+            crate::commands::vision::get_current_active_window_info,
+            crate::commands::system::get_all_processes_summary,
+            crate::commands::input::get_input_frequency_stats,
+            crate::commands::vision::get_visible_windows, // 시각 센서 커맨드 등록
+            crate::commands::ml::check_model_update,
             // backend_communicator 모듈의 커맨드를 핸들러에 등록
-            backend_communicator::submit_feedback,
-            backend_communicator::start_session,
-            backend_communicator::end_session,
-            backend_communicator::get_tasks,
-            backend_communicator::get_current_session_info,
-            backend_communicator::login,             //  로그인 커맨드
-            backend_communicator::logout,            //  로그아웃 커맨드
-            backend_communicator::check_auth_status, // 자동 로그인 커맨드 등록
-            window_commands::hide_overlay,
-            window_commands::show_overlay,                   
-            window_commands::set_overlay_ignore_cursor_events, 
+            crate::utils::backend_comm::submit_feedback,
+            crate::utils::backend_comm::start_session,
+            crate::utils::backend_comm::end_session,
+            crate::utils::backend_comm::get_tasks,
+            crate::utils::backend_comm::get_current_session_info,
+            crate::utils::backend_comm::login,             //  로그인 커맨드
+            crate::utils::backend_comm::logout,            //  로그아웃 커맨드
+            crate::utils::backend_comm::check_auth_status, // 자동 로그인 커맨드 등록
+            crate::commands::window::hide_overlay,
+            crate::commands::window::show_overlay,                   
+            crate::commands::window::set_overlay_ignore_cursor_events, 
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

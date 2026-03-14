@@ -1,7 +1,7 @@
-use crate::backend_communicator::BackendCommunicator;
-use crate::app_core::AppCore; 
-use crate::storage_manager::StorageManager;
-use crate::inference::InferenceEngine;
+use crate::utils::backend_comm::BackendCommunicator;
+use crate::core::app::AppCore; 
+use crate::managers::storage::StorageManager;
+use crate::ai::inference::InferenceEngine;
 use crate::StorageManagerArcMutex;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;

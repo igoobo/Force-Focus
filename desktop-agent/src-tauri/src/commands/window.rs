@@ -1,6 +1,6 @@
 use tauri::{AppHandle, Manager, Runtime, State};
 use std::sync::Mutex;
-use crate::app_core::AppCore;
+use crate::core::app::AppCore;
 
 /// 'overlay' 창을 숨기고, FSM 상태를 리셋하는 Tauri 커맨드
 #[tauri::command]

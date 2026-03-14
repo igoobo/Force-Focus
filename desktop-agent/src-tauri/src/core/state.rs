@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::inference::InferenceResult;
+use crate::ai::inference::InferenceResult;
 
 // --- 1. 설정값 (시간 단위: 초) ---
 // 문서 Phase 4-2.A: 상태 정의 및 임계값
@@ -188,7 +188,7 @@ impl StateEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::inference::InferenceResult;
+    use crate::ai::inference::InferenceResult;
 
     // 테스트 헬퍼: 엔진을 만들고 특정 상태로 틱(Tick)을 진행시킴
     fn simulate_ticks(

@@ -1,5 +1,5 @@
 use std::collections::{VecDeque, HashMap};
-use crate::commands::{WindowInfo, InputStats};
+use crate::commands::{vision::WindowInfo, input::InputStats};
 
 /// 원천 데이터를 ML 모델 입력용 벡터로 변환하는 감각 기관
 pub struct FeatureExtractor {
@@ -95,7 +95,7 @@ impl FeatureExtractor {
         // 입력이 적을수록(침묵) 1.0에 가까워짐 -> 문맥이 중요해짐
         // 입력이 많으면(타이핑) 0.5에 가까워짐 -> 문맥 영향력 감소 (행동 자체가 중요)
         let input_factor = 1.0 / (delta + 0.1); // 분모 0 방지 (Spec: 0.1)
-        let sigmoid_val = 1.0 / (1.0 + (-input_factor).exp()); // Basic Sigmoid
+        let sigmoid_val = 1.0 / (1.0 + (-input_factor as f64).exp()); // Basic Sigmoid
         
         // 문서 의도: "입력이 없을 때(Sigmoid High) 문맥이 긍정적이면 Interaction 점수 부여"
         // 범위: 0.0 ~ 1.0 (Interaction은 긍정적 지표이므로 음수 Context는 0처리)

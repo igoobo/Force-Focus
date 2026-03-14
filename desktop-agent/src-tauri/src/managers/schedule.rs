@@ -99,7 +99,7 @@ async fn check_and_execute_schedules(app: &AppHandle) -> Result<(), String> {
 
 async fn trigger_schedule(
     app: &AppHandle,
-    schedule: &crate::storage_manager::LocalSchedule,
+    schedule: &crate::managers::storage::LocalSchedule,
     storage_state: &StorageManagerArcMutex,
 ) -> Result<(), String> {
     // A. 이미 세션이 진행 중인지 확인 (중복 실행 방지)

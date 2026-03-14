@@ -12,15 +12,15 @@ use std::thread; // 백그라운드 스레드 생성
 use std::time::Duration;
 use tauri::AppHandle;
 
-use crate::commands::InputStatsArcMutex;
+use crate::commands::input::InputStatsArcMutex;
 
 // 로그에 저장할 데이터 형식 정의 ---
 // 주기적으로 수집한 정보 담는 구조체
 #[derive(Debug, Serialize, Deserialize)] // Debug, Serialize, Deserialize 트레이트 파생
 pub struct ActivityLogEntry {
     pub timestamp: String, // ISO 8601 형식의 시간 (예: "2023-10-27T10:00:00+09:00")
-    pub active_window: Option<commands::ActiveWindowInfo>, // 활성 창 정보 (없을 수도 있으므로 Option)
-    pub input_stats: Option<commands::InputStats>, // 입력 통계 정보 (없을 수도 있으므로 Option)
+    pub active_window: Option<crate::commands::vision::ActiveWindowInfo>, // 활성 창 정보 (없을 수도 있으므로 Option)
+    pub input_stats: Option<commands::input::InputStats>, // 입력 통계 정보 (없을 수도 있으므로 Option)
 
                                                    // 참고: 프로세스 요약은 데이터가 너무 커질 수 있으므로, 초기 단계에서는 포함 안함
                                                    // 필요시 나중에 추가하거나, 요약된 형태로 저장하는 것을 고려
@@ -91,7 +91,7 @@ pub fn start_data_collection_and_logging(
             };
 
             // 1. 활성 창 정보 수집
-            match commands::_get_active_window_info_internal() {
+            match crate::commands::vision::_get_active_window_info_internal() {
                 Ok(active_window_info) => {
                     log_entry.active_window = Some(active_window_info);
                 }
