@@ -7,15 +7,11 @@ Table에 새로운 데이터 추가는 commands.rs에서 이루어짐
 use rusqlite::{Connection, OptionalExtension, Result, params};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager, Runtime}; // cache_event 함수에 필요한 use 문
 
 // lib.rs
-use crate::commands::input::InputStats;
-use crate::ActiveSessionInfo;
-use crate::LoggableEventData;
 
 // 로컬 작업 및 스케줄 구조체 (public)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -602,6 +598,7 @@ mod tests {
     use super::*;
     // 테스트용 lib.rs의 ActiveSessionInfo
     use crate::ActiveSessionInfo;
+    use crate::commands::input::InputStats;
 
     fn setup_test_db() -> StorageManager {
         StorageManager::new_in_memory().expect("Failed to create in-memory DB")

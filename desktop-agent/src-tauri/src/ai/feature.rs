@@ -158,3 +158,54 @@ impl FeatureExtractor {
         variance.sqrt()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calculate_context_score_strict() {
+        let extractor = FeatureExtractor::new();
+
+        // Case 1: Known positive tool -> VSCode (0.9)
+        let score1 = extractor.calculate_context_score_strict("Code", "main.rs - Visual Studio Code");
+        // "code" (0.9), "main", "rs" (0.9), "visual", "studio" (0.9), "code" (0.9)
+        // Average should be positive (0.9)
+        assert_eq!(score1, 0.9, "Should calculate correct positive average");
+
+        // Case 2: Known negative tool -> YouTube (-0.9)
+        let score2 = extractor.calculate_context_score_strict("chrome", "Cat Video - YouTube");
+        // "chrome" (0.1), "cat", "video", "youtube" (-0.9)
+        // Total matched: chrome (0.1) + youtube (-0.9) = -0.8
+        // Average: -0.8 / 2 = -0.4
+        assert_eq!(score2, -0.4, "Should calculate correct negative average");
+
+        // Case 3 (RED TEST for Edge Case): No match should be exactly 0.0
+        let score3 = extractor.calculate_context_score_strict("KakaoTalk", "Chatting with Mom");
+        assert_eq!(score3, 0.0, "Should return 0.0 if no keywords match");
+    }
+
+    #[test]
+    fn test_calculate_burstiness() {
+        let mut extractor = FeatureExtractor::new();
+        
+        // Initial state: burstiness should be 0.0
+        assert_eq!(extractor.calculate_burstiness(), 0.0, "Initial burstiness should be 0.0");
+
+        // Manually inject some history data: [2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0]
+        // Mean = 40.0 / 8 = 5.0
+        // Variances = [9.0, 1.0, 1.0, 1.0, 0.0, 0.0, 4.0, 16.0]
+        // Sum of variances = 32.0
+        // Population Variance = 32.0 / 8 = 4.0
+        // Standard Deviation (Burstiness) = 2.0
+        let data = vec![2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0];
+        for val in data {
+            extractor.input_count_history.push_back(val);
+        }
+
+        let burstiness = extractor.calculate_burstiness();
+        
+        // Assert within a small epsilon for float comparison
+        assert!((burstiness - 2.0).abs() < f64::EPSILON, "Burstiness should correctly calculate population standard deviation");
+    }
+}

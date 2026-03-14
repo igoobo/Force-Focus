@@ -295,4 +295,21 @@ mod tests {
         let t4 = simulate_ticks(&mut engine, 20, InferenceResult::StrongOutlier, false, false);
         assert_eq!(t4, InterventionTrigger::TriggerOverlay);
     }
+
+    #[test]
+    fn test_recovery_from_distracted_to_idle() {
+        let mut engine = StateEngine::new();
+        engine.last_tick_ts = 1000;
+        engine.drift_gauge = 65.0; // 강제 DISTRACTED 세팅 (임계값 60 이상)
+        engine.current_state = FSMState::DISTRACTED;
+
+        // 1. Inlier로 복귀 (배속: -2.0)
+        // 5초 경과 -> 10.0 감소 -> 55.0 (DRIFT 범위)
+        simulate_ticks(&mut engine, 5, InferenceResult::Inlier, false, true);
+        assert_eq!(engine.current_state, FSMState::DRIFT, "Should downgrade to DRIFT");
+        
+        // 2. 추가 15초 경과 -> 30.0 감소 -> 25.0 (FOCUS 범위)
+        simulate_ticks(&mut engine, 15, InferenceResult::Inlier, false, true);
+        assert_eq!(engine.current_state, FSMState::FOCUS, "Should downgrade to FOCUS");
+    }
 }
