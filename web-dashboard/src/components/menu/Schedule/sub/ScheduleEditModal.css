@@ -96,6 +96,8 @@
   font-family: inherit;
   box-sizing: border-box;
   transition: all 0.3s ease;
+  background-color: #ffffff;
+  color: #1f2937;
 }
 
 .form-group input:focus,
@@ -168,7 +170,7 @@
 .dark-theme .modal-form input,
 .dark-theme .modal-form textarea,
 .dark-theme .modal-form select {
-  background-color: #111827;
+  background-color: #0f172a;
   border: 1px solid #334155;
   color: #f8fafc;
 }

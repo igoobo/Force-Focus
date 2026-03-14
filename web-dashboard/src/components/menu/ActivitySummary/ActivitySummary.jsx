@@ -52,7 +52,7 @@ export default function ActivitySummary() {
   return (
     <div className={`activity-summary ${activityViewMode} ${isDarkMode ? "dark-theme" : ""}`}>
       <div className="summary-header">
-        <span className="summary-title">📊 주간 활동 요약 리포트</span>
+        <span className="summary-title">📊 최근 7일간 활동 요약 리포트</span>
         <button onClick={toggleLayout} className="toggle-btn">
           {activityViewMode === "vertical" ? "가로로 보기" : "세로로 보기"}
         </button>
@@ -70,7 +70,7 @@ export default function ActivitySummary() {
           <h3>활동 분석 요약 보고서</h3>
           {hasNoData ? (
             <div className="report-description empty">
-              <p>아직 활동 데이터가 존재하지 않습니다. 지금 바로 세션을 시작해 보세요!</p>
+              <p>지난 7일간 활동 데이터가 존재하지 않습니다. 지금 바로 세션을 시작해 보세요!</p>
             </div>
           ) : (
             <>

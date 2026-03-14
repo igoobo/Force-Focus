@@ -82,6 +82,8 @@
   font-size: 0.95rem;
   outline: none;
   font-family: "Inter", "Pretendard", "Noto Sans KR", sans-serif;
+  background-color: #ffffff;
+  color: #1f2937;
 }
 
 .modal-form input:focus,
