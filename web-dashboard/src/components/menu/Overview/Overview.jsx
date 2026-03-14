@@ -24,20 +24,54 @@ export default function Overview() {
   const [previewDate, setPreviewDate] = useState(new Date());
   const scrollRef = useRef(null);
 
-  // 피드백 데이터 상태 관리
+  // 피드백 데이터 상태 관리 및 전역 캐시 활용
+  const feedbackCache = useMainStore((state) => state.feedbackCache);
+  const setFeedbackCache = useMainStore((state) => state.setFeedbackCache);
   const [feedbackData, setFeedbackData] = useState(null);
   const [isFeedbackLoading, setIsFeedbackLoading] = useState(true);
+  // 가장 최근 세션의 ID를 정확히 저장하기 위한 상태 추가
+  const [latestId, setLatestId] = useState("");
 
+  // 최신 세션 피드백 자동 로드 로직 추가
   useEffect(() => {
-    const fetchFeedback = () => {
-      const cachedFeedback = sessionStorage.getItem("last_ai_feedback");
-      if (cachedFeedback) {
-        setFeedbackData(JSON.parse(cachedFeedback));
-      }
-      setIsFeedbackLoading(false);
-    };   
+    const fetchLatestFeedback = async () => {
+      setIsFeedbackLoading(true);
+      try {
+        // 1. 세션 목록에서 가장 최근 항목 1개 가져오기
+        const sessionsResponse = await authApi.get("/api/v1/sessions/?limit=1");
+        const sessions = Array.isArray(sessionsResponse.data) 
+          ? sessionsResponse.data 
+          : (sessionsResponse.data.sessions || []);
 
-    fetchFeedback();
+        if (sessions && sessions.length > 0) {
+          const latestSessionId = sessions[0].id;
+          
+          // 찾은 최신 ID를 상태에 저장
+          setLatestId(latestSessionId);
+
+          // 2. 캐시 확인 후 없으면 API 호출
+          if (feedbackCache[latestSessionId]) {
+            setFeedbackData(feedbackCache[latestSessionId]);
+          } else {
+            const feedbackResponse = await authApi.get(`/api/v1/insight/analyze/${latestSessionId}`);
+            const freshData = feedbackResponse.data;
+            setFeedbackData(freshData);
+            
+            // 전역 스토어 캐시에 저장
+            setFeedbackCache({ ...feedbackCache, [latestSessionId]: freshData });
+          }
+          
+          // [수정] 피드백 메뉴 진입 시 세션 선택을 건너뛰도록 ID 설정하는 로직을 여기서 제거합니다.
+          // (마운트 시 자동 실행 방지)
+        }
+      } catch (err) {
+        console.error("최근 피드백 로드 실패:", err);
+      } finally {
+        setIsFeedbackLoading(false);
+      }
+    };
+
+    fetchLatestFeedback();
   }, []);
 
   // --- 오늘 날짜 계산 로직 ---
@@ -88,7 +122,7 @@ export default function Overview() {
     const lastFetch = sessionStorage.getItem(CACHE_KEY);
     const now = Date.now();
 
-    // 1시간 이내 기록이 있고 스토어에 데이터가 이미 있다면 API 호출 건너뜀
+    // 1시간 이내 기록이 있고 스토어에 데이터가 이미 있다면 API 호출 건너뜜
     if (lastFetch && (now - parseInt(lastFetch)) < ONE_HOUR && stats.chartData.length > 0) {
       return;
     }
@@ -111,6 +145,14 @@ export default function Overview() {
     const viewMap = { "일": "day", "주": "week", "월": "month" };
     const targetView = viewMap[viewMode] || "week";
     setActiveMenu("스케줄", targetView);
+  };
+
+  // 피드백 카드 클릭 시에만 ID를 저장하고 이동하도록 핸들러
+  const handleMoveToFeedback = () => {
+    if (latestId) {
+      sessionStorage.setItem("target_session_id", latestId);
+    }
+    setActiveMenu("피드백");
   };
 
   // 마크다운 텍스트를 HTML로 변환하는 함수 (굵게, 기울임만 지원)
@@ -170,28 +212,29 @@ export default function Overview() {
             )}
           </div>
           
-          <div className="card feedback-card" onClick={() => setActiveMenu("피드백")}>
+          <div className="card feedback-card" onClick={handleMoveToFeedback}>
             <h4>최근 작업 피드백</h4>
             <div className="feedback-highlight-container">
-            {!isFeedbackLoading && feedbackData ? (
+            {isFeedbackLoading ? (
+                <p className="feedback-text loading-feedback">최근 세션의 피드백을 불러오는 중입니다...</p>
+              ) : feedbackData ? (
                 <>
                   <span className="feedback-main-title">
-                    {/* Feedback.jsx의 summary_title 필드 사용 */}
                     {feedbackData.summary_title || "종합 피드백"}
                   </span>
                   <p 
                     className="feedback-text"
                     dangerouslySetInnerHTML={{ 
-                    __html: formatMarkdown(feedbackData.summary_description) || "데이터 분석 결과가 존재합니다." 
+                      __html: formatMarkdown(feedbackData.summary_description) 
                     }}
                   />
                 </>
               ) : (
                 <p className="feedback-text empty-feedback">
-                  {isFeedbackLoading ? "데이터를 분석 중입니다..." : "지금 작업 피드백을 확인해 보세요!"}
+                  지금 작업 피드백을 확인해 보세요!
                 </p>
               )}
-          </div>
+            </div>
           </div>
         </div>
       </div>

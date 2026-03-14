@@ -71,7 +71,7 @@ const useMainStore = create(
       setFeedbackCache: (newCache) => set({ feedbackCache: newCache }),
     }),
     { name: 'main-storage',
-      partialize: (state) => ({ isDarkMode: state.isDarkMode, isLoggedIn: state.isLoggedIn })
+      partialize: (state) => ({ isDarkMode: state.isDarkMode, isLoggedIn: state.isLoggedIn, feedbackCache: state.feedbackCache })
     }
   )
 );

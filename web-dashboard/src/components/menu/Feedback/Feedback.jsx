@@ -22,6 +22,41 @@ export default function Feedback() {
   const [sessionLoading, setSessionLoading] = useState(true);
   const [selectedSessionId, setSelectedSessionId] = useState("");
 
+  useEffect(() => {
+    // Overview 미리보기를 통해 넘겨받은 ID가 있는지 확인
+    const targetId = sessionStorage.getItem("target_session_id");
+
+    if (targetId) {
+      // ID가 있다면 해당 세션을 바로 선택 처리
+      setSelectedSessionId(targetId);
+    
+      // 중요: 사용 직후 즉시 삭제하여, 이후 '메뉴 직접 클릭' 시에는 
+      // 이 로직이 작동하지 않도록 방지
+      sessionStorage.removeItem("target_session_id");
+    } else {
+      // 미리보기를 거치지 않고 직접 메뉴를 눌러 들어온 경우
+      // selectedSessionId가 ""인 상태를 유지하여 모달이 뜨도록 함
+      setSelectedSessionId("");
+   }
+  }, []);
+
+  useEffect(() => {
+    isMounted.current = true;
+
+    // 전역 캐시(feedbackCache)에 데이터가 있다면 새로고침 시 재호출하지 않음
+    // 오직 로그아웃 후 다시 로그인하여 캐시가 비워진 상태일 때만 서버에 요청
+    if (Object.keys(feedbackCache).length === 0) {
+      fetchSessionList(isMounted);
+    } else {
+      // 캐시가 있다면 로딩 상태를 즉시 해제하여 기존 리스트/리포트를 보여줌
+      setSessionLoading(false);
+    }
+
+    return () => {
+      isMounted.current = false;
+    };
+  }, []); // 마운트 시 1회만 실행되도록 비워둠
+
   // old_feedback.jsx의 텍스트 포맷팅 함수
   const formatText = (text) => {
     if (!text) return "";
