@@ -24,7 +24,7 @@ use crate::{
 };
 
 // StorageManager의 메서드를 호출하기 위해 모듈 import
-use crate::managers::storage::{self, CachedEvent, LocalSchedule, LocalTask}; // LocalTask, LocalSchedule import
+use crate::managers::storage::{CachedEvent, LocalSchedule, LocalTask}; // LocalTask, LocalSchedule import
 use crate::core::app::AppCore;
 
 use std::time::{SystemTime, UNIX_EPOCH}; // 세션 시작 시간 생성용
@@ -680,7 +680,7 @@ pub async fn end_session(
 
         // [Fix] 세션 종료 시 오버레이 숨기기 및 FSM 리셋 (UX: 즉시 반응)
         // hide_overlay는 내부적으로 AppCore.manual_reset()을 호출합니다.
-        use crate::commands::window;
+        
         if let Err(e) = crate::commands::window::hide_overlay(app_handle.clone(), app_core_state) {
             eprintln!("Warning: Failed to hide overlay on session end: {}", e);
         }

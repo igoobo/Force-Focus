@@ -2,7 +2,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Manager};
 use tokio::time::sleep;
-use serde_json::json;
 use chrono::{DateTime, Utc}; // 날짜 변환용
 
 use crate::utils::backend_comm::{BackendCommunicator, FeedbackPayload};

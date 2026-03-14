@@ -1,7 +1,7 @@
 // 파일 위치: src-tauri/src/input_monitor.rs
 
 use crate::InputStatsArcMutex; // lib.rs (crate root)에서 정의한 타입
-use rdev::{listen, Event, EventType};
+use rdev::{listen, EventType};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 

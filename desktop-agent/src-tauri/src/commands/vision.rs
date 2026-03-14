@@ -9,13 +9,13 @@ use std::ffi::OsString;
 #[cfg(target_os = "windows")]
 use std::os::windows::ffi::OsStringExt;
 
-use windows::core::{PCWSTR, PWSTR};
+use windows::core::PWSTR;
 use windows::Win32::Foundation::{
-    CloseHandle, BOOL, FALSE, HANDLE, HWND, LPARAM, MAX_PATH, RECT, TRUE,
+    BOOL, HWND, LPARAM, MAX_PATH, RECT, TRUE,
 };
 use windows::Win32::Graphics::Gdi::{
     CombineRgn, CreateRectRgn, CreateRectRgnIndirect, DeleteObject, GetRgnBox, HGDIOBJ, HRGN,
-    NULLREGION, RGN_COMBINE_MODE, RGN_DIFF, RGN_OR,
+    NULLREGION, RGN_DIFF, RGN_OR,
 };
 
 use windows::Win32::System::Threading::{

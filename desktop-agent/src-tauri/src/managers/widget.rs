@@ -2,7 +2,7 @@
 use crate::SessionStateArcMutex; // lib.rs에서 정의한 전역 세션 상태
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Manager, Runtime, Url, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use tauri::{AppHandle, Manager, Runtime, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 /// [추가] setup 훅에서 호출될 '위젯' 이벤트 리스너 설정 함수
 pub fn setup_widget_listeners<R: Runtime>(

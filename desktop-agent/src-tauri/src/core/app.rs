@@ -1,8 +1,8 @@
 // 파일 위치: src-tauri/src/app_core.rs
 
 use crate::{
-    commands::{self, vision::{ActiveWindowInfo, WindowInfo}},
-    core::state::{self, StateEngine, InterventionTrigger},
+    commands::{self},
+    core::state::{StateEngine, InterventionTrigger},
     commands::input::InputStatsArcMutex,
     SessionStateArcMutex,
     StorageManagerArcMutex,
@@ -199,8 +199,8 @@ pub fn start_core_loop<R: Runtime>(
                 let current_events = input_stats.meaningful_input_events;
                 
                 // Safety Net용 활동 감지
-                let has_recent_input = (now_ms.saturating_sub(input_stats.last_meaningful_input_timestamp_ms) < 2000);
-                let is_mouse_active = (now_ms.saturating_sub(input_stats.last_mouse_move_timestamp_ms) < 2000);
+                let has_recent_input = now_ms.saturating_sub(input_stats.last_meaningful_input_timestamp_ms) < 2000;
+                let is_mouse_active = now_ms.saturating_sub(input_stats.last_mouse_move_timestamp_ms) < 2000;
 
                 // ------------------------------------------------
                 // [Slow Path] 5초마다 실행 (무거운 센싱 & ML)

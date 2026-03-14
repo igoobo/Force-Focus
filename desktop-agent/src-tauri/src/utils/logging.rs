@@ -1,16 +1,15 @@
 // 파일 위치: Force-Focus/desktop-agent/src-tauri/src/logging.rs
 
 use crate::commands;
-use chrono::{DateTime, Datelike, Local, Timelike}; // 시간 및 날짜 처리
+use chrono::{DateTime, Local}; // 시간 및 날짜 처리
 use serde::{Deserialize, Serialize}; // JSON 직렬화/역직렬화
 use serde_json;
 use std::env; // 환경 변수 접근
-use std::fs::{self, File, OpenOptions}; // 파일 시스템 작업
+use std::fs::{self, OpenOptions}; // 파일 시스템 작업
 use std::io::prelude::*; // 파일 쓰기
 use std::path::PathBuf; // 경로 관리
 use std::thread; // 백그라운드 스레드 생성
 use std::time::Duration;
-use tauri::AppHandle;
 
 use crate::commands::input::InputStatsArcMutex;
 

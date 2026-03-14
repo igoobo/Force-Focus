@@ -1,4 +1,4 @@
-use ndarray::{Array2, Array1};
+use ndarray::Array2;
 use ort::session::{Session, builder::GraphOptimizationLevel};
 use ort::value::Value; 
 use serde::Deserialize;
