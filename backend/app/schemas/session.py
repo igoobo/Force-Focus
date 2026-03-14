@@ -84,12 +84,13 @@ class SessionRead(BaseModel):
     """
     [응답] 세션 반환
     """
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     id: str
     user_id: str
     task_id: Optional[str] = None
     profile_id: Optional[str] = None
+    client_session_id: Optional[str] = None
 
     start_time: datetime
     end_time: Optional[datetime] = None

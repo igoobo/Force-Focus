@@ -128,6 +128,7 @@ def serialize_session(session) -> SessionRead:
     return SessionRead(
         id=str(session["_id"]),
         user_id=session["user_id"],
+        client_session_id=session.get("client_session_id"),
         task_id=session.get("task_id"),
         profile_id=session.get("profile_id"),
         start_time=session["start_time"],
