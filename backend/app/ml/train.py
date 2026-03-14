@@ -132,8 +132,10 @@ async def train_user_model(user_id: str) -> Dict[str, Any]:
 
     # 4. Feature Engineering (Identical to original)
     df['X_context'] = df.apply(calculate_context_score_wrapper, axis=1)
-    
-    df['input_count'] = df.get('meaningful_input_events', 0).fillna(0)
+    if 'meaningful_input_events' in df.columns:
+        df['input_count'] = df['meaningful_input_events'].fillna(0)
+    else:
+        df['input_count'] = 0.0
     df['delta_input'] = df.groupby('session_id')['input_count'].diff().fillna(0)
     df.loc[df['delta_input'] < 0, 'delta_input'] = 0
     df['X_log_input'] = np.log1p(df['delta_input'])

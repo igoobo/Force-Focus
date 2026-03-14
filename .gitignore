@@ -549,3 +549,5 @@ scaler_params.json
 # 단, 배포용(Production) 모델 폴더는 예외적으로 허용
 !desktop-agent/src-tauri/resources/models/*.onnx
 !desktop-agent/src-tauri/resources/models/scaler_params.json
+
+storage/

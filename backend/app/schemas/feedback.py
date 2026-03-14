@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 
 # [수정] Field 추가 Import
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class FeedbackTypeEnum(str, Enum):

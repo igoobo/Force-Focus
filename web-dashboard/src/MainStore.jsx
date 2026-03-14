@@ -12,7 +12,8 @@ const useMainStore = create(
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('userEmail');
-        set({ isLoggedIn: false, activeMenu: 'Overview' });
+        // 로그아웃 시 피드백 캐시 초기화 추가
+        set({ isLoggedIn: false, activeMenu: 'Overview', feedbackCache: {} });
         sessionStorage.clear();
       },
 
@@ -64,9 +65,13 @@ const useMainStore = create(
       // 12. 다크모드 상태 및 토글 함수 (다크 모드)
       isDarkMode: false,
       toggleDarkMode: () => set((state) => ({ isDarkMode: !state.isDarkMode })),
+
+      // 13. 피드백 데이터 캐시 상태 및 액션 정의 함수 (피드백 메뉴)
+      feedbackCache: {},
+      setFeedbackCache: (newCache) => set({ feedbackCache: newCache }),
     }),
     { name: 'main-storage',
-      partialize: (state) => ({ isDarkMode: state.isDarkMode, isLoggedIn: state.isLoggedIn })
+      partialize: (state) => ({ isDarkMode: state.isDarkMode, isLoggedIn: state.isLoggedIn, feedbackCache: state.feedbackCache })
     }
   )
 );
