@@ -40,7 +40,7 @@ export default function ScheduleEditModal({ schedule, onClose }) {
   };
 
   return (
-    <div className="modal-overlay">
+    <div className="edit-overlay">
       <div className="modal-content large">
         <div className="modal-header">
           <h2>일정 수정</h2>

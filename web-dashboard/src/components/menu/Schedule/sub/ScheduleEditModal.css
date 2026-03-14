@@ -1,5 +1,5 @@
-/* 1. 모달 전체 배경 (어둡게 처리) */
-.modal-overlay {
+/* 1. 모달 전체 배경 (어둡게 처리) - 클래스명 격리 */
+.edit-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -14,7 +14,7 @@
 }
 
 /* 2. 모달 컨텐츠 박스 */
-.modal-content {
+.edit-overlay .modal-content {
   background-color: #ffffff;
   width: 650px;
   max-width: 95%;
@@ -26,7 +26,7 @@
   box-sizing: border-box; 
 }
 
-.modal-content.large {
+.edit-overlay .modal-content.large {
   width: 800px;
 }
 
@@ -36,14 +36,15 @@
 }
 
 /* 3. 헤더 영역 */
-.modal-header {
+.edit-overlay .modal-header {
+  background: #ffffff;
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
 }
 
-.modal-header h2 {
+.edit-overlay .modal-header h2 {
   margin-bottom: 20px;
   font-size: 1.5rem;
   font-weight: 700;
@@ -52,42 +53,43 @@
 }
 
 /* 4. 폼 및 입력 그룹 */
-.modal-form {
+.edit-overlay .modal-form {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.modal-form select {
+.edit-overlay .modal-form select {
   width: 100%;
   padding: 10px;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 0.95rem;
-  background-color: #fff;
+  background-color: #ffffff !important;
+  color: #1f2937 !important;
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
-.modal-form select:focus {
+.edit-overlay .modal-form select:focus {
   border-color: #3b82f6;
   outline: none;
 }
 
-.form-group {
+.edit-overlay .form-group {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.form-group label {
+.edit-overlay .form-group label {
   font-size: 14px;
   font-weight: 700;
   color: #374151;
 }
 
-.form-group input,
-.form-group textarea {
+.edit-overlay .form-group input,
+.edit-overlay .form-group textarea {
   width: 100%;
   padding: 12px;
   border: 1.5px solid #d1d5db;
@@ -96,19 +98,19 @@
   font-family: inherit;
   box-sizing: border-box;
   transition: all 0.3s ease;
-  background-color: #ffffff;
-  color: #1f2937;
+  background-color: #ffffff !important;
+  color: #1f2937 !important;
 }
 
-.form-group input:focus,
-.form-group textarea:focus {
+.edit-overlay .form-group input:focus,
+.edit-overlay .form-group textarea:focus {
   outline: none;
   border-color: #4f46e5;
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
 /* 5. 날짜/시간 한 줄 정렬 (2열 배치) */
-.form-row {
+.edit-overlay .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
@@ -116,14 +118,15 @@
 }
 
 /* 6. 푸터 및 버튼 영역 */
-.modal-footer {
+.edit-overlay .modal-footer {
+  background: #ffffff;
   display: flex;
   justify-content: flex-end;
   gap: 12px;
   margin-top: 32px;
 }
 
-.cancel-btn {
+.edit-overlay .cancel-btn {
   background-color: #f3f4f6 !important;
   color: #4b5563 !important;
   padding: 12px 24px;
@@ -134,7 +137,7 @@
   transition: all 0.3s ease;
 }
 
-.save-btn {
+.edit-overlay .save-btn {
   background-color: #4f46e5 !important;
   color: #ffffff !important;
   padding: 12px 24px;
@@ -145,52 +148,52 @@
   transition: all 0.3s ease;
 }
 
-.save-btn:hover {
+.edit-overlay .save-btn:hover {
   background-color: #4338ca !important;
   transform: translateY(-1px);
 }
 
-.dark-theme .modal-content {
+.dark-theme .edit-overlay .modal-content {
   background-color: #1e293b;
   box-sizing: border-box;
 }
 
-.dark-theme .modal-header {
+.dark-theme .edit-overlay .modal-header {
   border-bottom: 1px solid #334155;
 }
 
-.dark-theme .modal-header h2 {
+.dark-theme .edit-overlay .modal-header h2 {
   color: #ffffff;
 }
 
-.dark-theme .form-group label {
+.dark-theme .edit-overlay .form-group label {
   color: #94a3b8;
 }
 
-.dark-theme .modal-form input,
-.dark-theme .modal-form textarea,
-.dark-theme .modal-form select {
-  background-color: #0f172a;
+.dark-theme .edit-overlay .modal-form input,
+.dark-theme .edit-overlay .modal-form textarea,
+.dark-theme .edit-overlay .modal-form select {
+  background-color: #0f172a !important;
   border: 1px solid #334155;
-  color: #f8fafc;
+  color: #f8fafc !important;
 }
 
-.dark-theme .modal-form input:focus,
-.dark-theme .modal-form select:focus {
+.dark-theme .edit-overlay .modal-form input:focus,
+.dark-theme .edit-overlay .modal-form select:focus {
   border-color: #2563eb;
-  background-color: #0f172a;
+  background-color: #0f172a !important;
 }
 
-.dark-theme .cancel-btn {
+.dark-theme .edit-overlay .cancel-btn {
   background-color: #334155 !important;
   color: #e2e8f0 !important;
 }
 
-.dark-theme .save-btn {
+.dark-theme .edit-overlay .save-btn {
   background-color: #4f46e5 !important;
   color: #ffffff !important;
 }
 
-.dark-theme .modal-footer {
+.dark-theme .edit-overlay .modal-footer {
   border-top: 1px solid #334155;
 }

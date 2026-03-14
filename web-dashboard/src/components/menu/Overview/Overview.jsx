@@ -202,7 +202,7 @@ export default function Overview() {
             <h4>최근 활동 요약</h4>
               {loading ? (
               // 1. 로딩 중일 때 표시
-              <p>지난 7일간의 작업 데이터를 분석 중입니다...</p>
+              <p>최근 7일간의 작업 데이터를 분석 중입니다...</p>
             ) : hasNoData ? (
               // 2. 로딩 완료 후 데이터가 없을 때 표시
               <p className="empty-message">지난 7일간 활동 데이터가 존재하지 않습니다. 지금 바로 세션을 시작해 보세요!</p>

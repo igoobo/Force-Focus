@@ -1,4 +1,5 @@
-.modal-overlay {
+/* 최상위 오버레이 명칭 변경으로 격리 */
+.add-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -11,7 +12,7 @@
   z-index: 9999;
 }
 
-.modal-content {
+.add-overlay .modal-content {
   background: #ffffff;
   border-radius: 20px;
   width: 550px; 
@@ -23,7 +24,7 @@
   flex-direction: column;
 }
 
-.modal-content h2 {
+.add-overlay .modal-content h2 {
   margin-bottom: 20px;
   font-size: 1.5rem;
   font-weight: 700;
@@ -31,23 +32,24 @@
   color: #1f2937;
 }
 
-.modal-content.large {
+.add-overlay .modal-content.large {
   width: 800px;
 }
 
-.modal-header {
+.add-overlay .modal-header {
+  background: #ffffff;
   padding: 10px 0 15px 0; 
   border-bottom: 1px solid #f1f5f9;
   margin-bottom: 15px;
 }
 
-.modal-form {
+.add-overlay .modal-form {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.modal-form label {
+.add-overlay .modal-form label {
   display: flex;
   flex-direction: column;
   font-size: 0.9rem;
@@ -55,26 +57,27 @@
   color: #374151;
 }
 
-.modal-form select {
+.add-overlay .modal-form select {
   width: 100%;
   padding: 8px 12px;
   border: 1px solid #ddd; 
   border-radius: 4px;
   font-size: 0.95rem;
-  background-color: #fff;
+  background-color: #ffffff !important;
+  color: #1f2937 !important;
   cursor: pointer;
   box-sizing: border-box;
   transition: all 0.3s ease;
 }
 
-.modal-form select:focus {
+.add-overlay .modal-form select:focus {
   border-color: #2563eb;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
   outline: none;
 }
 
-.modal-form input,
-.modal-form textarea {
+.add-overlay .modal-form input,
+.add-overlay .modal-form textarea {
   margin-top: 15px;
   padding: 8px 12px;
   border: 1px solid #d1d5db;
@@ -82,30 +85,30 @@
   font-size: 0.95rem;
   outline: none;
   font-family: "Inter", "Pretendard", "Noto Sans KR", sans-serif;
-  background-color: #ffffff;
-  color: #1f2937;
+  background-color: #ffffff !important;
+  color: #1f2937 !important;
 }
 
-.modal-form input:focus,
-.modal-form textarea:focus {
+.add-overlay .modal-form input:focus,
+.add-overlay .modal-form textarea:focus {
   border-color: #3b82f6;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
-.modal-actions {
+.add-overlay .modal-actions {
   display: flex;
   justify-content: flex-end;
   margin-top: 18px;
   gap: 10px;
 }
 
-.form-row {
+.add-overlay .form-row {
   display: flex;
   gap: 12px;
   margin-bottom: 5px;
 }
 
-.form-group {
+.add-overlay .form-group {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -113,14 +116,15 @@
   margin-bottom: 5px;
 }
 
-.modal-footer {
+.add-overlay .modal-footer {
+  background: #ffffff;
   display: flex;
   justify-content: flex-end;
   gap: 12px;
   margin-top: 24px;
 }
 
-.cancel-btn {
+.add-overlay .cancel-btn {
   background-color: #f3f4f6 !important;
   color: #4b5563 !important;
   border: none;
@@ -132,11 +136,11 @@
   transition: all 0.3s ease;
 }
 
-.cancel-btn:hover {
+.add-overlay .cancel-btn:hover {
   background-color: #e5e7eb !important;
 }
 
-.save-btn {
+.add-overlay .save-btn {
   background-color: #4f46e5 !important;
   color: #ffffff !important;
   border: none;
@@ -148,59 +152,53 @@
   transition: all 0.3s ease;
 }
 
-.save-btn:hover {
+.add-overlay .save-btn:hover {
   background-color: #4338ca !important;
   transform: translateY(-1px);
 }
-/* fadeIn Animation */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* 다크 모드 스타일링 */
-.dark-theme .modal-content {
+.dark-theme .add-overlay .modal-content {
   background-color: #1e293b;
   color: #f3f4f6;
 }
 
-.dark-theme .modal-header h2 {
+.dark-theme .add-overlay .modal-header h2 {
   color: #fff;
 }
 
-.dark-theme .modal-form label {
+.dark-theme .add-overlay .modal-form label {
   color: #94a3b8;
 }
 
-.dark-theme .modal-form input,
-.dark-theme .modal-form textarea,
-.dark-theme .modal-form select {
-  background-color: #0f172a;
+.dark-theme .add-overlay .modal-form input,
+.dark-theme .add-overlay .modal-form textarea,
+.dark-theme .add-overlay .modal-form select {
+  background-color: #000000 !important;
   border-color: #334155;
-  color: #f3f4f6;
+  color: #f3f4f6 !important;
 }
 
-.dark-theme .modal-form input:focus,
-.dark-theme .modal-form select:focus {
+.dark-theme .add-overlay .modal-form input:focus,
+.dark-theme .add-overlay .modal-form select:focus {
   border-color: #3b82f6;
 }
 
-.dark-theme .cancel-btn {
+.dark-theme .add-overlay .cancel-btn {
   background-color: #334155 !important;
   color: #e2e8f0 !important;
 }
 
-.dark-theme .save-btn {
+.dark-theme .add-overlay .save-btn {
   background-color: #4f46e5 !important;
   color: #ffffff !important;
 }
 
-.dark-theme .save-btn:hover {
+.dark-theme .add-overlay .save-btn:hover {
   background-color: #6366f1 !important;
 }

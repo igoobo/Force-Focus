@@ -47,7 +47,7 @@ export default function ScheduleAddModal({ onClose }) {
   };
 
   return (
-    <div className="modal-overlay">
+    <div className="add-overlay">
       <div className="modal-content large">
         <div className="modal-header">
           <h2>새 일정 추가</h2>
