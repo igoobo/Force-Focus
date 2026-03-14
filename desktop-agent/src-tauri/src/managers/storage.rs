@@ -686,10 +686,10 @@ mod tests {
 
         // 변경된 cache_event 시그니처 호출
         storage
-            .cache_event("session-1", "chrome.exe", "YouTube", &json_1)
+            .cache_event("session-1", "test-event-1", "chrome.exe", "YouTube", &json_1)
             .expect("Failed to cache event 1");
         storage
-            .cache_event("session-1", "code.exe", "lib.rs", &json_2)
+            .cache_event("session-1", "test-event-2", "code.exe", "lib.rs", &json_2)
             .expect("Failed to cache event 2");
 
         let conn = storage.conn.lock().unwrap();

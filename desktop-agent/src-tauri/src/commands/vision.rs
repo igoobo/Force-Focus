@@ -301,12 +301,36 @@ pub fn get_visible_windows() -> Result<Vec<WindowInfo>, String> {
 pub fn extract_semantic_keywords(app_name: &str, window_title: &str) -> Vec<String> {
     let full_text = format!("{} {}", app_name, window_title).to_lowercase();
     
-    full_text.split(|c: char| !c.is_alphanumeric())
-        .filter(|s| !s.is_empty())
-        .map(|s| s.to_string())
-        .collect()
+    let mut unique_tokens = Vec::new();
+    for token in full_text.split(|c: char| !c.is_alphanumeric()).filter(|s| !s.is_empty()) {
+        let token_string = token.to_string();
+        if !unique_tokens.contains(&token_string) {
+            unique_tokens.push(token_string);
+        }
+    }
+    unique_tokens
 }
 
 pub fn get_semantic_tokens(app_name: &str, window_title: &str) -> Vec<String> {
     extract_semantic_keywords(app_name, window_title)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_semantic_keywords_deduplication() {
+        // App name and title share a word
+        let app_name = "Chrome";
+        let window_title = "Google Chrome - Search";
+        
+        let tokens = extract_semantic_keywords(app_name, window_title);
+        
+        // Before our fix, it would be ["chrome", "google", "chrome", "search"]
+        // We expect standard lowercase, alphanumeric splitting, AND deduplication
+        let expected = vec!["chrome", "google", "search"];
+        
+        assert_eq!(tokens, expected, "Semantic tokens should not contain duplicates");
+    }
 }
