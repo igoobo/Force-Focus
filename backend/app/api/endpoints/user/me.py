@@ -135,3 +135,21 @@ async def delete_my_blocked_app(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to remove blocked app")
 
     return _to_user_read(user)
+
+@router.delete("/me", response_model=SuccessMessage)
+async def delete_my_account(
+    user_id: str = Depends(get_current_user_id),
+):
+    """
+    현재 로그인한 사용자의 계정을 삭제합니다.
+    """
+    # crud/users.py에 새로 추가한 delete_user 호출
+    success = await users_crud.delete_user(user_id)
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="사용자를 찾을 수 없거나 삭제에 실패했습니다."
+        )
+
+    return SuccessMessage(message="계정이 성공적으로 삭제되었습니다.")
