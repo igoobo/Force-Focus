@@ -83,8 +83,8 @@ impl ModelUpdateManager {
 
             // 3. 새 파일로 새 엔진 객체 생성하여 AppCore에 주입
             match InferenceEngine::new(
-                final_model_path.to_str().unwrap(), 
-                final_scaler_path.to_str().unwrap()
+                final_model_path.to_str().unwrap_or_default(), 
+                final_scaler_path.to_str().unwrap_or_default()
             ) {
                 Ok(new_engine) => {
                     core.inference_engine = Some(new_engine);
@@ -113,8 +113,13 @@ pub fn start_update_loop(app_handle: AppHandle) {
         loop {
             // 토큰 가져오기
             let token_opt = if let Some(storage_mutex) = app_handle.try_state::<StorageManagerArcMutex>() {
-                let storage = storage_mutex.lock().unwrap();
-                storage.load_auth_token().unwrap_or(None).map(|t| t.0)
+                match storage_mutex.lock() {
+                    Ok(storage) => storage.load_auth_token().unwrap_or(None).map(|t| t.0),
+                    Err(_) => {
+                        eprintln!("Failed to lock StorageManager in update loop");
+                        None
+                    }
+                }
             } else {
                 None
             };
