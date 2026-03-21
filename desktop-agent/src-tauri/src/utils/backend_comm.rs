@@ -419,7 +419,7 @@ pub fn login(
     // LSN에 토큰 저장
     storage_manager.save_auth_token(&access_token, &refresh_token, &user_email, &user_id)?;
 
-    println!("User logged in: {}", user_email);
+    println!("User logged in: [REDACTED]");
     Ok(())
 }
 
@@ -765,7 +765,7 @@ pub fn check_auth_status(
 
     // 토큰이 있으면 이메일 반환, 없으면 None
     if let Some((_, _, email, _)) = token_data {
-        println!("Auto-login: Found valid token for {}", email);
+        println!("Auto-login: Found valid token for [REDACTED]");
         Ok(Some(email))
     } else {
         Ok(None)
