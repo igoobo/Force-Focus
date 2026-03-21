@@ -70,7 +70,7 @@ pub type SessionStateArcMutex = Arc<Mutex<Option<ActiveSessionInfo>>>;
 // --- 공통 딥 링크 처리 함수 (핵심 로직 통합) ---
 // Single Instance와 on_open_url 양쪽에서 호출합니다.
 fn handle_deep_link(app: &AppHandle, url: &Url) {
-    println!("Processing Deep Link: {}", url);
+    println!("Processing Deep Link: {}://{}{}...", url.scheme(), url.host_str().unwrap_or("?"), url.path());
 
     // 1. URL 구조 검증 (Host='auth', Path='/callback')
     let is_scheme_valid = url.scheme() == "force-focus";
@@ -86,7 +86,7 @@ fn handle_deep_link(app: &AppHandle, url: &Url) {
             query_pairs.get("email"),
             query_pairs.get("user_id"),
         ) {
-            println!("Login detected for user: {}", email);
+            println!("Login detected for user: [REDACTED]");
 
             // 2. LSN 저장 (AppHandle을 통해 State 접근)
             if let Some(storage_state) = app.try_state::<StorageManagerArcMutex>() {
@@ -192,7 +192,6 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            greet,
             crate::commands::vision::get_current_active_window_info,
             crate::commands::system::get_all_processes_summary,
             crate::commands::input::get_input_frequency_stats,
@@ -278,8 +277,8 @@ fn handle_app_startup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Er
             println!("App started in silent mode (Tray only).");
         } else {
             println!("App started normally. Showing main window.");
-            window.show().unwrap();
-            window.set_focus().unwrap();
+            let _ = window.show();
+            let _ = window.set_focus();
         }
     }
     Ok(())
@@ -317,8 +316,3 @@ fn start_background_services(app: &mut tauri::App) -> Result<(), Box<dyn std::er
     Ok(())
 }
 
-
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}

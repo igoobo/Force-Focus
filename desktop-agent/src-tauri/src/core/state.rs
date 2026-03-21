@@ -16,7 +16,7 @@ pub enum InterventionTrigger {
 }
 
 // --- 3. FSM 상태 정의 ---
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum FSMState {
     IDLE,       // (초기 상태)
     FOCUS,      // 몰입 상태 (게이지 < 30)

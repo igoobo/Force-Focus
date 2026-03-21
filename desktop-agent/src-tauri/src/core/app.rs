@@ -49,7 +49,9 @@ impl AppCore {
         let model_dir = app_data_dir.join("models");
 
         if !model_dir.exists() {
-            std::fs::create_dir_all(&model_dir).unwrap();
+            if let Err(e) = std::fs::create_dir_all(&model_dir) {
+                eprintln!("⚠️ [AppCore] Failed to create model directory: {}", e);
+            }
         }
 
         let model_path = model_dir.join("personal_model.onnx");
@@ -178,11 +180,17 @@ pub fn start_core_loop<R: Runtime>(
             let now_ms = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
 
             // 2. 세션 활성 체크
-            let session_guard = session_state_mutex.lock().unwrap();
-            // 가드를 통해 내부 데이터를 '복제(Clone)'한 뒤, 가드는 즉시 놓아줍니다.
-            // ActiveSessionInfo는 Clone 트레이트가 있어야 합니다. (보통 derive로 되어 있음)
-            let active_session_opt = session_guard.clone(); 
-            drop(session_guard); // 락 해제 (이제 안전함)
+            let active_session_opt = match session_state_mutex.lock() {
+                Ok(guard) => {
+                    let cloned = guard.clone();
+                    drop(guard);
+                    cloned
+                },
+                Err(e) => {
+                    eprintln!("Failed to lock session state: {}", e);
+                    continue;
+                }
+            };
 
             if let Some(active_session) = active_session_opt { // 복제된 데이터를 소유권(Owned) 형태로 사용
 
@@ -195,7 +203,13 @@ pub fn start_core_loop<R: Runtime>(
                 // ------------------------------------------------
                 // [Fast Path] 1초마다 실행 (가벼운 데이터)
                 // ------------------------------------------------
-                let mut input_stats = input_stats_mutex.lock().unwrap();
+                let mut input_stats = match input_stats_mutex.lock() {
+                    Ok(guard) => guard,
+                    Err(e) => {
+                        eprintln!("Failed to lock input stats: {}", e);
+                        continue;
+                    }
+                };
                 let current_events = input_stats.meaningful_input_events;
                 
                 // Safety Net용 활동 감지
@@ -304,7 +318,13 @@ pub fn start_core_loop<R: Runtime>(
 
                         // 4. 데이터 저장 (학습용 데이터셋 구축)
                         // LSN에 이벤트를 저장해야 나중에 꺼내서 학습할 수 있습니다.
-                        let storage = storage_manager_mutex.lock().unwrap();
+                        let storage = match storage_manager_mutex.lock() {
+                            Ok(guard) => guard,
+                            Err(e) => {
+                                eprintln!("Failed to lock storage manager: {}", e);
+                                continue;
+                            }
+                        };
                         let raw_json = serde_json::json!({
                             "delta_events": raw_delta,
                             "silence_sec": silence_sec,
