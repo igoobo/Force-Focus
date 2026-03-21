@@ -53,7 +53,10 @@ pub fn setup_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
                  let app = tray.app_handle();
                  
                  // 쿨다운 체크
-                 let mut last = last_click_clone.lock().unwrap();
+                 let mut last = match last_click_clone.lock() {
+                     Ok(guard) => guard,
+                     Err(_) => return,
+                 };
                  if last.elapsed() < Duration::from_millis(200) {
                      return; 
                  }

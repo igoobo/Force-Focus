@@ -9,7 +9,13 @@ pub fn setup_widget_listeners<R: Runtime>(
     app_handle: AppHandle<R>,
     session_state_mutex: SessionStateArcMutex,
 ) {
-    let main_window = app_handle.get_webview_window("main").unwrap();
+    let main_window = match app_handle.get_webview_window("main") {
+        Some(w) => w,
+        None => {
+            eprintln!("Widget: main window not found, skipping listener setup");
+            return;
+        }
+    };
     let app_handle_clone = app_handle.clone(); // 스레드간 이동
 
     // 패닉 방지: 억지로 시간을 빼지 않고 Option으로 '초기 상태'를 표현
@@ -21,10 +27,16 @@ pub fn setup_widget_listeners<R: Runtime>(
         match event {
             // [유지] v2 API: '메인 창'이 '포커스를 잃음' (최소화 또는 다른 창 클릭)
             WindowEvent::Focused(false) => {
-                let session_state = session_state_mutex.lock().unwrap();
+                let session_state = match session_state_mutex.lock() {
+                    Ok(guard) => guard,
+                    Err(_) => return,
+                };
 
                 // 쿨다운 체크: 포커스를 얻은 지 200ms도 안 지났는데 잃었다면? -> 무시 (복원 노이즈)
-                let last_gain_opt = *last_focus_gain_time_clone.lock().unwrap();
+                let last_gain_opt = match last_focus_gain_time_clone.lock() {
+                    Ok(guard) => *guard,
+                    Err(_) => return,
+                };
 
                 if let Some(last_gain) = last_gain_opt {
                     // 포커스를 얻은 기록이 있다면, 경과 시간 체크
@@ -45,7 +57,10 @@ pub fn setup_widget_listeners<R: Runtime>(
             // [유지] v2 API: '메인 창'이 '포커스를 얻음'
             WindowEvent::Focused(true) => {
                 // 포커스 획득 시점 기록 (Some으로 감싸서 저장)
-                let mut last_gain = last_focus_gain_time_clone.lock().unwrap();
+                let mut last_gain = match last_focus_gain_time_clone.lock() {
+                    Ok(guard) => guard,
+                    Err(_) => return,
+                };
                 *last_gain = Some(Instant::now());
 
                 // '메인 창'이 보이므로 '위젯'을 숨김

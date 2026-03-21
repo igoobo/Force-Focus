@@ -145,7 +145,7 @@ async fn trigger_schedule(
 
             // Rust Command를 사용하여 외부 프로세스 실행 (비동기 spawn)
             // 주의: 경로나 권한 문제로 실패할 수 있음 (에러 로그만 남김)
-            match Command::new(&exe_path).spawn() {
+            match cmd.spawn() {
                 Ok(_) => println!("Schedule Monitor: Program launched successfully."),
                 Err(e) => eprintln!("Schedule Monitor: Failed to launch '{}': {}", exe_path, e),
             }
@@ -158,7 +158,7 @@ async fn trigger_schedule(
         task_id: schedule.task_id.clone(),
         start_time_s: SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs(),
     };
 

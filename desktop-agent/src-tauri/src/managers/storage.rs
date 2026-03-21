@@ -415,7 +415,7 @@ impl StorageManager {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs();
 
         conn.execute(
