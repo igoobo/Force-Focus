@@ -32,6 +32,7 @@
   box-shadow: 4px 0 24px rgba(0, 0, 0, 0.02); 
   display: flex;
   flex-direction: column;
+  /* 아래 transition 속성을 말풍선에도 적용할 것임 */
   transition: 
     width 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
     background-color 0.3s ease, 
@@ -136,6 +137,23 @@
   opacity: 0.8;
 }
 
+.menu-bar__user-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px; /* 아이콘 크기 */
+  height: 32px;
+  background-color: #3b82f6; /* 기본 파란색 배경 */
+  color: #ffffff; /* 흰색 글자 */
+  border-radius: 50%; /* 완벽한 원형 */
+  font-size: 1rem; /* 글자 크기 */
+  font-weight: 700; /* 굵게 */
+  text-transform: uppercase; /* 대문자 강제 */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* 미세한 그림자 */
+  flex-shrink: 0; /* 크기 고정 */
+  transition: all 0.3s ease;
+}
+
 .menu-bar__user-info {
   display: flex;
   flex-direction: column;
@@ -195,6 +213,26 @@
   background-color: var(--menu-hover-bg); /* 유저 카드는 배경색을 살짝 부여 */
   border: none !important;
   margin-bottom: 8px;
+  position: relative; /* 말풍선 위치 기준 */
+}
+
+/* 1. 기본 호버 스타일: 말풍선 내부가 아닌 '버튼 자체'에 호버했을 때만 이동 */
+.user-profile-item:hover {
+  background-color: var(--menu-hover-bg);
+  color: var(--menu-hover-text);
+  transform: translateX(4px) !important;
+}
+
+/* 2. 핵심 해결책: 말풍선 영역에 마우스가 올라가면 부모의 transform(이동)을 0으로 강제 고정 */
+.user-profile-item:has(.user-popover:hover) {
+  transform: translateX(0) !important;
+}
+
+/* 말풍선이 열려 있을 때의 기본 버튼 상태 (호버하지 않을 때) */
+.user-profile-item:has(.user-popover) {
+  background-color: var(--menu-hover-bg);
+  color: var(--menu-hover-text);
+  /* 평상시에는 이동하지 않음 */
 }
 
 .menu-bar__user-info {
@@ -235,4 +273,238 @@
 
 .theme-toggle-item:hover {
   color: var(--text-main);
+}
+
+/* 말풍선 컨테이너 */
+.user-popover {
+  position: absolute;
+  bottom: -10px; /* 위치 살짝 조정 */
+  left: calc(100% + 20px);
+  width: 480px; /* 너비 확장 */
+  background-color: #ffffff;
+  border-radius: 20px; /* 곡률 더 부드럽게 */
+  border: 1px solid rgba(255, 255, 255, 0.8); 
+  box-shadow: 
+    0 10px 15px -3px rgba(0, 0, 0, 0.05), 
+    0 25px 50px -12px rgba(0, 0, 0, 0.15),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+  padding: 48px 28px 28px 28px;
+  backdrop-filter: blur(8px);
+  z-index: 1001;
+  pointer-events: auto;
+  cursor: default;
+  animation: fadeIn 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: all 0.3s ease;
+}
+
+/* 메뉴바가 접혔을 때 말풍선 위치 조정 */
+.collapsed .user-popover {
+  left: calc(100% + 10px);
+}
+
+/* 다크 모드 말풍선 */
+.dark-theme .user-popover {
+  background-color: rgba(31, 41, 55, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 
+    0 20px 25px -5px rgba(0, 0, 0, 0.3), 
+    0 10px 10px -5px rgba(0, 0, 0, 0.2);
+}
+
+/* 7. X 버튼 스타일 */
+.user-popover__close {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  background: transparent !important;
+  border: none;
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #9ca3af; /* muted color */
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.2s ease;
+}
+
+.user-popover__close:hover {
+  color: #ef4444; /* darker on hover */
+}
+
+.dark-theme .user-popover__close {
+  color: #6b7280;
+}
+
+.dark-theme .user-popover__close:hover {
+  color: #d68888; /* lighter on dark hover */
+}
+
+.user-popover__content {
+  display: flex;
+  flex-direction: column;
+  gap: 18px; /* 간격 미세 조정 */
+  margin-bottom: 36px;
+  text-align: left; /* 전체 좌측 정렬 보장 */
+}
+
+/* 정보 카드 공통 스타일 */
+.user-popover__info-card {
+  background: var(--menu-hover-bg);
+  padding: 16px 20px;
+  border-radius: 16px;
+  border: 1px solid var(--menu-border);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.user-popover__info-card strong {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  display: block;
+  margin-bottom: 8px;
+  text-align: left; /* 라벨 좌측 정렬 */
+}
+
+/* 이메일과 아이콘 한 줄 배치 */
+.user-popover__email-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.95rem;
+  color: var(--menu-text);
+  font-weight: 500;
+}
+
+/* 팝업 내 아바타 크기 조정 (기존보다 작게, 텍스트와 맞춤) */
+.menu-bar__user-avatar.small {
+  width: 28px;
+  height: 28px;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.user-popover__info-card p {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--menu-text);
+  line-height: 1.2;
+  text-align: left; /* 내용 좌측 정렬 */
+}
+
+.dark-theme .user-popover__content p {
+  background: var(--menu-bg) !important;
+}
+
+.dark-theme .user-popover__content strong {
+  color: #bcc3d0;
+}
+
+.user-popover__footer {
+  border-top: 1px solid var(--menu-border);
+  padding-top: 24px;
+  display: flex;
+  flex-direction: column; /* 버튼들을 세로로 배치 */
+  gap: 12px; /* 버튼 사이 간격 */
+  align-items: center;
+}
+
+.dark-theme .user-popover__footer {
+  border-top-color: #4e5b6f;
+}
+
+/* 로그아웃 버튼 스타일 */
+.btn-logout {
+  width: 100%;
+  background-color: #eff6ff !important;
+  color: #2563eb;
+  border: 1px solid #dbeafe;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  gap: 10px;
+}
+
+.btn-logout svg {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.btn-logout:hover svg {
+  transform: translateX(2px); /* 호버 시 문 밖으로 나가는 느낌 */
+}
+
+.btn-logout:hover {
+  background-color: #2563eb !important;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+}
+
+.dark-theme .btn-logout {
+  background-color: rgba(37, 99, 235, 0.1) !important;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+}
+
+.dark-theme .btn-logout:hover {
+  background-color: #13347b !important;
+  border: 1px solid rgba(29, 55, 225, 0.2);
+}
+
+/* 버튼 스타일 */
+.btn-delete {
+  width: 100%; /* 버튼을 가득 채움 */
+  background-color: #fff1f2 !important;
+  color: #e11d48; /* 더 선명한 장미색 */
+  border: 1px solid #ffe4e6;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  gap: 10px;
+}
+
+.btn-delete svg {
+  flex-shrink: 0;
+}
+
+.btn-delete:hover {
+  background-color: #e11d48 !important;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(225, 29, 72, 0.3);
+}
+
+.dark-theme .btn-delete {
+  background-color: rgba(225, 29, 72, 0.1) !important;
+  border: 1px solid rgba(225, 29, 72, 0.2);
+}
+
+/* 말풍선 화살표 */
+.user-popover__arrow {
+  position: absolute;
+  left: -8px;
+  bottom: 20px;
+  width: 0;
+  height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-right: 8px solid #ffffff;
+  
+  /* 화살표 색상 전환 애니메이션 */
+  transition: border-right-color 0.3s ease;
+}
+
+.dark-theme .user-popover__arrow {
+  border-right-color: #1f2937;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
