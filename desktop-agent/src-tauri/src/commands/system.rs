@@ -17,8 +17,8 @@ pub struct ProcessSummary {
 pub fn get_all_processes_summary(
     sys_state: State<'_, SysinfoState>,
 ) -> Result<Vec<ProcessSummary>, String> {
-    let mut sys_guard = sys_state.0.lock().unwrap();
-    sys_guard.refresh_all();
+    let mut sys_guard = sys_state.0.lock().map_err(|_| "Failed to lock SysinfoState".to_string())?;
+    sys_guard.refresh_processes();
     let mut processes_summary = Vec::new();
     for (_pid, process) in sys_guard.processes() {
         if process.start_time() > 0 {

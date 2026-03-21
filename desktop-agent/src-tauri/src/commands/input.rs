@@ -31,7 +31,7 @@ pub type InputStatsArcMutex = Arc<Mutex<InputStats>>;
 pub fn get_input_frequency_stats(
     input_stats_arc_mutex: State<'_, InputStatsArcMutex>,
 ) -> Result<InputStats, String> {
-    let stats = input_stats_arc_mutex.lock().unwrap();
+    let stats = input_stats_arc_mutex.lock().map_err(|_| "Failed to lock InputStats".to_string())?;
     Ok((*stats).clone())
 }
 
