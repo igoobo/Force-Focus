@@ -20,7 +20,6 @@ export default function MenuBar() {
     { icon: '🛠️', label: '작업' },
     { icon: '📊', label: '활동 요약' },
     { icon: '🚨', label: '피드백' },
-    { icon: '⚙️', label: '설정' },
   ]
 
   useEffect(() => {

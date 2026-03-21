@@ -349,7 +349,7 @@
 
 /* 정보 카드 공통 스타일 */
 .user-popover__info-card {
-  background: var(--menu-hover-bg);
+  background: var(--menu-bg);
   padding: 16px 20px;
   border-radius: 16px;
   border: 1px solid var(--menu-border);

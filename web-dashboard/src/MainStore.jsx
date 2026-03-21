@@ -48,25 +48,21 @@ const useMainStore = create(
       // 8. 피드백 메뉴 진입 시 적용할 뷰 모드 (피드백 메뉴)
       feedbackViewMode: '종합', 
       setFeedbackViewMode: (mode) => set({ feedbackViewMode: mode }),
-
-      // 9. 설정 메뉴 진입 시 적용할 뷰 모드 (설정 메뉴)
-      settingsViewMode: 'limit', 
-      setSettingsViewMode: (mode) => set({ settingsViewMode: mode }),
       
-      // 10. 작업 변경 사항 추적 (작업 메뉴)
+      // 9. 작업 변경 사항 추적 (작업 메뉴)
       isDirty: false,
       setIsDirty: (status) => set({ isDirty: status }),
 
-      // 11. 도움말 모달 열림/닫힘 상태 (도움말)
+      // 10. 도움말 모달 열림/닫힘 상태 (도움말)
       isHelpOpen: false,
       openHelp: () => set({ isHelpOpen: true }),
       closeHelp: () => set({ isHelpOpen: false }),
 
-      // 12. 다크모드 상태 및 토글 함수 (다크 모드)
+      // 11. 다크모드 상태 및 토글 함수 (다크 모드)
       isDarkMode: false,
       toggleDarkMode: () => set((state) => ({ isDarkMode: !state.isDarkMode })),
 
-      // 13. 피드백 데이터 캐시 상태 및 액션 정의 함수 (피드백 메뉴)
+      // 12. 피드백 데이터 캐시 상태 및 액션 정의 함수 (피드백 메뉴)
       feedbackCache: {},
       setFeedbackCache: (newCache) => set({ feedbackCache: newCache }),
     }),
