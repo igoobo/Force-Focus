@@ -208,3 +208,17 @@ async def remove_blocked_app(user_id: Union[str, ObjectId], app_name: str) -> Op
         return None
 
     return await get_user_by_id(user_id)
+
+async def delete_user(user_id: Union[str, ObjectId]) -> bool:
+    """
+    ID를 기반으로 사용자를 컬렉션에서 영구 삭제합니다.
+    _id_filter를 사용하여 문자열/ObjectId 혼재 상황을 처리합니다.
+    """
+    # 공백 방지 및 필터 생성
+    user_filter = _id_filter(user_id)
+    
+    # delete_one 실행
+    result = await get_users_collection().delete_one(user_filter)
+    
+    # 삭제된 문서가 1개 이상이면 True 반환
+    return result.deleted_count > 0
