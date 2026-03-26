@@ -12,7 +12,7 @@ export default function ActivitySummary() {
 
   useEffect(() => {
     const CACHE_KEY = "last_activity_fetch_time";
-    const ONE_HOUR = 60 * 60 * 1000; // 1시간 (밀리초)
+    const ONE_HOUR = 60 * 60 * 1000; // 1시간 (밀리초 단위)
     
     const lastFetch = sessionStorage.getItem(CACHE_KEY);
     const now = Date.now();

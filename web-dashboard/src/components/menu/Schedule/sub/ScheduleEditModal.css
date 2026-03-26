@@ -1,19 +1,19 @@
-/* 1. 모달 전체 배경 (어둡게 처리) - 클래스명 격리 */
+/* 모달 전체 배경 */
 .edit-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.5); /* 반투명 검정 */
+  background-color: rgba(0, 0, 0, 0.5);
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 2000; /* 최상단에 위치 */
-  backdrop-filter: blur(2px); /* 배경 살짝 흐리게 처리 */
+  z-index: 2000;
+  backdrop-filter: blur(2px);
 }
 
-/* 2. 모달 컨텐츠 박스 */
+/* 모달 컨텐츠 박스 */
 .edit-overlay .modal-content {
   background-color: #ffffff;
   width: 650px;
@@ -35,7 +35,7 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* 3. 헤더 영역 */
+/* 헤더 영역 */
 .edit-overlay .modal-header {
   background: #ffffff;
   display: flex;
@@ -52,7 +52,7 @@
   color: #1f2937;
 }
 
-/* 4. 폼 및 입력 그룹 */
+/* 폼 및 입력 그룹 */
 .edit-overlay .modal-form {
   display: flex;
   flex-direction: column;
@@ -109,7 +109,7 @@
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
-/* 5. 날짜/시간 한 줄 정렬 (2열 배치) */
+/* 날짜/시간 한 줄 정렬 (2열 배치) */
 .edit-overlay .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -117,7 +117,7 @@
   width: 100%;
 }
 
-/* 6. 푸터 및 버튼 영역 */
+/* 푸터 및 버튼 영역 */
 .edit-overlay .modal-footer {
   background: #ffffff;
   display: flex;
@@ -153,6 +153,7 @@
   transform: translateY(-1px);
 }
 
+/* 다크 모드 대응 */
 .dark-theme .edit-overlay .modal-content {
   background-color: #1e293b;
   box-sizing: border-box;

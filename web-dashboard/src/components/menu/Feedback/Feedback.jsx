@@ -17,38 +17,29 @@ export default function Feedback() {
   const [error, setError] = useState(null);
   const [progressWidth, setProgressWidth] = useState(0); 
 
-  // --- 세션 목록 및 선택 관련 상태 ---
+  // 세션 목록 및 선택 관련 상태
   const [sessionList, setSessionList] = useState([]);
   const [sessionLoading, setSessionLoading] = useState(true);
   const [selectedSessionId, setSelectedSessionId] = useState("");
 
+  // 세션 선택 모달에서 세션 ID를 받아오는 로직
   useEffect(() => {
-    // Overview 미리보기를 통해 넘겨받은 ID가 있는지 확인
     const targetId = sessionStorage.getItem("target_session_id");
 
     if (targetId) {
-      // ID가 있다면 해당 세션을 바로 선택 처리
       setSelectedSessionId(targetId);
     
-      // 중요: 사용 직후 즉시 삭제하여, 이후 '메뉴 직접 클릭' 시에는 
-      // 이 로직이 작동하지 않도록 방지
       sessionStorage.removeItem("target_session_id");
     } else {
-      // 미리보기를 거치지 않고 직접 메뉴를 눌러 들어온 경우
-      // selectedSessionId가 ""인 상태를 유지하여 모달이 뜨도록 함
       setSelectedSessionId("");
    }
   }, []);
 
   useEffect(() => {
     isMounted.current = true;
-
-    // 전역 캐시(feedbackCache)에 데이터가 있다면 새로고침 시 재호출하지 않음
-    // 오직 로그아웃 후 다시 로그인하여 캐시가 비워진 상태일 때만 서버에 요청
     if (Object.keys(feedbackCache).length === 0) {
       fetchSessionList(isMounted);
     } else {
-      // 캐시가 있다면 로딩 상태를 즉시 해제하여 기존 리스트/리포트를 보여줌
       setSessionLoading(false);
     }
 
@@ -57,7 +48,7 @@ export default function Feedback() {
     };
   }, []); // 마운트 시 1회만 실행되도록 비워둠
 
-  // old_feedback.jsx의 텍스트 포맷팅 함수
+  // 텍스트 포맷팅 함수
   const formatText = (text) => {
     if (!text) return "";
     return text
@@ -65,7 +56,7 @@ export default function Feedback() {
       .replace(/\n/g, "<br/>");
   };
 
-  // old_feedback.jsx의 아이콘 지정 함수
+  // 아이콘 지정 함수
   const getStrategyIcon = (title) => {
     if (!title) return "💡";
     if (title.includes("시각") || title.includes("눈") || title.includes("화면")) return "👁️";
@@ -111,9 +102,6 @@ export default function Feedback() {
 
   useEffect(() => {
     isMounted.current = true;
-
-    // 1 & 2번 조건: 전체 새로고침 시 컴포넌트가 재마운트되므로 항상 이 로직이 실행됨
-    // 이전에 타임아웃이 났었더라도 새로고침하면 다시 호출함
     fetchSessionList(isMounted);
 
     return () => {
@@ -143,10 +131,7 @@ export default function Feedback() {
         const freshData = response.data;
         
         setData(freshData);
-        // 전역 스토어 캐시 업데이트
         setFeedbackCache({ ...feedbackCache, [selectedSessionId]: freshData });
-        
-        // 애니메이션 실행
         setTimeout(() => setProgressWidth(freshData.distraction_ratio || 0), 100);
       } catch (err) {
         console.error("AI Insight Fetch Error:", err);
@@ -159,7 +144,6 @@ export default function Feedback() {
     fetchFeedbackData();
   }, [selectedSessionId]);
 
-  // old_feedback.jsx의 탭 클릭 로직
   const handleTabClick = (tabName) => {
     setFeedbackViewMode(tabName);
     if (tabName === "피로도" && data) {
@@ -168,7 +152,6 @@ export default function Feedback() {
     }
   };
 
-  // old_feedback.jsx의 렌더링 로직 (데이터 구조 변경 없음)
   const renderContent = () => {
     if (loading) {
       return (
@@ -362,7 +345,6 @@ export default function Feedback() {
       {/* 선택 후 보여질 피드백 레이아웃 */}
       {selectedSessionId && (
         <>
-          {/* 버튼을 메뉴 바 안으로 이동하여 높이를 통일함 */}
           <div className="feedback-menu-container">
             <div className="feedback-menu">
               <ul>

@@ -8,7 +8,7 @@ import TaskView from "../../menu/Task/TaskView.jsx" // 메뉴 3 : 작업
 import ActivitySummary from "../../menu/ActivitySummary/ActivitySummary.jsx" // 메뉴 4 : 활동 요약
 import Feedback from "../../menu/Feedback/Feedback.jsx" // 메뉴 5 : 피드백
 
-// InfoBox 컴포넌트 (중앙 정보 표시 영역)
+// InfoBox 컴포넌트 (중앙 정보 표시 컨테이너 영역)
 export default function InfoBox() {
   const activeMenu = useMainStore((state) => state.activeMenu);
 

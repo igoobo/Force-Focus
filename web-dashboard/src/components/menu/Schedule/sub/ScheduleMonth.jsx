@@ -3,7 +3,7 @@ import "./ScheduleMonth.css";
 
 // 스케줄 월간 뷰 컴포넌트
 export default function ScheduleMonth({ schedules, onScheduleClick, onDateClick }) {
-  const today = new Date(); // 오늘 날짜
+  const today = new Date();
 
   // 현재 표시 중인 연 - 월 - 1일 (오늘 날짜 기준으로 초기화)
   const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1)); 
@@ -14,8 +14,8 @@ export default function ScheduleMonth({ schedules, onScheduleClick, onDateClick 
   const startDayOfWeek = new Date(year, month, 1).getDay(); // 해당 월의 1일이 무슨 요일인지 (0:일, 6:토)
   const endDayOfWeek = new Date(year, month, daysInMonth).getDay(); // 해당 월의 마지막 날이 무슨 요일인지
 
-  const isCurrentMonth =
-    today.getFullYear() === year && today.getMonth() === month; // 현재 보고 있는 달이 이번 달인지 여부
+  const isCurrentMonth = // 현재 보고 있는 달이 이번 달인지 여부
+    today.getFullYear() === year && today.getMonth() === month;
   const todayDate = today.getDate(); // 오늘 날짜의 일자
 
   // 지난/다음 달 정보
@@ -150,7 +150,7 @@ export default function ScheduleMonth({ schedules, onScheduleClick, onDateClick 
                 <div 
                   key={s.id} 
                   className="month-task" 
-                  style={{ cursor: "pointer" }} // 커서 추가
+                  style={{ cursor: "pointer" }}
                   onClick={(e) => {
                     e.stopPropagation(); // 날짜 클릭 이벤트 방지
                     onScheduleClick && onScheduleClick(s);

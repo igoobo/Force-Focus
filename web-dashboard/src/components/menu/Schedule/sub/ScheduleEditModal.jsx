@@ -57,7 +57,7 @@ export default function ScheduleEditModal({ schedule, onClose }) {
             />
           </div>
 
-          {/* 작업 선택 섹션 추가 */}
+          {/* 작업 선택 섹션 */}
           <div className="form-group">
             <label>작업 종류</label>
             <select 

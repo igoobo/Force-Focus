@@ -8,7 +8,6 @@ import HelpModal from './components/layout/Help/HelpModal.jsx';
 import Login from './components/login/login.jsx';
 
 function App() {
-  // Store에서 필요한 상태와 함수들을 가져옵니다.
   const { 
     isHelpOpen, openHelp, setActiveMenu, isDarkMode, 
     isLoggedIn, login, logout, activeMenu 
@@ -17,7 +16,7 @@ function App() {
   // 로그아웃 로직
   const handleLogout = () => {
     if (window.confirm("로그아웃 하시겠습니까?")) {
-      logout(); // Store의 logout 함수 호출
+      logout();
     }
   };
 

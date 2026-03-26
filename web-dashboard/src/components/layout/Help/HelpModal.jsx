@@ -723,8 +723,7 @@ const HelpModal = () => {
     }
   }, [isHelpOpen, activeMenu]);
 
-  // [소개] 탭으로 즉시 이동하는 함수 정의
-  const goToIntro = () => {
+  const goToIntro = () => {  // 처음 [소개] 탭으로 즉시 이동하는 함수
     setActiveMainTab('all');
     setActiveSubTab('intro');
   };
@@ -742,8 +741,6 @@ const HelpModal = () => {
   return (
     <div className={`help-modal-overlay ${isDarkMode ? 'dark-theme' : ''}`} onClick={closeHelp}>
       <div className="help-modal-container" onClick={(e) => e.stopPropagation()}>
-
-        {/* ✅ 우측 상단 X 닫기 버튼 추가 */}
         <button className="help-modal__close-icon-btn" onClick={closeHelp} aria-label="닫기">
           <svg 
             className="help-modal__close-icon"
@@ -760,11 +757,9 @@ const HelpModal = () => {
           </svg>
         </button>
         
-        {/* 왼쪽 사이드바: side-menu 디자인 반영 */}
         <aside className="help-modal__sidebar">
           <div className="help-modal__sidebar-header">
             <h2 className="help-modal__title" onClick={goToIntro}>
-              {/* ✅ 새로 생성된 대화 말풍선 SVG 아이콘 적용 */}
               <svg 
                 className="help-modal__title-icon"
                 xmlns="http://www.w3.org/2000/svg" 
@@ -798,8 +793,7 @@ const HelpModal = () => {
             <button className="help-modal__close-btn" onClick={closeHelp}>도움말 닫기</button>
           </div>
         </aside>
-
-        {/* 오른쪽 메인: main-content 디자인 반영 */}
+        
         <main className="help-modal__main">
           <header className="help-modal__header">
             <div className="help-modal__sub-tabs">

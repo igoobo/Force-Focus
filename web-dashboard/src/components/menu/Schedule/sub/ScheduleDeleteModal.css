@@ -32,7 +32,6 @@
   margin-bottom: 18px;
 }
 
-/* 목록 */
 .delete-schedule-list {
   flex: 1;
   overflow-y: auto;
@@ -40,8 +39,6 @@
   padding-right: 8px;
 }
 
-/* 일정 카드 */
-/* 카드 전체 */
 .delete-schedule-card {
   display: flex;
   align-items: flex-start;
@@ -80,7 +77,6 @@
   border-color: #312e81;
 }
 
-/* 기존 카드 내부 정보 여백 수정 */
 .delete-schedule-info {
   margin-left: 42px;
   text-align: left;
@@ -98,7 +94,7 @@
 
 /* 라디오 버튼 크기 및 위치 */
 .delete-radio {
-  width: 20px;     /* 조금 더 큼 */
+  width: 20px;
   height: 20px;
   cursor: pointer;
   accent-color: #3b82f6;
@@ -135,7 +131,7 @@
   margin-top: 4px;
 }
 
-/* [수정] 하단 버튼 영역 - 이미지 가이드에 맞춰 배치 조정 */
+/* 하단 버튼 영역 */
 .delete-modal-footer {
   display: flex;
   align-items: center;
@@ -147,11 +143,10 @@
 .delete-footer-right {
   display: flex;
   gap: 12px;
-  /* 버튼 그룹을 푸터의 중앙부로 밀어넣기 위해 auto margin 사용 */
   margin: 0 auto; 
 }
 
-/* [추가] 전체 선택 버튼 스타일 - 좌측 끝 고정 */
+/* 전체 선택 버튼 스타일 */
 .delete-select-all-btn {
   background: transparent !important;
   color: #6b7280;
@@ -162,7 +157,7 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
-  position: absolute; /* 좌측 끝에 고정 */
+  position: absolute;
   left: 0;
 }
 
@@ -177,13 +172,13 @@
   cursor: not-allowed;
 }
 
-/* 빨간색 네모 위치 (삭제 버튼) */
+/* 삭제 버튼 */
 .delete-main-btn {
-  background: #ff5a5a !important; /* 이미지의 붉은 계열 색상 반영 */
+  background: #ff5a5a !important;
   color: white;
   border: none;
   border-radius: 6px;
-  padding: 10px 30px; /* 크기 조정 */
+  padding: 10px 30px;
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
@@ -199,13 +194,13 @@
   background: #dc2626;
 }
 
-/* 회색 네모 위치 (닫기 버튼) */
+/* 닫기 버튼 */
 .delete-cancel-btn {
-  background: #e2e8f0 !important; /* 이미지의 회색 계열 반영 */
+  background: #e2e8f0 !important;
   border: none;
   border-radius: 6px;
   color: #111827;
-  padding: 10px 30px; /* 크기 조정 */
+  padding: 10px 30px;
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
@@ -262,7 +257,6 @@
   background: #d1d5db;
 }
 
-/* 일정 없음 */
 .delete-empty-text {
   text-align: center;
   color: #6b7280;
@@ -338,7 +332,6 @@
   color: #64748b;
 }
 
-/* [추가] 다크모드 전체 선택 버튼 */
 .dark-theme .delete-select-all-btn {
   color: #94a3b8;
   border-color: #4b5563;

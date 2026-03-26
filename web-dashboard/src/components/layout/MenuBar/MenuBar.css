@@ -8,7 +8,6 @@
   --menu-border: #e5e7eb;
 }
 
-/* 다크 모드 */
 .dark-theme .menu-bar {
   --menu-bg: #111827;
   --menu-text: #d1d5db;
@@ -32,7 +31,6 @@
   box-shadow: 4px 0 24px rgba(0, 0, 0, 0.02); 
   display: flex;
   flex-direction: column;
-  /* 아래 transition 속성을 말풍선에도 적용할 것임 */
   transition: 
     width 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
     background-color 0.3s ease, 
@@ -45,7 +43,6 @@
   width: 60px;
 }
 
-/* 상단 헤더 */
 .menu-bar__header {
   display: flex;
   align-items: center;
@@ -74,7 +71,6 @@
   color: #cbd5e1;
 }
 
-/* 토글 버튼 */
 .menu-bar__toggle {
   background-color: transparent !important;
   border: none;
@@ -89,7 +85,6 @@
   transition: background-color 0.3s ease, color 0.3s ease, transform 0.3s ease;
 }
 
-/* 접혔을 때 버튼 위치를 중앙으로 조정 */
 .collapsed .menu-bar__toggle {
   width: 100%;
   margin: 0;
@@ -102,7 +97,6 @@
   transform: scale(1.05);
 }
 
-/* 메뉴 리스트 */
 .menu-bar__nav {
   padding: 12px 10px;
 }
@@ -113,7 +107,6 @@
   padding: 0;
 }
 
-/* 개별 메뉴 항목 */
 .menu-bar__item {
   color: var(--menu-text);
   display: flex;
@@ -141,16 +134,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px; /* 아이콘 크기 */
+  width: 32px;
   height: 32px;
-  background-color: #3b82f6; /* 기본 파란색 배경 */
-  color: #ffffff; /* 흰색 글자 */
-  border-radius: 50%; /* 완벽한 원형 */
-  font-size: 1rem; /* 글자 크기 */
-  font-weight: 700; /* 굵게 */
-  text-transform: uppercase; /* 대문자 강제 */
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* 미세한 그림자 */
-  flex-shrink: 0; /* 크기 고정 */
+  background-color: #3b82f6;
+  color: #ffffff;
+  border-radius: 50%;
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
   transition: all 0.3s ease;
 }
 
@@ -191,7 +184,6 @@
   box-shadow: none;
 }
 
-/* 접힘 상태 */
 .menu-bar.collapsed .menu-bar__label {
   display: none;
 }
@@ -200,7 +192,6 @@
   opacity: 1;
 }
 
-/* 맨 아래쪽 푸터 영역 고정 */
 .menu-bar__footer {
   margin-top: auto;
   padding: 16px 10px;
@@ -208,31 +199,26 @@
   transition: width 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
 }
 
-/* 유저 프로필 아이템 스타일 */
 .user-profile-item {
-  background-color: var(--menu-hover-bg); /* 유저 카드는 배경색을 살짝 부여 */
+  background-color: var(--menu-hover-bg);
   border: none !important;
   margin-bottom: 8px;
-  position: relative; /* 말풍선 위치 기준 */
+  position: relative;
 }
 
-/* 1. 기본 호버 스타일: 말풍선 내부가 아닌 '버튼 자체'에 호버했을 때만 이동 */
 .user-profile-item:hover {
   background-color: var(--menu-hover-bg);
   color: var(--menu-hover-text);
   transform: translateX(4px) !important;
 }
 
-/* 2. 핵심 해결책: 말풍선 영역에 마우스가 올라가면 부모의 transform(이동)을 0으로 강제 고정 */
 .user-profile-item:has(.user-popover:hover) {
   transform: translateX(0) !important;
 }
 
-/* 말풍선이 열려 있을 때의 기본 버튼 상태 (호버하지 않을 때) */
 .user-profile-item:has(.user-popover) {
   background-color: var(--menu-hover-bg);
   color: var(--menu-hover-text);
-  /* 평상시에는 이동하지 않음 */
 }
 
 .menu-bar__user-info {
@@ -242,19 +228,16 @@
   transition: opacity var(--transition-speed) ease;
 }
 
-/* 메뉴바가 접혔을 때 이메일과 상세 정보 숨기기 */
 .collapsed .menu-bar__user-info{
   opacity: 0;
   display: none;
 }
 
-/* 접혔을 때 푸터 아이템 중앙 정렬 */
 .collapsed .menu-bar__footer .menu-bar__item {
   justify-content: center;
   padding: 14px 0;
 }
 
-/* 다크모드 시 하단 아이템 색상 보정 */
 .dark-theme .theme-toggle-item {
   color: #94a3b8;
 }
@@ -275,14 +258,13 @@
   color: var(--text-main);
 }
 
-/* 말풍선 컨테이너 */
 .user-popover {
   position: absolute;
-  bottom: -10px; /* 위치 살짝 조정 */
+  bottom: -10px;
   left: calc(100% + 20px);
-  width: 480px; /* 너비 확장 */
+  width: 480px;
   background-color: #ffffff;
-  border-radius: 20px; /* 곡률 더 부드럽게 */
+  border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.8); 
   box-shadow: 
     0 10px 15px -3px rgba(0, 0, 0, 0.05), 
@@ -297,12 +279,10 @@
   transition: all 0.3s ease;
 }
 
-/* 메뉴바가 접혔을 때 말풍선 위치 조정 */
 .collapsed .user-popover {
   left: calc(100% + 10px);
 }
 
-/* 다크 모드 말풍선 */
 .dark-theme .user-popover {
   background-color: rgba(31, 41, 55, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -311,7 +291,6 @@
     0 10px 10px -5px rgba(0, 0, 0, 0.2);
 }
 
-/* 7. X 버튼 스타일 */
 .user-popover__close {
   position: absolute;
   top: 8px;
@@ -320,7 +299,7 @@
   border: none;
   font-size: 1.2rem;
   font-weight: bold;
-  color: #9ca3af; /* muted color */
+  color: #9ca3af;
   cursor: pointer;
   padding: 0;
   line-height: 1;
@@ -328,7 +307,7 @@
 }
 
 .user-popover__close:hover {
-  color: #ef4444; /* darker on hover */
+  color: #ef4444;
 }
 
 .dark-theme .user-popover__close {
@@ -336,18 +315,17 @@
 }
 
 .dark-theme .user-popover__close:hover {
-  color: #d68888; /* lighter on dark hover */
+  color: #d68888;
 }
 
 .user-popover__content {
   display: flex;
   flex-direction: column;
-  gap: 18px; /* 간격 미세 조정 */
+  gap: 18px;
   margin-bottom: 36px;
-  text-align: left; /* 전체 좌측 정렬 보장 */
+  text-align: left;
 }
 
-/* 정보 카드 공통 스타일 */
 .user-popover__info-card {
   background: var(--menu-bg);
   padding: 16px 20px;
@@ -363,7 +341,7 @@
   color: #94a3b8;
   display: block;
   margin-bottom: 8px;
-  text-align: left; /* 라벨 좌측 정렬 */
+  text-align: left;
 }
 
 /* 이메일과 아이콘 한 줄 배치 */
@@ -376,7 +354,6 @@
   font-weight: 500;
 }
 
-/* 팝업 내 아바타 크기 조정 (기존보다 작게, 텍스트와 맞춤) */
 .menu-bar__user-avatar.small {
   width: 28px;
   height: 28px;
@@ -389,7 +366,7 @@
   font-size: 0.95rem;
   color: var(--menu-text);
   line-height: 1.2;
-  text-align: left; /* 내용 좌측 정렬 */
+  text-align: left;
 }
 
 .dark-theme .user-popover__content p {
@@ -404,8 +381,8 @@
   border-top: 1px solid var(--menu-border);
   padding-top: 24px;
   display: flex;
-  flex-direction: column; /* 버튼들을 세로로 배치 */
-  gap: 12px; /* 버튼 사이 간격 */
+  flex-direction: column;
+  gap: 12px;
   align-items: center;
 }
 
@@ -413,7 +390,6 @@
   border-top-color: #4e5b6f;
 }
 
-/* 로그아웃 버튼 스타일 */
 .btn-logout {
   width: 100%;
   background-color: #eff6ff !important;
@@ -435,7 +411,7 @@
 }
 
 .btn-logout:hover svg {
-  transform: translateX(2px); /* 호버 시 문 밖으로 나가는 느낌 */
+  transform: translateX(2px);
 }
 
 .btn-logout:hover {
@@ -454,11 +430,10 @@
   border: 1px solid rgba(29, 55, 225, 0.2);
 }
 
-/* 버튼 스타일 */
 .btn-delete {
-  width: 100%; /* 버튼을 가득 채움 */
+  width: 100%;
   background-color: #fff1f2 !important;
-  color: #e11d48; /* 더 선명한 장미색 */
+  color: #e11d48;
   border: 1px solid #ffe4e6;
   padding: 10px 16px;
   border-radius: 10px;
@@ -485,7 +460,6 @@
   border: 1px solid rgba(225, 29, 72, 0.2);
 }
 
-/* 말풍선 화살표 */
 .user-popover__arrow {
   position: absolute;
   left: -8px;
@@ -495,8 +469,6 @@
   border-top: 8px solid transparent;
   border-bottom: 8px solid transparent;
   border-right: 8px solid #ffffff;
-  
-  /* 화살표 색상 전환 애니메이션 */
   transition: border-right-color 0.3s ease;
 }
 

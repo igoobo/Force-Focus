@@ -29,6 +29,7 @@ export default function Overview() {
   const setFeedbackCache = useMainStore((state) => state.setFeedbackCache);
   const [feedbackData, setFeedbackData] = useState(null);
   const [isFeedbackLoading, setIsFeedbackLoading] = useState(true);
+
   // 가장 최근 세션의 ID를 정확히 저장하기 위한 상태 추가
   const [latestId, setLatestId] = useState("");
 
@@ -60,9 +61,6 @@ export default function Overview() {
             // 전역 스토어 캐시에 저장
             setFeedbackCache({ ...feedbackCache, [latestSessionId]: freshData });
           }
-          
-          // [수정] 피드백 메뉴 진입 시 세션 선택을 건너뛰도록 ID 설정하는 로직을 여기서 제거합니다.
-          // (마운트 시 자동 실행 방지)
         }
       } catch (err) {
         console.error("최근 피드백 로드 실패:", err);
@@ -74,7 +72,7 @@ export default function Overview() {
     fetchLatestFeedback();
   }, []);
 
-  // --- 오늘 날짜 계산 로직 ---
+  // 오늘 날짜 계산 로직
   const today = new Date();
   const dayIndex = today.getDay();
   const year = today.getFullYear();
@@ -89,7 +87,7 @@ export default function Overview() {
   // 활동 데이터 존재 여부 판단 (차트 데이터가 없거나 주요 앱이 "데이터 없음"으로 표시되는 경우)
   const hasNoData = !loading && (!stats.chartData || stats.chartData.length === 0 || summary.mainApp === "데이터 없음");
 
-  // 자동 스크롤 로직 (기존 유지)
+  // 자동 스크롤 로직
   useEffect(() => {
     if (viewMode === "월") return;
 

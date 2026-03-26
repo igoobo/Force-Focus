@@ -12,7 +12,7 @@ const Login = ({ onLoginSuccess }) => {
     const handleGoogleSuccess = async (credentialResponse) => {
         setIsLoading(true);
         try {
-            // 백엔드 검증 엔드포인트 호출
+            // 백엔드 검증 엔드포인트를 호출함
             const response = await authApi.post('/api/v1/auth/google/verify', {
                 token: credentialResponse.credential 
             });

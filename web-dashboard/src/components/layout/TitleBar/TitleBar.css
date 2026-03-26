@@ -104,7 +104,7 @@
   color: var(--tb-accent);
 }
 
-/* 로그아웃 버튼 (배경 투명, 글씨만 빨간색) */
+/* 로그아웃 버튼 */
 .titlebar__btn--logout-styled {
   display: flex;
   align-items: center;
@@ -122,7 +122,6 @@
 }
 
 .titlebar__btn--logout-styled:hover {
-  /* 호버 시 아주 미세하게 연한 빨간색 배경을 넣어 클릭 영역임을 표시 */
   background: rgba(239, 68, 68, 0.08) !important;
 }
 
@@ -155,13 +154,13 @@ body {
 
 /* 툴팁 말풍선 기본 스타일 */
 [data-tooltip]::before {
-  content: attr(data-tooltip); /* data-tooltip의 텍스트를 가져옴 */
+  content: attr(data-tooltip); 
   position: absolute;
-  top: 110%; /* 버튼 아래쪽에 위치 */
+  top: 110%;
   left: 50%;
   transform: translateX(-50%) translateY(10px);
   padding: 6px 10px;
-  background: rgba(31, 41, 55, 0.9); /* 어두운 배경 */
+  background: rgba(31, 41, 55, 0.9);
   color: #fff;
   font-size: 12px;
   font-weight: 500;
@@ -180,7 +179,7 @@ body {
   transform: translateX(-50%) translateY(0);
 }
 
-/* (선택) 툴팁 화살표 */
+/* 툴팁 화살표 */
 [data-tooltip]::after {
   content: "";
   position: absolute;

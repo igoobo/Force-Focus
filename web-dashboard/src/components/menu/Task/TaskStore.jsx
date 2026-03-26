@@ -12,15 +12,13 @@ const DEFAULT_TASK_MAPPING = {
 
 const DEFAULT_TASK_NAMES = Object.keys(DEFAULT_TASK_MAPPING);
 
-// [수정] t.description 및 t.name을 모두 활용하여 isCustom을 더 정확하게 판별
 const normalizeTask = (t) => {
   if (!t) return null;
   const name = t.name || "제목 없음";
   const desc = t.description || "";
   
-  // 기본 작업 이름 목록에 포함되어 있지 않거나, 설명이 명시적으로 "사용자 추가 작업"인 경우 true
   const isCustomTask = !DEFAULT_TASK_NAMES.includes(name) || desc === "사용자 추가 작업";
-  // 단, 이름은 기본 목록에 있는데 설명이 "시스템"인 경우는 명백히 false (이중 검증)
+
   const finalIsCustom = DEFAULT_TASK_NAMES.includes(name) && desc === "시스템 기본 제공 작업" ? false : isCustomTask;
 
   return {
@@ -97,13 +95,13 @@ export const useTaskStore = create((set, get) => ({
     }
   },
 
-  // [중요 수정] 업데이트 시 description이 소실되지 않도록 페이로드에 포함
+  // 업데이트 시 description이 소실되지 않도록 페이로드에 포함
   updateTaskApps: async (id, paths) => {
     try {
       const task = get().tasks.find(t => t.id === id);
       const payload = {
         name: task.label,
-        description: task.description, // 기존 설명을 유지하여 isCustom 판별 유지
+        description: task.description,
         target_executable: paths.filter(p => p.trim() !== "").join(','), 
       };
       await taskApi.update(id, payload);

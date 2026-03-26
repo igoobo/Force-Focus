@@ -31,8 +31,8 @@ export default function Schedule() {
   
   // 날짜 칸 클릭 시 실행될 핸들러
   const handleDateClick = (date) => {
-    setViewDate(date);   // 클릭한 날짜로 변경
-    setViewMode("day");  // 일간 뷰로 변경
+    setViewDate(date);
+    setViewMode("day");
   };
 
   // 일정 추가 모달 열기/닫기 함수
@@ -56,12 +56,12 @@ export default function Schedule() {
   useEffect(() => {
     fetchSchedules();
     return () => clearSchedules();
-  }, [fetchSchedules, clearSchedules, currentUser]); // currentUser가 바뀌면 다시 실행됨
+  }, [fetchSchedules, clearSchedules, currentUser]);
 
   useEffect(() => {
     if (scheduleInitialView) {    // Overview에서 넘어온 예약된 뷰 모드가 있다면 즉시 반영
       setViewMode(scheduleInitialView);
-      clearScheduleInitialView(); // 적용 후 예약 정보 초기화
+      clearScheduleInitialView();
     }
   }, [scheduleInitialView, clearScheduleInitialView]);
 
@@ -116,7 +116,7 @@ export default function Schedule() {
         </div>
       </div>
 
-      {/* 각 뷰 컴포넌트에 onScheduleClick 프롭으로 수정 함수 전달 */}
+      {/* 각 뷰 컴포넌트에 onScheduleClick 프롭으로 함수 전달 */}
       {viewMode === "day" && <ScheduleDay key="day" schedules={schedules} onScheduleClick={openEditModal} currentDate={viewDate} setCurrentDate={setViewDate} />}
       {viewMode === "week" && <ScheduleWeek key="week" schedules={schedules} onScheduleClick={openEditModal} />}
       {viewMode === "month" && <ScheduleMonth key="month" schedules={schedules} onScheduleClick={openEditModal} onDateClick={handleDateClick} />}

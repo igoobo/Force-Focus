@@ -3,11 +3,10 @@ import "./ScheduleList.css";
 import { useTaskStore } from "../../Task/TaskStore";
 
 const ScheduleList = ({ schedules = [], onScheduleClick }) => {
-  // 작업 목록을 가져와서 task_id에 해당하는 작업 이름을 매핑하기 위함
-  const { tasks, fetchTasks } = useTaskStore(); // 서버 DB의 작업 목록 가져오기
+  const { tasks, fetchTasks } = useTaskStore();
 
   useEffect(() => {
-    fetchTasks(); // 최신 작업 정보를 DB에서 조회
+    fetchTasks();
   }, [fetchTasks]);
 
   const sortedSchedules = [...schedules].sort(
@@ -59,7 +58,7 @@ const ScheduleList = ({ schedules = [], onScheduleClick }) => {
                         day: '2-digit',
                         timeZone: "Asia/Seoul" 
                       })
-                      .replace(/\s/g, '') // 공백 제거 (yyyy.mm.dd. 형태 유지)
+                      .replace(/\s/g, '') // 공백 제거
                       .replace(/(\d{4})\.(\d{2})\.(\d{2})\./, '$1. $2. $3.') // 숫자 뒤에 한 칸씩 띄움
                     : "정보 없음"}
                 </span>

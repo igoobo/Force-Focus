@@ -25,8 +25,8 @@ body {
   margin: 0;
   padding: 0;
   font-family: "Segoe UI", Arial, sans-serif;
-  background-color: var(--bg-main); /* 변수 적용 */
-  color: var(--text-main);          /* 변수 적용 */
+  background-color: var(--bg-main);
+  color: var(--text-main);
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
@@ -54,7 +54,7 @@ button {
 
 /* 각 버튼 색상 구분 */
 button:first-of-type {
-  background-color: #3b82f6; /* 파랑 */
+  background-color: #3b82f6;
 }
 
 button:first-of-type:hover {
@@ -62,19 +62,17 @@ button:first-of-type:hover {
 }
 
 button:last-of-type {
-  background-color: #ef4444; /* 빨강 */
+  background-color: #ef4444;
 }
 
 button:last-of-type:hover {
   background-color: #dc2626;
 }
 
-/* 클릭 시 살짝 눌리는 효과 */
 button:active {
   transform: scale(0.97);
 }
 
-/* 반응형 정렬용 래퍼 */
 #root {
   text-align: center;
 }
@@ -83,7 +81,7 @@ button:active {
 .menu-bar__footer {
   padding: 15px;
   border-top: 1px solid var(--border-color);
-  margin-top: auto; /* 하단 밀착 */
+  margin-top: auto;
 }
 
 .theme-toggle-btn {
@@ -102,7 +100,6 @@ button:active {
   background-color: var(--border-color);
 }
 
-/* 기존 버튼 공통 스타일 유지하되 배경색 변수로 수정 권장 */
 button {
   transition: background-color 0.3s ease, color 0.3s ease, transform 0.1s ease;
 }

@@ -8,8 +8,8 @@ export default function ScheduleDeleteModal({ onClose }) {
   const [selectedIds, setSelectedIds] = useState([]);
   const { tasks, fetchTasks } = useTaskStore();
 
-  useEffect(() => {
-    fetchTasks(); // 배지 표시를 위한 최신 작업 리스트 로드
+  useEffect(() => { // 배지 표시를 위한 최신 작업 리스트 로드
+    fetchTasks();
   }, [fetchTasks]);
 
   // task_id를 통해 작업 라벨을 찾는 함수
@@ -28,9 +28,9 @@ export default function ScheduleDeleteModal({ onClose }) {
   // 전체 선택/해제 핸들러
   const handleSelectAll = () => {
     if (selectedIds.length === schedules.length) {
-      setSelectedIds([]); // 이미 모두 선택된 경우 전체 해제
+      setSelectedIds([]);
     } else {
-      setSelectedIds(schedules.map((s) => s.id)); // 모든 ID 선택
+      setSelectedIds(schedules.map((s) => s.id));
     }
   };
 
@@ -48,7 +48,7 @@ export default function ScheduleDeleteModal({ onClose }) {
         // 모든 선택된 ID에 대해 삭제 프로세스 실행
         await Promise.all(selectedIds.map(id => deleteSchedule(id)));
         alert("선택한 일정들이 모두 삭제되었습니다.");
-        setSelectedIds([]); // 선택 초기화
+        setSelectedIds([]);
       } catch (error) {
         console.error("삭제 중 오류 발생:", error);
         alert("일부 일정 삭제에 실패했습니다.");
@@ -68,16 +68,13 @@ export default function ScheduleDeleteModal({ onClose }) {
             schedules.map((s) => (
               <label
                 key={s.id}
-                // 선택 여부 확인 로직 변경
                 className={`delete-schedule-card ${selectedIds.includes(s.id) ? "selected" : ""}`}
               >
                 <div className="delete-card-left">
                   <input
-                    // radio -> checkbox로 변경
                     type="checkbox"
                     name="selectedSchedule"
                     value={s.id}
-                    // 체크 여부 확인 로직 변경
                     checked={selectedIds.includes(s.id)}
                     onChange={() => handleCheckboxChange(s.id)}
                     className="delete-radio"

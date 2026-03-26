@@ -1,6 +1,6 @@
 import './MenuBar.css'
 import useMainStore from '../../../MainStore.jsx'
-import { useState, useEffect, useRef } from 'react' // 1. useRef 추가
+import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 
 export default function MenuBar() {
@@ -12,7 +12,7 @@ export default function MenuBar() {
   const [userData, setUserData] = useState({ email: '', lastLogin: '' });
   const [isPopupOpen, setIsPopupOpen] = useState(false);
 
-  const popoverRef = useRef(null); // 2. 외부 클릭 감지를 위한 Ref 생성
+  const popoverRef = useRef(null);
 
   const menus = [
     { icon: '🏠', label: 'Overview' },
@@ -31,7 +31,7 @@ export default function MenuBar() {
             headers: { Authorization: `Bearer ${token}` }
           });
 
-          // 1. 서버에서 가져온 원본 데이터 (예: "2026-03-21 11:30:00")
+          // 1. 서버에서 가져온 원본 데이터 (예: "2026-01-01 00:00:00")
           let rawDate = response.data.last_login_at;
           let formattedDate = '기록 없음';
 
@@ -41,7 +41,6 @@ export default function MenuBar() {
             const date = new Date(utcDateStr);
             
             // 2. 한국 시간(KST, UTC+9)으로 오프셋을 적용하여 각 항목 추출
-            // Intl.DateTimeFormat을 사용하여 각 요소를 배열로 가져옵니다.
             const d = new Intl.DateTimeFormat('ko-KR', {
               timeZone: 'Asia/Seoul',
               year: 'numeric', month: '2-digit', day: '2-digit',
@@ -53,13 +52,10 @@ export default function MenuBar() {
             const p = {};
             d.forEach(({ type, value }) => { p[type] = value; });
 
-            // 4. 최종 문자열 조립: 하이픈(-)과 공백( )을 명시적으로 넣습니다.
-            // 결과 예시: 2026-03-21 20:30:57
+            // 4. 최종 문자열 조립: 하이픈(-)과 공백( )을 명시적으로 추가함
+            // 결과 예시: 2026-01-01 00:00:00
             formattedDate = `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second}`;
           }
-          
-          // API 응답 데이터 구조에 맞춰 바인딩 (이메일 및 마지막 로그인 시간)
-          // 'last_login' 필드명은 백엔드 명세에 따라 확인이 필요합니다.
           setUserData({
             email: response.data.email,
             lastLogin: formattedDate
@@ -73,11 +69,9 @@ export default function MenuBar() {
     fetchUserInfo();
   }, []);
 
-  // 3. 외부 클릭 감지 로직 추가
+  // 3. 외부 클릭 감지 로직
   useEffect(() => {
     function handleClickOutside(event) {
-      // 팝업이 열려 있고, 클릭한 대상이 팝업 내부(popoverRef)가 아니며,
-      // 클릭한 대상이 [사용자 정보] 아이템(.user-profile-item) 내부가 아닐 때만 닫음
       if (isPopupOpen && 
           popoverRef.current && 
           !popoverRef.current.contains(event.target) &&
@@ -89,11 +83,11 @@ export default function MenuBar() {
     // 마우스 다운 이벤트 리스너 등록
     document.addEventListener("mousedown", handleClickOutside);
     
-    // 컴포넌트 언마운트 시 리스너 해제 (클린업)
+    // 컴포넌트 언마운트 시 리스너 해제
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isPopupOpen]); // isPopupOpen 상태가 변할 때마다 이펙트 재실행
+  }, [isPopupOpen]);
 
   const handleMenuClick = (menuLabel) => {
     if (activeMenu === '작업' && menuLabel !== '작업' && isDirty) {
@@ -167,9 +161,7 @@ export default function MenuBar() {
             </div>
 
             {isPopupOpen && (
-              // 4. popoverRef 연결 및 stopPropagation 추가
               <div className="user-popover" ref={popoverRef} onClick={(e) => e.stopPropagation()}>
-                {/* 5. 우측 상단 X 버튼 추가 */}
                 <button 
                   className="user-popover__close" 
                   onClick={(e) => {
@@ -182,7 +174,6 @@ export default function MenuBar() {
                 </button>
                 
                 <div className="user-popover__content">
-                  {/* 이메일 칸 내부에 아바타와 주소를 나란히 배치 */}
                     <div className="user-popover__info-card">
                       <strong>이메일</strong>
                       <div className="user-popover__email-row">
@@ -198,7 +189,7 @@ export default function MenuBar() {
                     </div>
                   </div>
                     <div className="user-popover__footer">
-                      {/* 로그아웃 버튼 (SVG 추가) */}
+                      {/* 로그아웃 버튼 */}
                       <button className="btn-logout" onClick={handleLogoutClick}>
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -208,7 +199,7 @@ export default function MenuBar() {
                         {'\u00A0'}{'\u00A0'}로그아웃
                       </button>
 
-                      {/* 계정 삭제 버튼 (SVG 추가) */}
+                      {/* 계정 삭제 버튼 */}
                       <button className="btn-delete" onClick={handleDeleteAccount}>
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M3 6h18" />

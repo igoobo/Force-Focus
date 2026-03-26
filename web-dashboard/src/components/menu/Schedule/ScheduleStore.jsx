@@ -79,7 +79,6 @@ export const useScheduleStore = create((set, get) => ({
         schedules: [...state.schedules, normalizedNewItem]
       }));
 
-      // 전체 목록을 서버와 다시 한번 동기화
       await get().fetchSchedules(); 
     } catch (err) {
       const detail = err.response?.data?.detail;

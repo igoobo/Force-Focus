@@ -55,7 +55,6 @@
   cursor: pointer;
 }
 
-/* hover 시 효과 */
 .schedule-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
@@ -167,7 +166,7 @@
   padding: 40px 0;
 }
 
-/* 다크 모드 스타일링 */
+/* 다크 모드 대응 */
 .dark-theme .schedule-list-container { background-color: var(--bg-main); }
 .dark-theme .list-title { color: var(--text-main); border-color: var(--border-color); }
 

@@ -112,9 +112,6 @@ button:active { transform: scale(0.97); }
   }
 }
 
-/* Schedule.jsx에서 렌더링되는 각 뷰 컴포넌트(ScheduleDay, Week 등)는 
-   내부적으로 특정 클래스를 가지고 있거나 래퍼를 통해 이 애니메이션이 적용되어야 합니다.
-*/
 .schedule-container > :not(.schedule-header) {
   animation: schedulesFadeIn 0.35s ease-out forwards;
 }

@@ -1,4 +1,4 @@
-/* 1. 기본 설정 및 변수 통합 */
+/* 1. 기본 설정 및 변수 지정 */
 :root {
   --login-bg-start: #dbeafe; 
   --login-bg-end: #eff6ff;
@@ -51,7 +51,6 @@
   transition: background 0.3s ease;
 }
 
-/* 기하학적 패턴이 그라데이션을 가리지 않도록 z-index 확인 */
 .login-container::before {
   content: "";
   position: absolute;
@@ -160,7 +159,7 @@
   align-items: center;
   justify-content: center;
   gap: 15px;
-  height: 40px; /* GoogleLogin 버튼과 유사한 높이 유지 */
+  height: 40px;
   padding: 20px 0;
 }
 

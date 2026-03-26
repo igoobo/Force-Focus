@@ -3,7 +3,7 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* 1. 컨테이너 및 헤더 영역 */
+/* 컨테이너 및 헤더 영역 */
 .task-container {
   padding: 32px;
   width: 100%;
@@ -42,7 +42,7 @@
   transition: all 0.3s ease;
 }
 
-/* 2. 그리드 레이아웃 및 세션 카드 */
+/* 그리드 레이아웃 및 세션 카드 */
 .task-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -101,7 +101,7 @@
   transition: all 0.3s ease;
 }
 
-/* 3. 다중 프로그램 경로 입력 리스트 UI */
+/* 다중 프로그램 경로 입력 리스트 UI */
 .empty-path-message {
   font-size: 0.9rem;
   color: #888;
@@ -255,7 +255,7 @@
   color: #2563eb;
 }
 
-/* 4. 버튼 공통 스타일 (흰색 테마) */
+/* 버튼 공통 스타일 (흰색 테마) */
 .add-task-btn, .cancel-btn {
   background: #ffffff !important;
   color: #374151 !important;
@@ -308,7 +308,7 @@
   transform: translateY(-1px);
 }
 
-/* 5. 모달 및 팝오버 스타일 */
+/* 모달 및 팝오버 스타일 */
 .modal-overlay {
   position: fixed;
   top: 0;

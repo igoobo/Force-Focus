@@ -1,6 +1,7 @@
 import React from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
+/* 최근 활동 그래프와 관련한 컴포넌트 지정 */
 const ActivityChart = ({ data = [] }) => {
   const displayData = data.length > 0 ? data : [
     { day: "일", events: 0, duration: 0 },

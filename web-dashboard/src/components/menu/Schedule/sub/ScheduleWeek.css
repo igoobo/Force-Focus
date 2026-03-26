@@ -45,7 +45,7 @@
   width: 100%;
 }
 
-/* 시간 레이블 [수정]: 눈금선과 높이를 정확히 맞추기 위해 border-bottom 스타일 통일 */
+/* 시간 레이블 */
 .time-label {
   height: 40px;
   display: flex;
@@ -111,7 +111,7 @@
   display: block;
 }
 
-/* 시간 라인 (눈금) : 가시성을 위해 색상을 조금 더 진하게 조정하고 레이블과 위치 동기화 */
+/* 시간 라인 (눈금) */
 .week-calendar .time-line {
   height: 40px;
   width: 100%;
@@ -129,7 +129,7 @@
   pointer-events: none;
 }
 
-/* 동그라미 포인터 [수정]: 시간 컬럼 숫자가 있는 맨 왼쪽에 딱 붙도록 설정 */
+/* 동그라미 포인터 */
 .current-time-pointer {
   position: absolute;
   left: 0; 
@@ -180,7 +180,7 @@
   transition: all 0.3s ease;
 }
 
-/* 다크 모드 스타일링 */
+/* 다크 모드 대응 */
 .dark-theme .week-calendar {
   background: var(--bg-main);
   border-color: var(--border-color);

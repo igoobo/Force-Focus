@@ -50,7 +50,7 @@ export default function TaskView() {
   const [newSessionName, setNewSessionName] = useState('');
   const [activeSelection, setActiveSelection] = useState({ taskId: null, index: null });
 
-  // 1. 초기 데이터 로드 및 로컬 상태 초기화
+  // 초기 데이터 로드 및 로컬 상태 초기화
   useEffect(() => {
     resetTasks();
     fetchTasks();
@@ -112,7 +112,7 @@ export default function TaskView() {
     if (!path.trim()) return;
     const { taskId, index } = activeSelection;
     
-    // [에러 해결] task 존재 여부 확인 로직 추가
+    // task 존재 여부 확인 로직 추가
     const task = localTasks.find(t => t.id === taskId);
     if (!task) return;
 
@@ -141,15 +141,15 @@ export default function TaskView() {
     }
 
     try {
-      // 1. 삭제 처리
+      // 삭제 처리
       if (deletedIds.length > 0) {
         await Promise.all(deletedIds.map(id => deleteTask(id)));
       }
 
-      // 2. 추가 및 수정 처리
+      // 추가 및 수정 처리
       await Promise.all(localTasks.map(async (t) => {
         if (t.isNew) {
-          // [수정] 입력된 프로그램 경로를 함께 전송
+          // 입력된 프로그램 경로를 함께 전송
           const pathsString = t.appPaths.filter(p => p.trim() !== "").join(',');
           await addTask(t.label, pathsString); 
         } else {
@@ -162,7 +162,7 @@ export default function TaskView() {
       // 저장 완료 후 dirty 해제 및 상태 완전 동기화
       setIsDirty(false);
       setDeletedIds([]);
-      await fetchTasks(); // 서버 데이터와 싱크
+      await fetchTasks();
     } catch (err) {
       alert("데이터 저장 중 오류가 발생했습니다.");
     }
@@ -216,7 +216,6 @@ export default function TaskView() {
     }
   };
 
-  // 기존 이벤트 리스너들 유지
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (isDirty) { e.preventDefault(); e.returnValue = ""; }

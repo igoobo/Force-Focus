@@ -172,7 +172,7 @@
   box-shadow: 0 0 6px rgba(59, 130, 246, 0.4);
 }
 
-/* 다크 모드 스타일링 */
+/* 다크 모드 대응 */
 .dark-theme .month-view {
   background-color: var(--bg-main) !important;
   border-color: var(--border-color);

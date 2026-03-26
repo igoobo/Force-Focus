@@ -1,5 +1,3 @@
-/* HelpModal.css */
-
 .help-modal-overlay {
   position: fixed;
   top: 0;
@@ -119,9 +117,9 @@
 }
 
 .help-modal__close-container {
-  margin-top: auto; /* 하단으로 밀기 */
-  padding: 20px 16px; /* 버튼 주변 패딩 */
-  border-top: 1px solid #b5bbc4; /* ✅ 라이트 모드 회색 구분선 */
+  margin-top: auto;
+  padding: 20px 16px;
+  border-top: 1px solid #b5bbc4;
 }
 
 .help-modal__close-btn {
@@ -233,10 +231,7 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* --------------------------------------------------
-   다크 모드 대응 (수정된 핵심 부분)
--------------------------------------------------- */
-
+/* 다크 모드 대응 */
 .dark-theme .help-modal-container { 
   background-color: #1e293b !important; 
   border: 1px solid #334155;
@@ -247,14 +242,12 @@
   border-color: #1e293b;
 }
 
-/* ✅ 타이틀 아이콘 색상을 타이틀 텍스트와 동일하게 수정 */
 .dark-theme .help-modal__title { color: #f8fafc !important; }
 .dark-theme .help-modal__title-icon { color: #f8fafc !important; }
 
-/* ✅ 사이드바 아이템 호버 시 어색한 배경색 수정 */
 .dark-theme .help-modal__nav-item { color: #94a3b8 !important; }
 .dark-theme .help-modal__nav-item:hover { 
-  background-color: #334155 !important; /* 너무 밝은 파란색 대신 깊은 회색톤 적용 */
+  background-color: #334155 !important;
   color: #f8fafc !important;
 }
 .dark-theme .help-modal__nav-item.active {
@@ -265,7 +258,6 @@
 .dark-theme .help-modal__main { background-color: #1e293b !important; }
 .dark-theme .help-modal__header { border-color: #334155 !important; }
 
-/* ✅ 서브 메뉴 탭 호버 색상 상향 조정 */
 .dark-theme .help-modal__sub-tab-item { color: #94a3b8 !important; }
 .dark-theme .help-modal__sub-tab-item:hover { 
   color: #f8fafc !important; 
@@ -274,7 +266,6 @@
   color: #60a5fa !important; 
 }
 
-/* ✅ 우측 상단 X 아이콘 버튼 호버 대응 */
 .dark-theme .help-modal__close-icon-btn { color: #94a3b8 !important; }
 .dark-theme .help-modal__close-icon-btn:hover {
   background-color: #334155 !important;
@@ -292,7 +283,7 @@
 }
 
 .dark-theme .help-modal__close-container {
-  border-color: #334155; /* 다크 모드에 맞는 어두운 회색선 */
+  border-color: #334155;
 }
 
 .dark-theme .help-modal__close-btn {
@@ -326,7 +317,6 @@
   line-height: 1.6;
 }
 
-/* --- 안내 카드 그리드 --- */
 .guide-card-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -369,7 +359,6 @@
   color: var(--text-muted);
 }
 
-/* --- 팁 박스 --- */
 .guide-info-box {
   background-color: #eff6ff;
   border-left: 4px solid #3b82f6;
@@ -382,7 +371,6 @@
   border-left-color: #60a5fa;
 }
 
-/* --- 단축키 테이블 --- */
 .guide-menu-list {
   display: flex;
   flex-direction: column;
@@ -402,7 +390,7 @@
 }
 
 .dark-theme .guide-menu-item {
-  background-color: #334155; /* 텍스트 박스 배경색과 통일 */
+  background-color: #334155;
   border-color: #475569;
 }
 
@@ -417,7 +405,6 @@
   margin-right: 5px;
 }
 
-/* --- Overview 레이아웃 시각화 --- */
 .guide-visual-layout {
   display: flex;
   flex-direction: column;
@@ -436,7 +423,7 @@
 }
 
 .dark-theme .layout-item {
-  background-color: #334155; /* 텍스트 박스 배경과 동일 */
+  background-color: #334155;
   border-color: #475569;
 }
 
@@ -461,7 +448,6 @@
   margin: 0;
   font-size: 0.95rem;
   line-height: 1.5;
-  /* 글씨 선명도 강화 */
   color: #1f2937; 
 }
 
@@ -469,7 +455,6 @@
   color: #f8fafc !important;
 }
 
-/* --- (기존 선명도 강화 스타일 유지) --- */
 .dark-theme .guide-section-title {
   color: #ffffff !important;
 }
@@ -479,16 +464,16 @@
   border-collapse: collapse;
   margin-top: 15px;
   background-color: transparent;
-  table-layout: fixed; /* 표 너비 고정 */
+  table-layout: fixed;
   text-align: center;
 }
 
 .guide-table th {
   text-align: left;
   padding: 12px 15px;
-  background-color: #f1f5f9; /* 헤더 배경색 */
+  background-color: #f1f5f9;
   border-bottom: 2px solid #e2e8f0;
-  color: #1f2937; /* 라이트 모드 헤더 글씨색 */
+  color: #1f2937;
   font-size: 0.9rem;
   font-weight: 700;
   text-align: center;
@@ -497,29 +482,27 @@
 .guide-table td {
   padding: 15px;
   border-bottom: 1px solid #e5e7eb;
-  color: #1f2937; /* 라이트 모드 본문 글씨색 */
+  color: #1f2937;
   font-size: 0.95rem;
   line-height: 1.5;
   vertical-align: middle;
 }
 
-/* --- 다크 모드 테이블 대응 --- */
 .dark-theme .guide-table th {
-  background-color: #0f172a; /* 더 어두운 헤더 */
+  background-color: #0f172a;
   border-bottom-color: #475569;
   color: #ffffff !important;
 }
 
 .dark-theme .guide-table td {
   border-bottom-color: #334155;
-  color: #f8fafc !important; /* 선명한 백색 */
+  color: #f8fafc !important;
 }
 
 .dark-theme .guide-table tr:hover {
-  background-color: rgba(255, 255, 255, 0.02); /* 호버 시 미세한 강조 */
+  background-color: rgba(255, 255, 255, 0.02);
 }
 
-/* 배지 및 태그 정렬 보정 */
 .guide-menu-badge, .layout-tag {
   display: inline-block;
   margin: 0;

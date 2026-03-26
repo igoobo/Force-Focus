@@ -7,8 +7,8 @@ export default function ScheduleAddModal({ onClose }) {
   const addSchedule = useScheduleStore((state) => state.addSchedule);
   const { tasks, fetchTasks } = useTaskStore();
 
-  useEffect(() => {
-    fetchTasks(); // 컴포넌트 마운트 시 최신 작업 목록 로드
+  useEffect(() => { // 컴포넌트 마운트 시 최신 작업 목록 로드
+    fetchTasks();
   }, [fetchTasks]);
 
   const [form, setForm] = useState({

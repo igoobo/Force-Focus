@@ -24,7 +24,7 @@
   align-items: center;
   margin-bottom: 20px;
   padding: 0 4px;
-  flex-shrink: 0; /* 헤더 크기 고정 */
+  flex-shrink: 0;
 }
 
 .summary-title {
@@ -53,17 +53,17 @@
 .summary-content {
   display: flex;
   gap: 20px;
-  flex: 1; /* 남은 화면 높이를 모두 차지 */
-  min-height: 0; /* 자식 요소의 높이 계산 오류 방지 */
+  flex: 1;
+  min-height: 0;
 }
 
 /* 가로/세로 레이아웃 대응 */
 .activity-summary.horizontal .summary-content {
   flex-direction: column;
-  overflow-y: auto; /* 내용이 많을 경우 내부 스크롤 */
+  overflow-y: auto;
 }
 
-/* 세로 모드 핵심 수정 부분 */
+/* 세로 모드 */
 .activity-summary.vertical .summary-content {
   flex-direction: row;
   align-items: stretch;
@@ -72,7 +72,7 @@
 .activity-summary.vertical .summary-graph,
 .activity-summary.vertical .summary-report {
   flex: 1;
-  height: 100%; /* 하단까지 꽉 채움 */
+  height: 100%;
   min-width: 0;
 }
 
@@ -86,8 +86,8 @@
   flex-direction: column;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
-  flex: 1; /* 1:1 비율로 가로 너비 차지 */
-  height: 100%; /* 세로 화면을 전부 채우도록 설정 */
+  flex: 1;
+  height: 100%;
   box-sizing: border-box;
   overflow: hidden;
 }

@@ -40,7 +40,7 @@
 }
 
 .dark-theme .overview-left {
-  background-color: var(--card-bg); /* 변수 적용 */
+  background-color: var(--card-bg);
   border-color: var(--border-color);
   color: var(--text-main);
   transition: all 0.3s ease;
@@ -327,15 +327,15 @@
 }
 
 .feedback-main-title {
-  font-size: 1.5rem; /* 큰 글씨 적용 */
+  font-size: 1.5rem;
   font-weight: 800;
-  color: #2563eb; /* 포인트 컬러 (블루) */
+  color: #2563eb;
   letter-spacing: -0.5px;
   transition: all 0.3s ease;
 }
 
 .dark-theme .feedback-main-title {
-  color: #60a5fa; /* 다크모드 시 밝은 블루 */
+  color: #60a5fa;
 }
 
 .feedback-text {

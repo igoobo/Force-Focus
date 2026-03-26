@@ -13,7 +13,7 @@ export default function TitleBar({
   const openHelp = useMainStore((state) => state.openHelp); // openHelp 가져오기
 
   const handleLogoClick = () => {
-    setActiveMenu('Overview');    // 로고 클릭 시 전역 상태를 'Overview'로 변경
+    setActiveMenu('Overview');    // 로고 클릭 시 전역 메뉴 상태를 'Overview'로 변경
   };
 
   return (

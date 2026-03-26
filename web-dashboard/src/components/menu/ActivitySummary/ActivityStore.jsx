@@ -51,7 +51,7 @@ export const useActivityStore = create((set, get) => ({
       const sessions = sessionRes.data || [];
       const events = eventRes.data || [];
 
-      // [수정] 1. Event 객체의 session_id(UUID)를 기준으로 개수 집계
+      // 1. Event 객체의 session_id(UUID)를 기준으로 개수 집계
       const eventCountMap = events.reduce((acc, event) => {
         const sId = event.session_id; 
         if (sId) {
@@ -60,7 +60,7 @@ export const useActivityStore = create((set, get) => ({
         return acc;
       }, {});
 
-      // [수정] 2. 세션 데이터를 순회하며 client_session_id를 연결고리로 사용
+      // 2. 세션 데이터를 순회하며 client_session_id를 연결고리로 사용
       sessions.forEach(s => {
         const d = new Date(s.start_time);
         const sDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -71,7 +71,7 @@ export const useActivityStore = create((set, get) => ({
           day.duration += (Number(s.duration) || 0);
           
           // 핵심: session.client_session_id 필드와 event.session_id를 매칭
-          // 백엔드 데이터에 해당 필드가 포함되어 있는지 확인하며 매칭을 수행합니다.
+          // 백엔드 데이터에 해당 필드가 포함되어 있는지 확인하며 매칭을 수행함
           const connectionId = s.client_session_id;
           if (connectionId && eventCountMap[connectionId]) {
             day.eventsCount += eventCountMap[connectionId];
@@ -99,8 +99,7 @@ export const useActivityStore = create((set, get) => ({
       const chartData = analysisMap.map(d => ({
         day: d.dayName,
         events: d.eventsCount,
-        // 초 단위를 분 단위로 변환하되, 아주 짧은 기록도 반영되도록 반올림 처리
-        duration: Math.round(d.duration / 60) 
+        duration: Math.round(d.duration / 60) // 초 단위를 분 단위로 변환하되, 아주 짧은 기록도 반영되도록 반올림 처리 
       }));
 
       set({
