@@ -178,6 +178,9 @@ impl InferenceEngine {
         let outputs = session.run(inputs)?;
 
         let scores = outputs["scores"].try_extract_tensor::<f32>()?;
+        if scores.1.is_empty() {
+            return Err("Inference returned empty score tensor".into());
+        }
         let current_score = scores.1[0] as f64;
 
         // 4. Rule-based Decision
