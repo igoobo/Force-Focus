@@ -75,7 +75,8 @@ impl StateEngine {
         let multiplier = self.calculate_multiplier(inference, is_mouse_active, has_recent_input);
         
         // 게이지 누적/감소 (최소 0.0, 최대 차단 임계값 + 여유분까지 허용)
-        self.drift_gauge = (self.drift_gauge + (dt * multiplier)).max(0.0);
+        let max_gauge = THRESHOLD_BLOCK_SEC + 30.0;
+        self.drift_gauge = (self.drift_gauge + (dt * multiplier)).clamp(0.0, max_gauge);
         
         // (Optional) 디버깅용: 게이지 상태 출력
         // println!("Gauge: {:.2}s (x{:.1}) | State: {:?}", self.drift_gauge, multiplier, self.current_state);
