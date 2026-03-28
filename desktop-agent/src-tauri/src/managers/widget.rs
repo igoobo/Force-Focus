@@ -112,7 +112,9 @@ fn show_widget_window<R: Runtime>(app_handle: &AppHandle<R>) {
             
             println!("Calculated Widget Position: ({}, {}) for Screen Width: {}", pos_x, pos_y, screen_logical_width);
         } else {
-             println!("Failed to detect monitor. Using default position.");
+             println!("Failed to detect monitor. Using default safe position (top-left).");
+             pos_x = 20.0;
+             pos_y = 20.0;
         }
 
         if let Err(e) = WebviewWindowBuilder::new(app_handle, "widget", url)
