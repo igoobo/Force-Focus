@@ -21,8 +21,7 @@ pub fn setup_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     let last_click_clone = last_click.clone();
 
     // 3. 트레이 아이콘 생성
-    let _tray = TrayIconBuilder::with_id("tray")
-        .icon(app.default_window_icon().unwrap().clone())
+    let mut builder = TrayIconBuilder::with_id("tray")
         .menu(&menu)
         .menu_on_left_click(false) // 왼쪽 클릭 시 메뉴가 뜨지 않도록 설정 (우클릭에만 반응)
         .on_menu_event(move |app, event| {
@@ -74,8 +73,13 @@ pub fn setup_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
                      }
                  }
              }
-        })
-        .build(app)?;
+        });
+
+    if let Some(icon) = app.default_window_icon() {
+        builder = builder.icon(icon.clone());
+    }
+
+    let _tray = builder.build(app)?;
 
     Ok(())
 }
