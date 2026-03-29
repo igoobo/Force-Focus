@@ -96,12 +96,16 @@ pub struct WindowInfo {
 }
 
 #[cfg(target_os = "windows")]
-const WINDOWS_SYSTEM_PATHS: &[&str] = &[
-    "C:\\WINDOWS\\SYSTEM32",
-    "C:\\WINDOWS\\SYSTEMAPPS",
-    "C:\\PROGRAM FILES\\WINDOWSAPPS",
-    "C:\\WINDOWS\\EXPLORER.EXE",
-];
+fn get_windows_system_paths() -> Vec<String> {
+    let sys_root = std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".to_string());
+    let program_files = std::env::var("ProgramW6432").unwrap_or_else(|_| "C:\\Program Files".to_string());
+    vec![
+        format!("{}\\{}", sys_root, "SYSTEM32").to_lowercase(),
+        format!("{}\\{}", sys_root, "SYSTEMAPPS").to_lowercase(),
+        format!("{}\\{}", sys_root, "EXPLORER.EXE").to_lowercase(),
+        format!("{}\\{}", program_files, "WINDOWSAPPS").to_lowercase(),
+    ]
+}
 
 #[cfg(target_os = "windows")]
 const IGNORED_TITLES: &[&str] = &[
@@ -193,11 +197,10 @@ unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BO
                     let mut app_name = String::from("Unknown");
                     let mut is_system = false;
 
+                    let sys_paths = get_windows_system_paths();
                     if let Some(path) = get_process_path_from_pid(pid) {
                         let p = path.to_lowercase();
-                        is_system = WINDOWS_SYSTEM_PATHS
-                            .iter()
-                            .any(|sys| p.starts_with(&sys.to_lowercase()));
+                        is_system = sys_paths.iter().any(|sys| p.starts_with(sys));
 
                         if !is_system {
                             if let Some(name) = Path::new(&path).file_name() {
@@ -288,7 +291,7 @@ pub fn _get_all_visible_windows_internal() -> Vec<WindowInfo> {
 
     #[cfg(not(target_os = "windows"))]
     {
-        vec![("Unsupported OS".to_string(), false)]
+        vec![]
     }
 }
 
