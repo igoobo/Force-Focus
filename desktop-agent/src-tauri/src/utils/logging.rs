@@ -10,6 +10,7 @@ use std::io::prelude::*; // 파일 쓰기
 use std::path::PathBuf; // 경로 관리
 use std::thread; // 백그라운드 스레드 생성
 use std::time::Duration;
+use tauri::Manager;
 
 use crate::commands::input::InputStatsArcMutex;
 
@@ -28,39 +29,43 @@ pub struct ActivityLogEntry {
 
 // 로그 파일을 저장할 기본 디렉토리를 반환
 // 애플리케이션 데이터 디렉토리 찾기
-pub fn get_log_dir() -> Result<PathBuf, String> {
-    // OS별 기본 경로 설정
-    let mut base_path: PathBuf = if cfg!(target_os = "windows") {
-        // Windows: %APPDATA% (Roaming)
-        env::var("APPDATA")
-            .map_err(|e| format!("APPDATA environment variable not found: {}", e))?
-            .into()
-    } else {
-        // 그 외 OS: HOME 디렉토리 사용
-        env::var("HOME")
-            .map_err(|e| format!("HOME environment variable not found: {}", e))?
-            .into()
-    };
-
-    // 애플리케이션 고유의 서브디렉토리 추가
-    base_path.push("Force-Focus");
+pub fn get_log_dir<R: tauri::Runtime>(app_handle: &tauri::AppHandle<R>) -> Result<PathBuf, String> {
+    let mut base_path = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app_data_dir: {}", e))?;
     base_path.push("logs");
-
     Ok(base_path)
 }
 
-// 특정 날짜의 로그 파일 경로를 반환 (예: 2023-10-27.jsonl)
+// 특정 날짜의 로그 파일 경로를 반환하면서 최대 10MB 크기 제한 롤링 (예: 2023-10-27-0.jsonl)
 pub fn get_log_file_path(log_dir: &PathBuf, date: &DateTime<Local>) -> PathBuf {
-    let file_name = format!("{}.jsonl", date.format("%Y-%m-%d")); // JSON Lines 형식
-    log_dir.join(file_name)
+    let base_name = date.format("%Y-%m-%d").to_string();
+    let mut idx = 0;
+    loop {
+        let file_name = if idx == 0 {
+            format!("{}.jsonl", base_name)
+        } else {
+            format!("{}-{}.jsonl", base_name, idx)
+        };
+        let path = log_dir.join(&file_name);
+        
+        // 파일 존재 여부와 무관하게 10MB 크기 측정
+        let size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+        if size < 10 * 1024 * 1024 { // 10MB 미만이면 이 파일 사용
+            return path;
+        }
+        idx += 1; // 10MB 초과시 다음 인덱스 탐색
+    }
 }
 
 // 주기적으로 데이터를 수집하고 파일에 로깅하는 함수
-pub fn start_data_collection_and_logging(
+pub fn start_data_collection_and_logging<R: tauri::Runtime + Send + 'static>(
+    app_handle: tauri::AppHandle<R>,
     input_stats_arc_mutex: InputStatsArcMutex,
     interval_secs: u64,
 ) {
-    let log_dir_result = get_log_dir(); // 로그 디렉토리 경로 가져오기
+    let log_dir_result = get_log_dir(&app_handle); // 로그 디렉토리 경로 가져오기
 
     if let Err(e) = &log_dir_result {
         eprintln!("Failed to get log directory: {}", e);
