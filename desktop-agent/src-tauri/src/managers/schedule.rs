@@ -130,24 +130,26 @@ async fn trigger_schedule(
     // C. [RPA] 프로그램 강제 실행
     if let Some(exe_path) = target_executable {
         if !exe_path.is_empty() {
-            println!("Schedule Monitor: Launching program -> {}", exe_path);
+            if !is_safe_executable_path(&exe_path) {
+                eprintln!("Schedule Monitor Security [BLOCKED]: Unsafe executable path rejected -> {}", exe_path);
+            } else {
+                println!("Schedule Monitor: Launching program -> {}", exe_path);
 
-            let mut cmd = Command::new(&exe_path);
+                let mut cmd = Command::new(&exe_path);
 
-            // 인자가 있으면 공백 기준으로 분리하여 추가
-            if let Some(args_str) = target_arguments {
-                if !args_str.is_empty() {
-                    // 단순 공백 분리 (복잡한 escaping은 추후 고려)
-                    let args: Vec<&str> = args_str.split_whitespace().collect();
-                    cmd.args(args);
+                // 인자가 있으면 따옴표를 고려하여 분리 후 추가
+                if let Some(args_str) = target_arguments {
+                    if !args_str.is_empty() {
+                        let parsed_args = parse_arguments(&args_str);
+                        cmd.args(parsed_args);
+                    }
                 }
-            }
 
-            // Rust Command를 사용하여 외부 프로세스 실행 (비동기 spawn)
-            // 주의: 경로나 권한 문제로 실패할 수 있음 (에러 로그만 남김)
-            match cmd.spawn() {
-                Ok(_) => println!("Schedule Monitor: Program launched successfully."),
-                Err(e) => eprintln!("Schedule Monitor: Failed to launch '{}': {}", exe_path, e),
+                // Rust Command를 사용하여 외부 프로세스 실행 (비동기 spawn)
+                match cmd.spawn() {
+                    Ok(_) => println!("Schedule Monitor: Program launched successfully."),
+                    Err(e) => eprintln!("Schedule Monitor: Failed to launch '{}': {}", exe_path, e),
+                }
             }
         }
     }
@@ -188,4 +190,63 @@ async fn trigger_schedule(
         .show();
 
     Ok(())
+}
+
+// [보안 패치] 경로 검증 및 인자 파싱 유틸리티 함수 추가
+fn is_safe_executable_path(path_str: &str) -> bool {
+    let path = std::path::Path::new(path_str);
+    
+    // 1. 절대 경로 확인 및 파일 존재 여부 확인
+    if !path.is_absolute() || !path.exists() {
+        return false;
+    }
+    
+    // 2. 확장자가 .exe 인지 확인 (스크립트 실행 방지)
+    if let Some(ext) = path.extension() {
+        if ext.to_string_lossy().to_lowercase() != "exe" {
+            return false;
+        }
+    } else {
+        return false;
+    }
+    
+    // 3. 명령어 쉘 및 스크립트 실행기 블랙리스트
+    if let Some(file_name) = path.file_name() {
+        let name_str = file_name.to_string_lossy().to_lowercase();
+        let blacklist = [
+            "cmd.exe", "powershell.exe", "pwsh.exe", 
+            "wscript.exe", "cscript.exe", "mshta.exe", 
+            "bash.exe", "wsl.exe"
+        ];
+        if blacklist.contains(&name_str.as_str()) {
+            return false;
+        }
+    }
+    
+    true
+}
+
+fn parse_arguments(args_str: &str) -> Vec<String> {
+    let mut args = Vec::new();
+    let mut current_arg = String::new();
+    let mut in_quotes = false;
+
+    for c in args_str.chars() {
+        match c {
+            '"' => in_quotes = !in_quotes,
+            ' ' if !in_quotes => {
+                if !current_arg.is_empty() {
+                    args.push(current_arg.clone());
+                    current_arg.clear();
+                }
+            }
+            _ => current_arg.push(c),
+        }
+    }
+    
+    if !current_arg.is_empty() {
+        args.push(current_arg);
+    }
+    
+    args
 }
