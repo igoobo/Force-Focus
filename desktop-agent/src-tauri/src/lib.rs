@@ -32,16 +32,16 @@ pub struct ActiveSessionInfo {
 //  MainView.tsx가 invoke할 Task 데이터 모델 (handlers.ts 미러링) --- 중간 점검 production
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Task {
-    id: String,
-    user_id: String,
-    task_name: String,
-    description: String,
-    due_date: String,
-    status: String,
-    target_executable: String,
-    target_arguments: Vec<String>, // handlers.ts는 [] (빈 배열)이었음
-    created_at: String,
-    updated_at: String,
+    pub id: String,
+    pub user_id: String,
+    pub task_name: String,
+    pub description: String,
+    pub due_date: String,
+    pub status: String,
+    pub target_executable: String,
+    pub target_arguments: Vec<String>, // handlers.ts는 [] (빈 배열)이었음
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 // LSN 이벤트 캐싱을 위한 통합 데이터 모델 (stroage manger.rs)
@@ -52,8 +52,7 @@ pub struct LoggableEventData<'a> {
     // [추후] pub current_url: Option<&'a str>,
 }
 
-// 애플리케이션 전역에서 공유할 시스템 정보 상태 정의
-pub struct SysinfoState(pub Mutex<System>);
+// SysinfoState는 commands::system::SysinfoState에서 단일 정의됨 (C-10 해결)
 
 // 사용자 입력 통계 추적을 위한 공유 상태
 pub type InputStatsArcMutex = Arc<Mutex<commands::input::InputStats>>;
@@ -134,7 +133,7 @@ fn handle_deep_link(app: &AppHandle, url: &Url) {
 pub fn run() {
     let input_stats_manager_state: InputStatsArcMutex = Arc::new(Mutex::new(commands::input::InputStats::default()));
     let state_engine_manager_state: StateEngineArcMutex = Arc::new(Mutex::new(core::state::StateEngine::new()));
-    let backend_communicator_state = Arc::new(utils::backend_comm::BackendCommunicator::new());
+    let backend_communicator_state = Arc::new(utils::api::BackendCommunicator::new());
 
     tauri::Builder::default()
         .plugin(tauri_plugin_autostart::init(
@@ -197,14 +196,14 @@ pub fn run() {
             crate::commands::input::get_input_frequency_stats,
             crate::commands::vision::get_visible_windows,
             crate::commands::ml::check_model_update,
-            crate::utils::backend_comm::submit_feedback,
-            crate::utils::backend_comm::start_session,
-            crate::utils::backend_comm::end_session,
-            crate::utils::backend_comm::get_tasks,
-            crate::utils::backend_comm::get_current_session_info,
-            crate::utils::backend_comm::login,
-            crate::utils::backend_comm::logout,
-            crate::utils::backend_comm::check_auth_status,
+            crate::commands::session::submit_feedback,
+            crate::commands::session::start_session,
+            crate::commands::session::end_session,
+            crate::commands::task::get_tasks,
+            crate::commands::session::get_current_session_info,
+            crate::commands::auth::login,
+            crate::commands::auth::logout,
+            crate::commands::auth::check_auth_status,
             crate::commands::window::hide_overlay,
             crate::commands::window::show_overlay,                   
             crate::commands::window::set_overlay_ignore_cursor_events, 
@@ -315,4 +314,3 @@ fn start_background_services(app: &mut tauri::App) -> Result<(), Box<dyn std::er
 
     Ok(())
 }
-

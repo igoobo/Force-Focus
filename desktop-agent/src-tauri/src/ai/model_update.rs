@@ -1,4 +1,4 @@
-use crate::utils::backend_comm::BackendCommunicator;
+use crate::utils::api::BackendCommunicator;
 use crate::core::app::AppCore; 
 use crate::ai::inference::InferenceEngine;
 use crate::StorageManagerArcMutex;
@@ -26,9 +26,8 @@ impl ModelUpdateManager {
     }
 
     // 업데이트 확인 및 수행 (Result<bool> 반환: true=업데이트됨)
-    // 이 메서드는 '백그라운드 루프'와 '프론트엔드 커맨드' 양쪽에서 호출됩니다.
     pub async fn check_and_update(&self, token: &str) -> Result<bool, String> {
-        // 1. 필요한 State 가져오기 (AppHandle을 통해 접근)
+        // 1. 필요한 State 가져오기
         let communicator = self.app_handle.try_state::<Arc<BackendCommunicator>>()
             .ok_or("BackendCommunicator state not found")?
             .inner().clone();
@@ -50,7 +49,6 @@ impl ModelUpdateManager {
             .map_err(|e| format!("Check version failed: {}", e))?;
 
         // TODO: 로컬 버전과 비교 로직 추가 (현재는 무조건 진행)
-        // println!("Remote version: {}", info.version);
 
         // 4. 다운로드 (임시 파일)
         let temp_model_path = model_dir.join("temp_model.onnx");
@@ -62,9 +60,6 @@ impl ModelUpdateManager {
             .map_err(|e| format!("Download scaler failed: {}", e))?;
 
         // 5. Atomic Swap & Reload (Critical Section)
-        // ----------------------------------------------------------------
-        // [핵심 수정] AppCore를 Lock하고 내부의 InferenceEngine을 통째로 교체
-        // ----------------------------------------------------------------
         if let Some(app_core_state) = self.app_handle.try_state::<Mutex<AppCore>>() {
             let mut core = app_core_state.lock().map_err(|_| "Failed to lock AppCore")?;
 
@@ -92,7 +87,6 @@ impl ModelUpdateManager {
                     Ok(true)
                 },
                 Err(e) => {
-                    // 새 모델 로드 실패 시, 백업 파일로 복구를 시도해야 하나 여기서는 생략하고 에러 반환
                     Err(format!("Failed to load new model: {}", e))
                 }
             }
@@ -107,11 +101,9 @@ pub fn start_update_loop(app_handle: AppHandle) {
         println!("🚀 Model Update Loop Started.");
         sleep(Duration::from_secs(5)).await;
 
-        // Manager 인스턴스 생성 (루프 내에서 사용)
         let manager = ModelUpdateManager::new(app_handle.clone());
 
         loop {
-            // 토큰 가져오기
             let token_opt = if let Some(storage_mutex) = app_handle.try_state::<StorageManagerArcMutex>() {
                 match storage_mutex.lock() {
                     Ok(storage) => storage.load_auth_token().unwrap_or(None).map(|t| t.0),
@@ -125,14 +117,12 @@ pub fn start_update_loop(app_handle: AppHandle) {
             };
 
             if let Some(token) = token_opt {
-                // [핵심] 로직 재사용: check_and_update 호출
                 match manager.check_and_update(&token).await {
                     Ok(updated) => {
                         if updated { println!("✨ Background update success."); }
                     },
-                    Err(e) => {
+                    Err(_e) => {
                         // 백그라운드에서는 에러가 나도 죽지 않고 로그만 남김
-                        // eprintln!("Background update check failed: {}", e);
                     }
                 }
             }

@@ -25,11 +25,11 @@ impl InputStats {
     }
 }
 
-pub type InputStatsArcMutex = Arc<Mutex<InputStats>>;
+// InputStatsArcMutex 타입은 lib.rs에서 단일 정의됨 (C-5 해결)
 
 #[command]
 pub fn get_input_frequency_stats(
-    input_stats_arc_mutex: State<'_, InputStatsArcMutex>,
+    input_stats_arc_mutex: State<'_, crate::InputStatsArcMutex>,
 ) -> Result<InputStats, String> {
     let stats = input_stats_arc_mutex.lock().map_err(|_| "Failed to lock InputStats".to_string())?;
     Ok((*stats).clone())
@@ -60,7 +60,6 @@ mod tests {
 
         let json_str = stats.to_activity_vector_json();
         
-        // Parse it back to serde_json::Value to verify fields without being fragile to spacing
         let parsed: serde_json::Value = serde_json::from_str(&json_str).expect("Should produce valid JSON");
         
         assert_eq!(parsed["meaningful_input_events"], 150);
@@ -72,7 +71,6 @@ mod tests {
         assert_eq!(windows[0]["app_name"], "Code");
         assert_eq!(windows[0]["title"], "main.rs - VSCode");
         
-        // Ensure start_monitoring_timestamp_ms is intentionally missing from the spec
         assert!(parsed.get("start_monitoring_timestamp_ms").is_none(), "start_monitoring_timestamp_ms should not be serialized into the activity vector");
     }
 }

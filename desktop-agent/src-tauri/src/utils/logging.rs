@@ -12,7 +12,7 @@ use std::thread; // 백그라운드 스레드 생성
 use std::time::Duration;
 use tauri::Manager;
 
-use crate::commands::input::InputStatsArcMutex;
+use crate::InputStatsArcMutex;
 
 // 로그에 저장할 데이터 형식 정의 ---
 // 주기적으로 수집한 정보 담는 구조체

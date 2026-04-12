@@ -498,8 +498,6 @@ impl StorageManager {
         String::from_utf8(original).unwrap_or_default()
     }
 
-    // Removed the rest of buggy keyring load routine for clean rewrite above
-
     // --- 스케줄 관리 함수 ---
 
     pub fn sync_schedules(&self, schedules: Vec<LocalSchedule>) -> Result<(), String> {

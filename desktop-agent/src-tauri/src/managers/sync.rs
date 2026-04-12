@@ -4,7 +4,7 @@ use tauri::{AppHandle, Manager};
 use tokio::time::sleep;
 use chrono::{DateTime, Utc}; // 날짜 변환용
 
-use crate::utils::backend_comm::{BackendCommunicator, FeedbackPayload};
+use crate::utils::api::{BackendCommunicator, FeedbackPayload};
 use crate::StorageManagerArcMutex;
 
 /// 백그라운드 동기화 루프 시작
@@ -31,15 +31,11 @@ async fn process_sync(app: &AppHandle) -> Result<(), String> {
         .try_state::<StorageManagerArcMutex>()
         .ok_or("StorageManager state not found in AppHandle")?;
 
-    // 백엔드 통신 모듈 가져오기
-    // (BackendCommunicator는 내부적으로 Client를 가지고 있으며, 상태로 등록됨)
-    // Arc<BackendCommunicator> 타입으로 가져오기
     let comm_state = app
         .try_state::<Arc<BackendCommunicator>>()
         .ok_or("BackendCommunicator state not found")?;
 
     // 2. 토큰 확인 (로그인 여부)
-    // 이벤트를 조회하기 전에 토큰부터 확인
     let token = {
         let storage = storage_state.lock().map_err(|e| e.to_string())?;
         match storage.load_auth_token()? {
@@ -119,7 +115,6 @@ async fn process_sync(app: &AppHandle) -> Result<(), String> {
         let count = feedbacks.len();
 
         // 2. [매핑] DB 구조체 -> API Payload 변환
-        // event_id는 서버 스키마에 없으므로 context_snapshot JSON에 넣어줍니다.
         let payloads: Vec<FeedbackPayload> = feedbacks.into_iter().map(|f| {
              let dt = DateTime::<Utc>::from_timestamp(f.timestamp, 0).unwrap_or(Utc::now());
              

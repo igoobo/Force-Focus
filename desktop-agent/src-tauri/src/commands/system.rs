@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use sysinfo::System;
 use tauri::{command, State};
-use crate::core::app::AppCore;
 
 // --- 공유 상태 관리 ---
 pub struct SysinfoState(pub Mutex<System>);
@@ -31,13 +30,4 @@ pub fn get_all_processes_summary(
     Ok(processes_summary)
 }
 
-#[tauri::command]
-pub fn get_system_stats(state: State<Mutex<AppCore>>) -> Result<serde_json::Value, String> {
-    let app = state.lock().map_err(|_| "Failed to lock AppCore")?;
-    let stats = serde_json::json!({
-        "current_state": format!("{:?}", app.state_engine.get_state_string()), 
-        "gauge_ratio": app.state_engine.get_gauge_ratio(),
-        "is_overlay_active": app.state_engine.get_gauge_ratio() >= 1.0 
-    });
-    Ok(stats)
-}
+// get_system_stats (C-4): 삭제됨 — invoke_handler에 미등록된 데드 코드
