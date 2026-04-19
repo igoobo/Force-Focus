@@ -129,19 +129,19 @@ const InterventionOverlay: React.FC = () => {
               padding: '12px 20px', cursor: 'pointer', borderRadius: '6px', border: 'none',
               backgroundColor: '#4a4a4a', color: 'white', fontSize: '14px'
             }}>
-              아니요, 업무 중입니다 (오류 신고)
+              오류 신고 (업무 중이었습니다)
             </button>
             <button onClick={handleRestoreClick} style={{ 
               padding: '12px 20px', cursor: 'pointer', borderRadius: '6px', border: 'none',
               backgroundColor: '#3b82f6', color: 'white', fontWeight: 'bold', fontSize: '14px'
             }}>
-              작업 공간 롤백
+              이전 작업 공간 롤백 후 복귀
             </button>
             <button onClick={handleCloseClick} style={{ 
               padding: '12px 20px', cursor: 'pointer', borderRadius: '6px', border: 'none',
               backgroundColor: '#ff6b6b', color: 'white', fontWeight: 'bold', fontSize: '14px'
             }}>
-              업무 복귀하기
+              현재 창 남겨두고 바로 복귀
             </button>
         </div>
       </div>
