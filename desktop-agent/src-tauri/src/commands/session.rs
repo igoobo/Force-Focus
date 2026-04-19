@@ -95,6 +95,7 @@ pub async fn start_session(
     session_state_mutex: State<'_, SessionStateArcMutex>,
     storage_manager_mutex: State<'_, StorageManagerArcMutex>,
     input_stats_mutex: State<'_, InputStatsArcMutex>,
+    app_core_state: State<'_, Mutex<AppCore>>,
 ) -> Result<ActiveSessionInfo, String> {
     let (info, auth_token) = {
         let mut session_state = session_state_mutex
@@ -137,6 +138,11 @@ pub async fn start_session(
         input_stats.last_mouse_move_timestamp_ms = start_time_s * 1000;
 
         eprintln!("Session started (Offline-First). ID: {}", info.session_id);
+
+        if let Ok(mut app_core) = app_core_state.lock() {
+            app_core.state_engine.manual_reset();
+            app_core.last_inference_result = crate::ai::inference::InferenceResult::Inlier;
+        }
 
         (info, token)
     };
@@ -200,6 +206,11 @@ pub async fn end_session(
 
         storage_manager.delete_active_session()?;
         *session_state = None;
+
+        if let Ok(mut app_core) = app_core_state.lock() {
+            app_core.state_engine.manual_reset();
+            app_core.last_inference_result = crate::ai::inference::InferenceResult::Inlier;
+        }
 
         if let Err(e) = crate::commands::window::hide_overlay(app_handle.clone(), app_core_state) {
             eprintln!("Warning: Failed to hide overlay on session end: {}", e);
