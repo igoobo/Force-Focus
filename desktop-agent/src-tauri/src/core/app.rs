@@ -40,6 +40,12 @@ pub struct AppCore {
 
     // X_burstiness 계산을 위한 최근 12틱(1분) delta_input 큐
     pub delta_history: VecDeque<f64>,
+
+    // 이전 틱의 FSM 상태 (전이 감지용)
+    pub previous_state: crate::core::state::FSMState,
+
+    // FOCUS 진입 시점의 작업 공간 스냅샷
+    pub last_snapshot: Option<crate::commands::vision::WorkspaceSnapshot>,
 }
 
 impl AppCore {
@@ -112,6 +118,8 @@ impl AppCore {
             current_event_id: None,
             global_map,
             delta_history: VecDeque::with_capacity(12),
+            previous_state: crate::core::state::FSMState::IDLE,
+            last_snapshot: None,
         }
     }
 
@@ -378,6 +386,18 @@ pub fn start_core_loop<R: Runtime>(
                     is_mouse_active,
                     has_recent_input
                 );
+
+                // --- [신규] 상태 전이 감지 및 스냅샷 캡처 ---
+                let current_state = core.state_engine.get_state();
+                if current_state == crate::core::state::FSMState::FOCUS && core.previous_state != crate::core::state::FSMState::FOCUS {
+                    println!("📸 [Snapshot] FOCUS 상태 진입: 현재 창 배치를 캡처합니다.");
+                    let current_windows = commands::vision::_get_all_visible_windows_internal();
+                    core.last_snapshot = Some(crate::commands::vision::WorkspaceSnapshot {
+                        timestamp_ms: now_ms,
+                        windows: current_windows,
+                    });
+                }
+                core.previous_state = current_state;
 
                 // ------------------------------------------------
                 // [Action] 개입 실행

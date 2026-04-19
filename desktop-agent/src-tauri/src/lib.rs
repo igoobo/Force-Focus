@@ -195,6 +195,7 @@ pub fn run() {
             crate::commands::system::get_all_processes_summary,
             crate::commands::input::get_input_frequency_stats,
             crate::commands::vision::get_visible_windows,
+            crate::commands::vision::restore_workspace,
             crate::commands::ml::check_model_update,
             crate::commands::session::submit_feedback,
             crate::commands::session::start_session,

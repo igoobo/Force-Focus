@@ -24,6 +24,7 @@ use windows::Win32::System::Threading::{
 use windows::Win32::UI::WindowsAndMessaging::{
     EnumWindows, GetForegroundWindow, GetWindow, GetWindowRect, GetWindowTextLengthW,
     GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindowVisible, GW_OWNER,
+    ShowWindow, SetWindowPos, SW_MINIMIZE, SW_RESTORE, SWP_NOZORDER, SWP_SHOWWINDOW
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -93,6 +94,13 @@ pub struct WindowInfo {
     pub app_name: String,
     pub is_visible_on_screen: bool,
     pub rect: WinRect,
+    pub hwnd: isize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkspaceSnapshot {
+    pub timestamp_ms: u64,
+    pub windows: Vec<WindowInfo>,
 }
 
 #[cfg(target_os = "windows")]
@@ -247,6 +255,7 @@ unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BO
                                     right: rect.right,
                                     bottom: rect.bottom,
                                 },
+                                hwnd: hwnd.0 as isize,
                             });
 
                             CombineRgn(
@@ -299,6 +308,52 @@ pub fn _get_all_visible_windows_internal() -> Vec<WindowInfo> {
 pub fn get_visible_windows() -> Result<Vec<WindowInfo>, String> {
     let windows = _get_all_visible_windows_internal();
     Ok(windows)
+}
+
+#[command]
+pub fn restore_workspace(state: tauri::State<'_, std::sync::Mutex<crate::core::app::AppCore>>) -> Result<(), String> {
+    let mut core = state.lock().map_err(|e| e.to_string())?;
+    // 스냅샷을 가져옵니다 (1회용 복구일 수 있지만, 재사용할 수도 있으므로 복사)
+    let snapshot = core.last_snapshot.clone();
+    drop(core); // 락 해제
+
+    if let Some(snap) = snapshot {
+        #[cfg(target_os = "windows")]
+        {
+            let current_windows = _get_all_visible_windows_internal();
+            let saved_hwnds: std::collections::HashSet<isize> = snap.windows.iter().map(|w| w.hwnd).collect();
+
+            // 1. 스냅샷에 없는 새로운 창(이탈 앱) 최소화
+            for cw in current_windows {
+                if !saved_hwnds.contains(&cw.hwnd) {
+                    unsafe {
+                        let _ = ShowWindow(HWND(cw.hwnd as *mut _), SW_MINIMIZE);
+                    }
+                }
+            }
+
+            // 2. 스냅샷에 있던 업무 창들 위치 복구 및 표시
+            for sw in snap.windows {
+                unsafe {
+                    let hwnd = HWND(sw.hwnd as *mut _);
+                    let width = sw.rect.right - sw.rect.left;
+                    let height = sw.rect.bottom - sw.rect.top;
+                    
+                    let _ = ShowWindow(hwnd, SW_RESTORE);
+                    let _ = SetWindowPos(
+                        hwnd,
+                        HWND(std::ptr::null_mut()),
+                        sw.rect.left,
+                        sw.rect.top,
+                        width,
+                        height,
+                        SWP_NOZORDER | SWP_SHOWWINDOW
+                    );
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 pub fn extract_semantic_keywords(app_name: &str, window_title: &str) -> Vec<String> {
