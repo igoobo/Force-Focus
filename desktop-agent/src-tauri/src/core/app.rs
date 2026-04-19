@@ -46,6 +46,9 @@ pub struct AppCore {
 
     // FOCUS 진입 시점의 작업 공간 스냅샷
     pub last_snapshot: Option<crate::commands::vision::WorkspaceSnapshot>,
+
+    // 최근 평가 대상 창의 토큰 (오버레이 클릭 시 활성 창이 오버레이인 문제 해결용)
+    pub last_evaluated_tokens: String,
 }
 
 impl AppCore {
@@ -120,6 +123,7 @@ impl AppCore {
             delta_history: VecDeque::with_capacity(12),
             previous_state: crate::core::state::FSMState::IDLE,
             last_snapshot: None,
+            last_evaluated_tokens: String::new(),
         }
     }
 
@@ -251,6 +255,12 @@ pub fn start_core_loop<R: Runtime>(
                         // 활성 창 역시 동일한 로직으로 토큰을 추출합니다.
                         let active_tokens = commands::vision::get_semantic_tokens(&window_info.app_name, &window_info.title);
                         let sanitized_active_title = active_tokens.join(" ");
+
+                        // [버그 수정] 현재 창이 우리 에이전트 프로세스(오버레이 등)가 아니라면 타겟 토큰으로 기억
+                        let my_pid = std::process::id() as u64;
+                        if window_info.process_id != my_pid {
+                            core.last_evaluated_tokens = sanitized_active_title.clone();
+                        }
 
                         // UUID 생성 (Flag 발급)
                         let client_evt_id = format!("evt-{}", Uuid::new_v4());

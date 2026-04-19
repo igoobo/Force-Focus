@@ -49,11 +49,23 @@ pub async fn submit_feedback(
     {
         let mut app = app_core_state.lock().map_err(|_| "Failed to lock AppCore")?;
         
+        app.state_engine.manual_reset();
+        //  초기화 직후 최대 5초간 이전 아웃라이어 값이 반영되어 게이지가 다시 차오르지 않게 Inlier로 리셋
+        app.last_inference_result = crate::ai::inference::InferenceResult::Inlier;
+        
         if feedback_type == "is_work" {
-            app.state_engine.manual_reset();
-            println!("🔄 FSM State Reset by User Feedback");
+            // [버그 수정] 오류 신고를 누르는 시점에는 '오버레이(알림 창)'가 활성 창이므로,
+            // 오버레이가 뜨기 직전에 ML이 평가했던 '진짜 타겟 앱'의 토큰 조합을 가져와 화이트리스트 처리합니다.
+            let cache_key = app.last_evaluated_tokens.clone();
+            
+            if let Some(engine) = &mut app.inference_engine {
+                if !cache_key.is_empty() {
+                    engine.update_local_cache(cache_key, 4);
+                }
+            }
+            println!("🔄 FSM State Reset by User Feedback (is_work cached)");
         } else {
-            app.state_engine.manual_reset();
+            println!("🔄 FSM State Reset by User Feedback (resumed)");
         }
     }
 

@@ -145,24 +145,19 @@ impl InferenceEngine {
         };
 
         // 1. Local Cache Check & Override (문서 Phase 5)
-        // 사용자가 피드백을 준 토큰(예: "YouTube"로 강의 듣기)이 하나라도 있다면
-        // 문맥 점수(0번 인덱스)를 강제로 1.0(만점)으로 수정
         let mut cache_hit = false;
-        for token in active_tokens {
-            if let Some(expire_time) = self.local_cache.get(&token) {
-                if Instant::now() < *expire_time {
-                    cache_hit = true;
-                    // Note: 하나라도 맞으면 Trusted로 간주
-                } else {
-                    // 만료된 기억 (Lazy Deletion: 여기서는 삭제 안 하고 넘어가거나, 별도 클린업 필요)
-                    // self.local_cache.remove(&token); // loop 중 borrow checker 이슈 가능성 있음
-                }
+        let cache_key = active_tokens.join(" ");
+        if let Some(expire_time) = self.local_cache.get(&cache_key) {
+            if Instant::now() < *expire_time {
+                cache_hit = true;
             }
         }
         
         if cache_hit {
-             // 캐시 히트! 문맥 점수 강제 상향
-             input_vector[0] = 1.0; 
+             // 사용자가 "오류 신고"를 눌러 신뢰된 앱(캐시 히트)이라면,
+             // 쓸데없는 ML 거리 계산을 생략하고 즉시 만점(100.0)과 함께 정상 평가로 반환
+             println!("✅ [InferenceEngine] Cache Hit! Short-circuiting ML evaluation for trusted app.");
+             return Ok((100.0, InferenceResult::Inlier));
         }
 
         // 2. Preprocessing (Standard Scaling)
