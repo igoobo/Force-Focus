@@ -322,12 +322,19 @@ pub fn restore_workspace(state: tauri::State<'_, std::sync::Mutex<crate::core::a
         {
             let current_windows = _get_all_visible_windows_internal();
             let saved_hwnds: std::collections::HashSet<isize> = snap.windows.iter().map(|w| w.hwnd).collect();
+            let my_pid = std::process::id();
 
             // 1. 스냅샷에 없는 새로운 창(이탈 앱) 최소화
             for cw in current_windows {
                 if !saved_hwnds.contains(&cw.hwnd) {
                     unsafe {
-                        let _ = ShowWindow(HWND(cw.hwnd as *mut _), SW_MINIMIZE);
+                        let mut target_pid: u32 = 0;
+                        windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId(HWND(cw.hwnd as *mut _), Some(&mut target_pid));
+                        
+                        // 우리 앱의 창(오버레이, 메인 윈도우 등)은 강제로 최소화하지 않음
+                        if target_pid != my_pid {
+                            let _ = ShowWindow(HWND(cw.hwnd as *mut _), SW_MINIMIZE);
+                        }
                     }
                 }
             }
