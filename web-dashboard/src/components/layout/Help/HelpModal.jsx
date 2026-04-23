@@ -142,6 +142,10 @@ const helpContent = {
               </thead>
               <tbody>
                 <tr>
+                  <td><span className="layout-tag">일정 조회</span></td>
+                  <td><b>일간/주간/월간 스케줄 메뉴</b>를 각각 활용하여 일정을 다양한 시간 단위로 조회할 수 있습니다.</td>
+                </tr>
+                <tr>
                   <td><span className="layout-tag">일정 추가</span></td>
                   <td>우측 상단의 <b>[+ 일정 추가]</b> 버튼을 클릭하여 일정 추가를 수행할 수 있습니다.</td>
                 </tr>
@@ -162,7 +166,7 @@ const helpContent = {
           </div>
         )
       },
-      daily: { 
+      day: { 
         label: '일간 스케줄', 
         content: (
           <div className="guide-content">
@@ -189,7 +193,7 @@ const helpContent = {
           </div>
         )
       },
-      weekly: { 
+      week: { 
         label: '주간 스케줄', 
         content: (
           <div className="guide-content">
@@ -216,7 +220,7 @@ const helpContent = {
           </div>
         )
       },
-      monthly: { 
+      month: { 
         label: '월간 스케줄', 
         content: (
           <div className="guide-content">
@@ -248,11 +252,11 @@ const helpContent = {
         )
       },
       list: { 
-        label: '스케줄 목록', 
+        label: '일정 목록', 
         content: (
           <div className="guide-content">
-            <h4 className="guide-section-title">스케줄 목록: 텍스트 뷰</h4>
-            <p className="guide-text">기존에 추가된 전체 일정을 카드 모양의 목록 형태로 나열하여 관리의 편의성을 제공합니다.</p>
+            <h4 className="guide-section-title">일정 목록: 텍스트 뷰</h4>
+            <p className="guide-text">기존에 추가된 전체 일정을 카드 모양의 목록 형태로 나열하여 관리의 편의성을 제공하며, CSV 파일로 현재 등록된 일정 정보를 내보낼 수 있습니다.</p>
             <table className="guide-table">
               <thead>
                 <tr>
@@ -262,13 +266,105 @@ const helpContent = {
               </thead>
               <tbody>
                 <tr>
-                  <td><span className="layout-tag">스케줄 상세 정보 확인</span></td>
-                  <td>시작/종료 시간과 제목, 일정 생성 날짜 등의 <b>상세 정보</b>를 한눈에 확인 가능하며, 목록의 각 항목 클릭 시 해당 일정 수정이 가능합니다.</td>
+                  <td><span className="layout-tag">전체 일정 조회</span></td>
+                  <td>등록된 모든 일정을 최신순으로 표시하며, 전체 일정의 상세 정보를 일괄적으로 확인할 수 있습니다.</td>
+                </tr>
+                <tr>
+                  <td><span className="layout-tag">CSV 내보내기</span></td>
+                  <td>우측 상단의 <b>CSV로 내보내기</b> 버튼을 클릭하여 현재 전체 일정 데이터를 CSV 파일로 내려받을 수 있습니다.</td>
                 </tr>
               </tbody>
             </table>
           </div>
         )
+      },
+      add: { 
+        label: '일정 추가', 
+        content: (
+          <div className="guide-content">
+            <h4 className="guide-section-title">신규 일정 등록</h4>
+            <p className="guide-text">개별 등록 방식과 CSV 파일을 이용한 일괄 등록 방식을 지원합니다.</p>
+            <table className="guide-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '25%' }}>방식</th>
+                  <th>상세 설명</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span className="layout-tag">개별 등록</span></td>
+                  <td>일정 이름, 작업 유형, 시간 정보, 설명 등의 내용을 <b>사용자가 직접 입력</b>하여 개별적으로 등록합니다. </td>
+                </tr>
+                <tr>
+                  <td><span className="layout-tag">CSV 일괄 등록</span></td>
+                  <td>
+                    좌측 하단의 <b>[CSV 일괄 등록]</b> 버튼을 클릭하여 CSV 파일을 업로드하면 <b>다수의 일정을 한 번에</b> 업로드할 수 있습니다.
+                    <br />CSV 파일은 <b>반드시 형식에 맞게</b> 작성 및 업로드되어야 하며, 형식에 맞지 않는 파일 업로드 시 시스템에 업로드되지 않을 수 있습니다.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+              <div className="guide-info-box" style={{ marginTop: '10px' }}>
+                <strong>일정 추가 시 CSV 파일에 필요한 요소</strong> <br></br><code>name, task_name, description, start_date, start_time, end_date, end_time</code><br/>
+                <small>* task_name은 시스템에 등록된 작업 유형의 이름과 일치해야 하며, 날짜(YYYY-MM-DD)와 시간(HH:MM) 형식을 반드시 준수해야 합니다.</small>
+              </div>
+          </div>
+        ) 
+      },
+      edit: { 
+        label: '일정 수정', 
+        content: (
+          <div className="guide-content">
+            <h4 className="guide-section-title">일정 정보 수정</h4>
+            <p className="guide-text">기존에 등록된 일정의 세부 정보를 변경할 수 있습니다.</p>
+            <table className="guide-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '25%' }}>단계</th>
+                  <th>상세 설명</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span className="layout-tag">수정 모달 진입</span></td>
+                  <td>일정 목록이나 각 스케줄 화면에서 각 일정을 클릭하면 <b>상세 수정 모달</b>이 나타납니다.</td>
+                </tr>
+                <tr>
+                  <td><span className="layout-tag">데이터 저장</span></td>
+                  <td>내용을 수정한 후 저장 버튼을 누르면 실시간으로 데이터를 저장할 수 있습니다.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        ) 
+      },
+      delete: { 
+        label: '일정 삭제', 
+        content: (
+          <div className="guide-content">
+            <h4 className="guide-section-title">일정 영구 삭제</h4>
+            <p className="guide-text">더 이상 수행하지 않거나 잘못 등록된 일정을 삭제합니다.</p>
+            <table className="guide-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '25%' }}>구분</th>
+                  <th>상세 설명</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span className="layout-tag">삭제 처리</span></td>
+                  <td>스케줄 화면의 우측 상단 <b>삭제</b> 버튼을 클릭하여 삭제를 진행할 수 있습니다. <br></br>단, 삭제된 데이터는 복구할 수 없으므로 신중히 결정해 주세요.</td>
+                </tr>
+                <tr>
+                  <td><span className="layout-tag">데이터 연동</span></td>
+                  <td>일정을 삭제하더라도 해당 일정에 연결되었던 <b>작업(Task)</b> 유형 정보는 삭제되지 않습니다.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        ) 
       },
     }
   },
@@ -553,6 +649,10 @@ summary: {
                   <td><span className="layout-tag">메뉴 연동</span></td>
                   <td>Overview에서 <b>"최근 작업 피드백"</b> 카드를 클릭하면, 세션 선택 과정을 건너뛰고 <b>가장 최근 세션의 분석 결과</b>로 즉시 연결됩니다.</td>
                 </tr>
+                <tr>
+                  <td><span className="layout-tag">PDF로 피드백 저장</span></td>
+                  <td><b>PDF로 저장하기</b> 기능을 통해 현재 피드백 리포트 내용을 PDF 문서로 저장 및 보관할 수 있습니다.</td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -617,6 +717,9 @@ summary: {
                 </tr>
               </tbody>
             </table>
+            <div className="guide-info-box">
+              <p>💡 <strong>참고:</strong> 리포트 결과 확인 이후 <b>[PDF로 저장하기] 버튼</b> 클릭 시 현재 피드백 리포트 내용이 PDF 문서로 자동 정리되어 저장됩니다.</p>
+            </div>
           </div>
         )
       },
@@ -703,7 +806,7 @@ summary: {
 };
 
 const HelpModal = () => {
-  const { isDarkMode, isHelpOpen, closeHelp, activeMenu } = useMainStore(); // activeMenu 추가
+  const { isDarkMode, isHelpOpen, closeHelp, activeMenu, scheduleViewMode } = useMainStore(); // activeMenu 추가
   const [activeMainTab, setActiveMainTab] = useState('all');
   const [activeSubTab, setActiveSubTab] = useState('intro');
 
@@ -719,9 +822,15 @@ const HelpModal = () => {
 
       const targetTab = menuMapping[activeMenu] || 'all';
       setActiveMainTab(targetTab);
-      setActiveSubTab(Object.keys(helpContent[targetTab].subs)[0]);
+
+      if (targetTab === 'schedule' && scheduleViewMode) {
+        setActiveSubTab(scheduleViewMode);
+      } else {
+        // 그 외의 경우 해당 메인 카테고리의 첫 번째 서브 탭으로 설정
+        setActiveSubTab(Object.keys(helpContent[targetTab].subs)[0]);
+      }
     }
-  }, [isHelpOpen, activeMenu]);
+  }, [isHelpOpen, activeMenu, scheduleViewMode]); 
 
   const goToIntro = () => {  // 처음 [소개] 탭으로 즉시 이동하는 함수
     setActiveMainTab('all');
