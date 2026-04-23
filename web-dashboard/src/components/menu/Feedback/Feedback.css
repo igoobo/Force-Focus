@@ -96,32 +96,52 @@
   border: 1px solid #64748b !important;
 }
 
-.back-to-list-btn {
-  background: var(--bg-main) !important;
-  color: var(--text-main) !important;
-  border: 1px solid #334155 !important;
-  padding: 8px 18px;
-  border-radius: 12px;
+.action-btn {
+  height: 42px;
+  padding: 0 20px;
+  border-radius: 10px;
   font-size: 0.85rem;
   font-weight: 700;
   cursor: pointer;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  transition: all 0.3s ease;
-  margin-bottom: 12px;
+  transition: all 0.2s ease-in-out;
+  border: none;
+  box-sizing: border-box;
+  border: 0.75px solid #a1a1aa;
 }
 
-.back-to-list-btn:hover {
+.pdf-btn {
+  background: var(--primary-color) !important;
+  color: #ffffff !important;
+}
+
+.back-btn {
   background: var(--card-bg) !important;
+  color: var(--text-main) !important;
+}
+
+.action-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.back-btn:hover {
   border-color: var(--primary-color) !important;
   color: var(--primary-color) !important;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.12);
 }
 
-.back-to-list-btn .icon {
-  font-size: 1rem;
+.action-btn .icon {
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+}
+
+.dark-theme .back-btn {
+  border-color: #4e5e75 !important;
 }
 
 .section-header {
@@ -709,6 +729,7 @@
   transition: all 0.3s ease;
   box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
   letter-spacing: -0.02em;
+  margin-top: 30px;
 }
 
 .general-feedback-btn:hover {
@@ -719,3 +740,96 @@
 
 .dark-theme .badge { background: var(--card-bg); color: #a5b4fc; }
 .dark-theme .loader { border-color: #334155; border-left-color: #3b82f6; }
+
+/* PDF 전용 리포트 스타일 */
+.pdf-report-container {
+  width: 800px;
+  padding: 60px; /* 여백 확장 */
+  background: #ffffff;
+  color: #1e293b;
+  font-family: 'Pretendard', -apple-system, sans-serif;
+  line-height: 1.6;
+}
+
+.pdf-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  border-bottom: 3px solid var(--primary-color); /* 선 두께 강화 */
+  padding-bottom: 25px;
+  margin-bottom: 40px;
+}
+
+.pdf-logo {
+  font-size: 2.8rem;
+  font-weight: 900;
+  color: var(--primary-color);
+  margin: 0;
+  letter-spacing: -1.5px; /* 자간 조절로 세련미 추가 */
+}
+
+.pdf-section {
+  margin-bottom: 50px;
+}
+
+.section-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #0f172a;
+  border-left: 6px solid var(--primary-color);
+  padding-left: 18px;
+  margin-bottom: 25px;
+  display: flex;
+  align-items: center;
+}
+
+/* 카드 요소 디자인 보강 */
+.pdf-card {
+  background: #fcfdfe;
+  padding: 24px;
+  border-radius: 16px; /* 더 둥글게 수정 */
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); /* 은은한 그림자 추가 */
+  transition: all 0.3s ease;
+}
+
+.pdf-card h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--primary-color);
+  margin-bottom: 15px;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 10px;
+}
+
+/* 강조 구문 스타일 */
+.pdf-report-container strong {
+  color: var(--primary-color);
+  background: rgba(79, 70, 229, 0.05);
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+/* 집중도/피로도 지표 박스 보강 */
+.pdf-strategy {
+  padding: 30px;
+  border-radius: 20px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+/* 다크모드 대응 PDF 스타일 */
+.pdf-report-container.dark {
+  background: #0f172a;
+  color: #f1f5f9;
+}
+
+.pdf-report-container.dark .pdf-card {
+  background: #1e293b;
+  border-color: #334155;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+}
+
+.pdf-report-container.dark .section-title {
+  color: #f8fafc;
+}
