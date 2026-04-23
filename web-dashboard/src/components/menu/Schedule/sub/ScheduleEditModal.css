@@ -5,75 +5,44 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.4);
   display: flex;
-  justify-content: center;
   align-items: center;
-  z-index: 2000;
-  backdrop-filter: blur(2px);
+  justify-content: center;
+  z-index: 9999;
 }
 
 /* 모달 컨텐츠 박스 */
 .edit-overlay .modal-content {
-  background-color: #ffffff;
-  width: 650px;
-  max-width: 95%;
-  padding: 28px;
-  border-radius: 16px;
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
-  font-family: "Pretendard", sans-serif;
-  animation: modalAppear 0.3s ease-out;
-  box-sizing: border-box; 
-}
-
-.edit-overlay .modal-content.large {
-  width: 800px;
-}
-
-@keyframes modalAppear {
-  from { opacity: 0; transform: translateY(-20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* 헤더 영역 */
-.edit-overlay .modal-header {
   background: #ffffff;
+  border-radius: 20px;
+  width: 550px; 
+  max-width: 90%;
+  padding: 20px 28px; 
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
+  flex-direction: column;
+  box-sizing: border-box;
 }
 
-.edit-overlay .modal-header h2 {
-  margin-bottom: 20px;
+.edit-overlay .modal-content h2 {
+  margin-bottom: 20px; /* 제목과 아래 요소 간 여백 확보 */
   font-size: 1.5rem;
   font-weight: 700;
   text-align: center;
   color: #1f2937;
 }
 
-/* 폼 및 입력 그룹 */
+.edit-overlay .modal-content.large {
+  width: 800px;
+}
+
+/* 폼 레이아웃 */
 .edit-overlay .modal-form {
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-
-.edit-overlay .modal-form select {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 0.95rem;
-  background-color: #ffffff !important;
-  color: #1f2937 !important;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.edit-overlay .modal-form select:focus {
-  border-color: #3b82f6;
-  outline: none;
 }
 
 .edit-overlay .form-group {
@@ -82,66 +51,78 @@
   gap: 8px;
 }
 
-.edit-overlay .form-group label {
-  font-size: 14px;
-  font-weight: 700;
-  color: #374151;
-}
-
-.edit-overlay .form-group input,
-.edit-overlay .form-group textarea {
-  width: 100%;
-  padding: 12px;
-  border: 1.5px solid #d1d5db;
-  border-radius: 8px;
-  font-size: 15px;
-  font-family: inherit;
-  box-sizing: border-box;
-  transition: all 0.3s ease;
-  background-color: #ffffff !important;
-  color: #1f2937 !important;
-}
-
-.edit-overlay .form-group input:focus,
-.edit-overlay .form-group textarea:focus {
-  outline: none;
-  border-color: #4f46e5;
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
-}
-
-/* 날짜/시간 한 줄 정렬 (2열 배치) */
 .edit-overlay .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+}
+
+.edit-overlay label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+/* 입력 요소 스타일 */
+.edit-overlay input,
+.edit-overlay select,
+.edit-overlay textarea {
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 15px;
+  transition: all 0.2s;
+  background-color: #f9fafb;
+  box-sizing: border-box;
   width: 100%;
 }
 
-/* 푸터 및 버튼 영역 */
-.edit-overlay .modal-footer {
-  background: #ffffff;
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 32px;
+.edit-overlay input:focus,
+.edit-overlay select:focus,
+.edit-overlay textarea:focus {
+  outline: none;
+  border-color: #4f46e5;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
+.edit-overlay textarea {
+  height: 100px;
+  resize: none;
+}
+
+/* 푸터 영역 */
+.edit-overlay .modal-footer {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end; /* 수정 모달이므로 우측 정렬 유지 */
+  align-items: center;
+  gap: 12px;
+}
+
+/* 버튼 스타일 */
 .edit-overlay .cancel-btn {
   background-color: #f3f4f6 !important;
   color: #4b5563 !important;
-  padding: 12px 24px;
+  border: none;
   border-radius: 8px;
+  padding: 10px 24px;
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s;
+}
+
+.edit-overlay .cancel-btn:hover {
+  background-color: #e5e7eb !important;
 }
 
 .edit-overlay .save-btn {
   background-color: #4f46e5 !important;
   color: #ffffff !important;
-  padding: 12px 24px;
+  border: none;
   border-radius: 8px;
+  padding: 10px 24px;
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
@@ -153,36 +134,36 @@
   transform: translateY(-1px);
 }
 
-/* 다크 모드 대응 */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 다크 모드 스타일링 */
 .dark-theme .edit-overlay .modal-content {
   background-color: #1e293b;
-  box-sizing: border-box;
+  color: #f3f4f6;
 }
 
-.dark-theme .edit-overlay .modal-header {
-  border-bottom: 1px solid #334155;
+.dark-theme .edit-overlay .modal-content h2 {
+  color: #fff;
 }
 
-.dark-theme .edit-overlay .modal-header h2 {
-  color: #ffffff;
-}
-
-.dark-theme .edit-overlay .form-group label {
+.dark-theme .edit-overlay .modal-form label {
   color: #94a3b8;
 }
 
 .dark-theme .edit-overlay .modal-form input,
 .dark-theme .edit-overlay .modal-form textarea,
 .dark-theme .edit-overlay .modal-form select {
-  background-color: #0f172a !important;
-  border: 1px solid #334155;
-  color: #f8fafc !important;
+  background-color: #000000 !important;
+  border-color: #475569;
+  color: #f3f4f6 !important;
 }
 
 .dark-theme .edit-overlay .modal-form input:focus,
 .dark-theme .edit-overlay .modal-form select:focus {
-  border-color: #2563eb;
-  background-color: #0f172a !important;
+  border-color: #3b82f6;
 }
 
 .dark-theme .edit-overlay .cancel-btn {
@@ -193,8 +174,4 @@
 .dark-theme .edit-overlay .save-btn {
   background-color: #4f46e5 !important;
   color: #ffffff !important;
-}
-
-.dark-theme .edit-overlay .modal-footer {
-  border-top: 1px solid #334155;
 }

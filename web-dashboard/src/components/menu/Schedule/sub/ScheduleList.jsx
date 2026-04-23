@@ -19,26 +19,76 @@ const ScheduleList = ({ schedules = [], onScheduleClick }) => {
     return task ? task.label : "연결된 작업 없음";
   };
 
+  // CSV 내보내기 함수
+  const handleExportCsv = () => {
+    if (schedules.length === 0) {
+      alert("내보낼 일정 데이터가 없습니다.");
+      return;
+    }
+
+    // 1. 헤더 정의 (불러오기 형식과 동일)
+    const headers = ["name", "task_name", "description", "start_date", "start_time", "end_date", "end_time"];
+    
+    // 2. 데이터 변환
+    const csvRows = sortedSchedules.map(item => {
+      const row = [
+        item.name,
+        getTaskLabel(item.task_id), // ID 대신 텍스트 작업명
+        item.description || "",
+        item.start_date,
+        item.start_time.slice(0, 5),
+        item.end_date,
+        item.end_time.slice(0, 5)
+      ];
+      // 쉼표 포함 대비하여 각 항목을 큰따옴표로 감쌈
+      return row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(",");
+    });
+
+    // 3. BOM 추가 (한글 깨짐 방지) 및 결합
+    const csvContent = "\ufeff" + headers.join(",") + "\n" + csvRows.join("\n");
+    
+    // 4. 다운로드 링크 생성 및 실행
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `schedule_export_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="schedule-list-container">
-    <div className="list-header-section">
-      <h2 className="list-title">일정 목록</h2>
-      <p className="list-subtitle">지금까지 추가한 일정을 조회할 수 있습니다.</p>
-    </div>
+        {/* 제목과 버튼을 하나의 섹션으로 그룹화 */}
+        <div className="list-header-section">
+          <div className="header-text">
+            <h2 className="list-title">일정 목록</h2>
+          </div>
+          <button className="export-csv-btn" onClick={handleExportCsv}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            CSV로 내보내기
+          </button>
+        </div>
+        <p className="list-subtitle">지금까지 추가한 일정을 조회할 수 있습니다.</p>
 
-    {sortedSchedules.length === 0 ? (
-      <div className="empty-list">등록된 일정이 없습니다.</div>
-    ) : (
-      <div className="schedule-card-list">
+      {sortedSchedules.length === 0 ? (
+        <div className="empty-list">등록된 일정이 없습니다.</div>
+      ) : (
+        <div className="schedule-card-list">
           {sortedSchedules.map((item) => (
-            <div key={item.id} className="schedule-card"
-              style={{ cursor: "pointer" }}
+            <div 
+              key={item.id} 
+              className="schedule-card"
               onClick={() => onScheduleClick && onScheduleClick(item)}
             >
               <div className="card-header">
                 <div className="title-row">
                   <h3 className="card-title">{item.name}</h3>
-                  {/* 연결된 작업 유형을 태그 형태로 출력 */}
                   <span className="task-badge">{getTaskLabel(item.task_id)}</span>
                 </div>
                 <span className="card-date">
@@ -58,8 +108,8 @@ const ScheduleList = ({ schedules = [], onScheduleClick }) => {
                         day: '2-digit',
                         timeZone: "Asia/Seoul" 
                       })
-                      .replace(/\s/g, '') // 공백 제거
-                      .replace(/(\d{4})\.(\d{2})\.(\d{2})\./, '$1. $2. $3.') // 숫자 뒤에 한 칸씩 띄움
+                      .replace(/\s/g, '')
+                      .replace(/(\d{4})\.(\d{2})\.(\d{2})\./, '$1. $2. $3.')
                     : "정보 없음"}
                 </span>
               </div>

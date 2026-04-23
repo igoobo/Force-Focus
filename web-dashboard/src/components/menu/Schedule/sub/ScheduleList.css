@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 24px;
+  padding: 4px;
   height: 100%;
   background-color: #f9fafb;
   font-family: "Pretendard", sans-serif;
@@ -11,14 +11,33 @@
   transition: all 0.3s ease;
 }
 
+/* 헤더 영역 레이아웃: 제목은 완전 중앙, 버튼은 우측 상단 고정 */
+.list-header-section {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-bottom: 2px;
+  min-height: 50px;
+  border-bottom: 2px solid #e5e7eb;
+  transition: all 0.3s ease;
+}
+
+/* 제목 그룹 (텍스트 중앙 정렬) */
+.schedule-list-container .header-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
 /* 제목 */
 .list-title {
   font-size: 1.4rem;
   font-weight: 700;
   color: #1f2937;
-  margin-bottom: 8px;
-  border-bottom: 2px solid #e5e7eb;
-  padding-bottom: 6px;
+  margin-bottom: 2px;
+  padding-bottom: 2px;
   transition: all 0.3s ease;
 }
 
@@ -26,11 +45,38 @@
   font-size: 0.95rem;
   color: #6b7280;
   margin: 0;
+  transition: all 0.3s ease;
 }
 
-.list-header-section {
-  margin-bottom: 16px;
-  padding-bottom: 4px;
+/* CSV 내보내기 버튼: 두 번째 이미지의 녹색 상자 위치 */
+.export-csv-btn {
+  position: absolute;
+  right: 0;
+  top: 0;
+  background-color: #10b981 !important;
+  color: #ffffff !important;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  white-space: nowrap;
+}
+
+.export-csv-btn:hover {
+  background-color: #059669 !important;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.export-csv-btn svg {
+  stroke-width: 2.5px;
 }
 
 /* 카드 리스트 그리드 */
@@ -39,6 +85,16 @@
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 16px;
   box-sizing: border-box;
+  transition: all 0.3s ease;
+}
+
+/* 빈 목록 상태 (디자인 수정 없음) */
+.empty-list {
+  text-align: center;
+  font-size: 1rem;
+  color: #6b7280;
+  padding: 40px 0;
+  transition: all 0.3s ease;
 }
 
 /* 개별 카드 */
@@ -67,6 +123,7 @@
   gap: 8px;
   margin-bottom: 10px;
   text-align: center;
+  transition: all 0.3s ease;
 }
 
 /* 제목 */
@@ -76,6 +133,7 @@
   align-items: center;
   position: relative;
   width: 100%;
+  transition: all 0.3s ease;
 }
 
 .card-title {
@@ -89,6 +147,7 @@
   display: -webkit-box;
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
+  transition: all 0.3s ease;
 }
 
 /* 배지 */
@@ -122,6 +181,7 @@
   margin: 10px 0;
   line-height: 1.4;
   white-space: pre-line;
+  transition: all 0.3s ease;
 }
 
 /* 카드 하단 */
@@ -141,46 +201,80 @@
   color: #6b7280;
 }
 
-/* 버튼 */
-.detail-btn {
-  background-color: #3b82f6 !important;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  padding: 6px 10px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
+/* 다크 모드 */
+/* 다크 모드 대응 */
+.dark-theme .schedule-list-container {
+  background-color: #0f172a; /* 어두운 배경색 */
+}
+
+/* 헤더 섹션 구분선 다크 모드 */
+.dark-theme .list-header-section {
+  border-bottom-color: #1e293b;
+}
+
+/* 제목 및 서브타이틀 다크 모드 */
+.dark-theme .list-title {
+  color: #f8fafc;
+}
+
+.dark-theme .list-subtitle {
+  color: #94a3b8;
+}
+
+/* 빈 목록 상태 다크 모드 */
+.dark-theme .empty-list {
+  color: #64748b;
+}
+
+/* 일정 카드 다크 모드 */
+.dark-theme .schedule-card {
+  background-color: #1e293b;
+  border-color: #334155;
+}
+
+.dark-theme .card-title {
+  color: #f8fafc;
+}
+
+.dark-theme .card-date {
+  color: #94a3b8;
+}
+
+.dark-theme .card-description {
+  color: #cbd5e1;
+}
+
+/* 배지 다크 모드 */
+.dark-theme .task-badge {
+  background-color: #1e1b4b;
+  color: #818cf8;
+  border-color: #312e81;
+}
+
+/* 카드 하단 구분선 다크 모드 */
+.dark-theme .card-footer {
+  border-top-color: #334155;
+}
+
+.dark-theme .created-at {
+  color: #64748b;
+}
+
+.dark-theme .export-csv-btn {
+  background-color: #046949 !important;
+}
+
+/* 상세 정보 및 CSV 버튼 애니메이션 적용 (전환 효과) */
+.export-csv-btn, .detail-btn, .schedule-card, .schedule-list-container {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+}
+
+/* 호버 시 부드러운 애니메이션 효과 */
+.schedule-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); /* 다크 모드에서 조금 더 짙은 그림자 */
 }
 
 .detail-btn:hover {
-  background-color: #2563eb;
-}
-
-/* 빈 목록 안내 */
-.empty-list {
-  text-align: center;
-  font-size: 1rem;
-  color: #6b7280;
-  padding: 40px 0;
-}
-
-/* 다크 모드 대응 */
-.dark-theme .schedule-list-container { background-color: var(--bg-main); }
-.dark-theme .list-title { color: var(--text-main); border-color: var(--border-color); }
-
-.dark-theme .schedule-card {
-  background-color: var(--card-bg);
-  border-color: var(--border-color);
-}
-
-.dark-theme .card-title { color: #60a5fa; }
-.dark-theme .card-date, .dark-theme .card-description { color: var(--text-muted); }
-.dark-theme .card-footer { border-top-color: var(--border-color); }
-
-.dark-theme .task-badge {
-  background-color: #1e1b4b;
-  color: #a5b4fc;
-  border-color: #312e81;
+  transform: scale(1.05);
 }

@@ -16,7 +16,7 @@
   border-radius: 20px;
   width: 550px; 
   max-width: 90%;
-  padding: 20px 28px; 
+  padding: 28px 28px; 
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
   animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   display: flex;
@@ -24,7 +24,7 @@
 }
 
 .add-overlay .modal-content h2 {
-  margin-bottom: 20px;
+  margin-bottom: 40px;
   font-size: 1.5rem;
   font-weight: 700;
   text-align: center;
@@ -35,92 +35,89 @@
   width: 800px;
 }
 
-.add-overlay .modal-header {
-  background: #ffffff;
-  padding: 10px 0 15px 0; 
-  border-bottom: 1px solid #f1f5f9;
-  margin-bottom: 15px;
-}
-
 .add-overlay .modal-form {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-}
-
-.add-overlay .modal-form label {
-  display: flex;
-  flex-direction: column;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #374151;
-}
-
-.add-overlay .modal-form select {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #ddd; 
-  border-radius: 4px;
-  font-size: 0.95rem;
-  background-color: #ffffff !important;
-  color: #1f2937 !important;
-  cursor: pointer;
-  box-sizing: border-box;
-  transition: all 0.3s ease;
-}
-
-.add-overlay .modal-form select:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-  outline: none;
-}
-
-.add-overlay .modal-form input,
-.add-overlay .modal-form textarea {
-  margin-top: 15px;
-  padding: 8px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: 0.95rem;
-  outline: none;
-  font-family: "Inter", "Pretendard", "Noto Sans KR", sans-serif;
-  background-color: #ffffff !important;
-  color: #1f2937 !important;
-}
-
-.add-overlay .modal-form input:focus,
-.add-overlay .modal-form textarea:focus {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-}
-
-.add-overlay .modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 18px;
-  gap: 10px;
-}
-
-.add-overlay .form-row {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 5px;
+  gap: 16px;
 }
 
 .add-overlay .form-group {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  margin-bottom: 5px;
+  gap: 8px;
+}
+
+.add-overlay .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.add-overlay label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.add-overlay input,
+.add-overlay select,
+.add-overlay textarea {
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 15px;
+  transition: all 0.2s;
+  background-color: #f9fafb;
+}
+
+.add-overlay input:focus,
+.add-overlay select:focus,
+.add-overlay textarea:focus {
+  outline: none;
+  border-color: #4f46e5;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.add-overlay textarea {
+  height: 100px;
+  resize: none;
 }
 
 .add-overlay .modal-footer {
-  background: #ffffff;
+  margin-top: 12px;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between; /* 양 끝 정렬: left는 왼쪽, right는 오른쪽 */
+  align-items: center;
+}
+
+.add-overlay .footer-left {
+  display: flex;
+  align-items: center;
+}
+
+.add-overlay .footer-right {
+  display: flex;
   gap: 12px;
-  margin-top: 24px;
+}
+
+.add-overlay .csv-btn {
+  display: flex;
+  align-items: center;
+  background-color: #10b981 !important; /* 초록색 포인트 */
+  color: white !important;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.add-overlay .csv-btn:hover {
+  background-color: #059669 !important;
+  transform: translateY(-1px);
 }
 
 .add-overlay .cancel-btn {
@@ -128,11 +125,11 @@
   color: #4b5563 !important;
   border: none;
   border-radius: 8px;
-  padding: 10px 20px;
+  padding: 10px 24px;
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s;
 }
 
 .add-overlay .cancel-btn:hover {
@@ -167,7 +164,7 @@
   color: #f3f4f6;
 }
 
-.dark-theme .add-overlay .modal-header h2 {
+.dark-theme .add-overlay .modal-content h2 {
   color: #fff;
 }
 
@@ -193,11 +190,11 @@
   color: #e2e8f0 !important;
 }
 
+.dark-theme .add-overlay .csv-btn {
+  background-color: #059669 !important;
+}
+
 .dark-theme .add-overlay .save-btn {
   background-color: #4f46e5 !important;
   color: #ffffff !important;
-}
-
-.dark-theme .add-overlay .save-btn:hover {
-  background-color: #6366f1 !important;
 }

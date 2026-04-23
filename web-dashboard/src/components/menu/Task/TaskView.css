@@ -23,11 +23,11 @@
   transition: all 0.3s ease;
 }
 
-.header-text {
+.task-container .header-text {
   text-align: left;
 }
 
-.header-text h2 {
+.task-container .header-text h2 {
   margin: 0;
   font-size: 1.6rem;
   font-weight: 800;
