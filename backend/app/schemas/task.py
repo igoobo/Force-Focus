@@ -1,14 +1,11 @@
 # backend/app/schemas/task.py
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Literal
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
 
-# -------------------------
-# 공백 방지 공통 유틸
-# -------------------------
 def _strip_and_reject_blank(v: str, field_name: str) -> str:
     """
     문자열 양쪽 공백 제거 후,
@@ -18,6 +15,7 @@ def _strip_and_reject_blank(v: str, field_name: str) -> str:
         return v
     if not isinstance(v, str):
         return v
+
     stripped = v.strip()
     if stripped == "":
         raise ValueError(f"{field_name} must not be blank")
@@ -39,14 +37,14 @@ def _strip_to_none(v):
     return s or None
 
 
-# --- API 요청(Request) 스키마 ---
 class TaskCreate(BaseModel):
     """
     [요청] POST /tasks
     새로운 할 일을 생성할 때 클라이언트가 보내는 데이터 구조입니다.
     user_id는 인증 토큰에서 가져오므로 클라이언트가 보낼 필요가 없습니다.
+
+    created_at, status, isCustom은 서버 정책 필드로 관리됩니다.
     """
-    # ✅ 공통 strip 적용
     model_config = ConfigDict(str_strip_whitespace=True)
 
     name: str
@@ -54,10 +52,6 @@ class TaskCreate(BaseModel):
     due_date: Optional[datetime] = None
     target_executable: Optional[str] = None
     target_arguments: Optional[str] = None
-
-    # ✅ 추가: 기본 제공/사용자 추가 구분
-    # - 사용자 생성 POST /tasks는 기본적으로 custom으로 보는 게 자연스러워서 True 기본값 권장
-    isCustom: bool = True
 
     @field_validator("name")
     @classmethod
@@ -67,23 +61,20 @@ class TaskCreate(BaseModel):
     @field_validator("description", "target_executable", "target_arguments", mode="before")
     @classmethod
     def validate_optional_strings(cls, v):
-        # Optional[str]에서 "   "는 None으로 정규화
         return _strip_to_none(v)
 
 
 class TaskUpdate(BaseModel):
     """
     [요청] PUT /tasks/{task_id}
-    기존 할 일 정보를 업데이트할 때 클라이언트가 보내는 데이터 구조입니다.
-    모든 필드는 선택 사항(Optional)입니다.
+    현재 구현에서는 선택 필드만 부분 업데이트하는 방식으로 동작합니다.
     """
-    # ✅ 공통 strip 적용
     model_config = ConfigDict(str_strip_whitespace=True)
 
     name: Optional[str] = None
     description: Optional[str] = None
     due_date: Optional[datetime] = None
-    status: Optional[str] = None  # "pending", "completed" 등으로 변경
+    status: Optional[Literal["pending", "completed", "cancelled"]] = None
     linked_session_id: Optional[str] = None
     target_executable: Optional[str] = None
     target_arguments: Optional[str] = None
@@ -98,7 +89,6 @@ class TaskUpdate(BaseModel):
 
     @field_validator(
         "description",
-        "status",
         "linked_session_id",
         "target_executable",
         "target_arguments",
@@ -106,11 +96,9 @@ class TaskUpdate(BaseModel):
     )
     @classmethod
     def validate_optional_strings(cls, v):
-        # Optional[str]에서 "   "는 None으로 정규화
         return _strip_to_none(v)
 
 
-# --- API 응답(Response) 스키마 ---
 class TaskRead(BaseModel):
     """
     [응답] GET /tasks/{task_id}, POST /tasks 등 조회/생성 성공 시
