@@ -1,14 +1,14 @@
 # backend/app/crud/events.py
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 import uuid
 
+from app.db.mongo import get_db
 from app.schemas.event import EventCreate, EventRead
 
-
 def get_events_collection():
-    from app.db.mongo import db
+    db = get_db()
     if db is None:
         raise RuntimeError("MongoDB not initialized. Did you call connect_to_mongo()?")
     return db["events"]
@@ -24,71 +24,75 @@ def _strip_or_none(v: Optional[str]) -> Optional[str]:
 
 
 def serialize_event(doc) -> EventRead:
+    ts = doc["timestamp"]
+
+    # Mongo에서 tz 날아간 경우 보정
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+
     return EventRead(
-        id=str(doc["_id"]), 
+        id=str(doc["_id"]),
         user_id=doc["user_id"],
         session_id=doc.get("session_id"),
-        timestamp=doc["timestamp"],
+        client_event_id=doc.get("client_event_id"),
+        timestamp=ts,
         app_name=doc.get("app_name"),
         window_title=doc.get("window_title"),
         activity_vector=doc.get("activity_vector", {}) or {},
     )
 
 
-# CREATE
-async def create_event(event: EventCreate) -> str:
+def _build_event_doc(user_id: str, event: EventCreate) -> dict:
     """
-    이벤트 1개 생성 후 event_id(str) 반환
-    - _id를 uuid 문자열로 통일
+    이벤트 문서 생성 공통 헬퍼
+    - events._id는 UUID 문자열
     """
-    events = get_events_collection()
+    ts = event.timestamp
 
-    event_id = str(uuid.uuid4())
-    new_doc = {
-        "_id": event_id,  
-        "user_id": _strip_or_none(event.user_id),
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+
+    return {
+        "_id": str(uuid.uuid4()),
+        "user_id": _strip_or_none(user_id) or user_id,
         "session_id": _strip_or_none(event.session_id),
-        "timestamp": event.timestamp,
+        "client_event_id": _strip_or_none(event.client_event_id),
+        "timestamp": ts,
         "app_name": _strip_or_none(event.app_name),
         "window_title": _strip_or_none(event.window_title),
         "activity_vector": event.activity_vector or {},
     }
 
-    await events.insert_one(new_doc)
-    return event_id
+# CREATE
+async def create_event(event: EventCreate) -> str:
+    """
+    이벤트 1개 생성 후 event_id(str) 반환
+    - 서버 외 채널에서 직접 user_id를 주입해 사용할 때를 위한 내부/확장용 함수
+    """
+    raise NotImplementedError("Use create_event_for_user() in the web API flow.")
 
 
 # CREATE - 서버에서 user_id 주입하는 버전
 async def create_event_for_user(user_id: str, event: EventCreate) -> str:
     """
-    요청 스키마의 user_id는 무시하고 서버 user_id로 강제 주입
-    - _id를 uuid 문자열로 통일
+    인증된 사용자 소유로 이벤트를 생성합니다.
+    - _id를 UUID 문자열로 통일
     """
     events = get_events_collection()
-
-    event_id = str(uuid.uuid4())
-    new_doc = {
-        "_id": event_id,  
-        "user_id": _strip_or_none(user_id) or user_id,
-        "session_id": _strip_or_none(event.session_id),
-        "timestamp": event.timestamp,
-        "app_name": _strip_or_none(event.app_name),
-        "window_title": _strip_or_none(event.window_title),
-        "activity_vector": event.activity_vector or {},
-    }
+    new_doc = _build_event_doc(user_id=user_id, event=event)
 
     await events.insert_one(new_doc)
-    return event_id
+    return new_doc["_id"]
 
 
 # READ ONE
-async def get_event(event_id: str) -> Optional[EventRead]:
+async def get_event(user_id: str, event_id: str) -> Optional[EventRead]:
     events = get_events_collection()
 
     if isinstance(event_id, str):
         event_id = event_id.strip()
 
-    doc = await events.find_one({"_id": event_id})
+    doc = await events.find_one({"_id": event_id, "user_id": user_id})
     if not doc:
         return None
     return serialize_event(doc)
@@ -106,7 +110,6 @@ async def get_events(
 
     query = {"user_id": user_id}
 
-    # ✅ 공백/빈값은 None 취급해서 필터가 이상하게 걸리는 걸 방지
     session_id = _strip_or_none(session_id)
     if session_id is not None:
         query["session_id"] = session_id
