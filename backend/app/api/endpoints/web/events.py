@@ -42,11 +42,7 @@ async def read_event(
     event_id: str,
     user_id: str = Depends(get_current_user_id),
 ):
-    event = await event_crud.get_event(event_id)
+    event = await event_crud.get_event(user_id, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-
-    if event.user_id != user_id:
-        raise HTTPException(status_code=403, detail="Forbidden")
-
     return event
