@@ -1,84 +1,97 @@
 # backend/app/schemas/session.py
 
 from datetime import datetime
-from typing import Optional, Any
+from typing import Optional, Literal
 
-from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 
-# --- API 요청(Request) 스키마 ---
+SessionStatus = Literal["active", "completed", "cancelled"]
+
+
+def _strip_to_none(v):
+    if v is None:
+        return None
+    if not isinstance(v, str):
+        return v
+    s = v.strip()
+    return s or None
+
 
 class SessionCreate(BaseModel):
     """
     [요청] POST /sessions/start
     새로운 집중 세션 시작
+
+    클라이언트 계약:
+    - id 필드는 client_session_id의 alias로 수신
     """
     model_config = ConfigDict(
         str_strip_whitespace=True,
-        populate_by_name=True
+        populate_by_name=True,
     )
 
-    client_session_id: Optional[str] = Field(None, alias="id") 
-
+    client_session_id: Optional[str] = Field(None, alias="id")
     task_id: Optional[str] = None
-    # [수정] start_time을 Optional로 변경하고 기본값을 None으로 설정하여 422 에러 방지
     start_time: Optional[datetime] = None
-    goal_duration: Optional[float] = None  # 목표 집중 시간 (분 단위)
-
-    # ML 모델 도입전 실험적 필드
+    goal_duration: Optional[float] = None  # 분 단위
     profile_id: Optional[str] = None
 
-    @model_validator(mode="before")
-    @classmethod
-    def debug_incoming_data(cls, data: Any) -> Any:
-        print("\n" + "="*50)
-        print(f"[DEBUG] SessionCreate Incoming JSON: {data}")
-        print("="*50 + "\n")
-        return data
-
-    @field_validator("task_id", "profile_id", mode="before")
+    @field_validator("client_session_id", "task_id", "profile_id", mode="before")
     @classmethod
     def normalize_optional_ids(cls, v):
-        """
-        Optional[str]에서:
-        - None은 그대로
-        - "   " -> "" -> None
-        - 나머지는 strip된 문자열
-        """
+        return _strip_to_none(v)
+
+    @field_validator("goal_duration")
+    @classmethod
+    def validate_goal_duration(cls, v):
         if v is None:
             return None
-        if not isinstance(v, str):
-            return v
-        s = v.strip()
-        return s or None
+        if v < 0:
+            raise ValueError("goal_duration must be >= 0")
+        return v
 
 
 class SessionUpdate(BaseModel):
     """
     [요청] PUT /sessions/{session_id}
-    진행 중인 세션 업데이트 (종료 시 end_time/status 포함)
+    세션 종료/상태 변경/메타데이터 갱신
     """
     model_config = ConfigDict(str_strip_whitespace=True)
 
     end_time: Optional[datetime] = None
-    status: Optional[str] = None  # "completed", "cancelled" 등
+    end_time_s: Optional[float] = None
+    status: Optional[SessionStatus] = None
     goal_duration: Optional[float] = None
     interruption_count: Optional[int] = None
 
-    @field_validator("status", mode="before")
+    @field_validator("goal_duration")
     @classmethod
-    def validate_status(cls, v):
+    def validate_goal_duration(cls, v):
         if v is None:
             return None
-        if not isinstance(v, str):
-            return v
-        s = v.strip()
-        if s == "":
-            raise ValueError("status must not be blank")
-        return s
+        if v < 0:
+            raise ValueError("goal_duration must be >= 0")
+        return v
 
+    @field_validator("interruption_count")
+    @classmethod
+    def validate_interruption_count(cls, v):
+        if v is None:
+            return None
+        if v < 0:
+            raise ValueError("interruption_count must be >= 0")
+        return v
 
-# --- API 응답(Response) 스키마 ---
+    @field_validator("end_time_s")
+    @classmethod
+    def validate_end_time_s(cls, v):
+        if v is None:
+            return None
+        if v < 0:
+            raise ValueError("end_time_s must be >= 0")
+        return v
+
 
 class SessionRead(BaseModel):
     """
@@ -95,6 +108,6 @@ class SessionRead(BaseModel):
     start_time: datetime
     end_time: Optional[datetime] = None
     duration: Optional[float] = None  # 초 단위
-    status: str
+    status: SessionStatus
     goal_duration: Optional[float] = None
     interruption_count: int = Field(default=0)
