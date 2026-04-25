@@ -21,23 +21,23 @@
 
 ## 2. 개발 환경 및 배포 URL
 ### 2.1 개발 환경
-- Web Framework
+- **Web Framework**
     - Frontend : JavaScript + React
     - Backend : Python + FastAPI
 
-- State Management
+- **State Management**
     - Zustand (전역 상태 관리 라이브러리)
 
-- Database
+- **Database**
     - MongoDB
 
-- Infrastructure & DevOps
+- **Infrastructure & DevOps**
     - Containerization : Docker
     - Cloud Platform : Google Cloud Platform (GCP)
 
 
 ### 2.2 배포 URL
-- https://34.63.228.213.sslip.io/
+- Web Dashboard : https://34.63.228.213.sslip.io/
 
 ### 2.3 시스템 아키텍처
 
@@ -63,7 +63,7 @@ graph LR
 
 ### 2.4 URL 구조
 #### 2.4.1 Frontend URL (SPA)
-본 프로젝트는 **Single Page Application (SPA)** 방식을 채택하여 대시보드 내 모든 페이지 전환 및 기능 수행이 루트 경로 내에서 동적으로 이루어집니다.
+- 본 프로젝트는 **Single Page Application (SPA)** 방식을 채택하여 대시보드 내 모든 페이지 전환 및 기능 수행이 루트 경로 내에서 동적으로 이루어집니다.
 
 | App | URL | Note |
 |:---|:---|:---|
@@ -72,7 +72,7 @@ graph LR
 <br>
 
 #### 2.4.2 Backend API Endpoints (FastAPI)
-백엔드와의 통신은 `axios` 인스턴스를 통해 수행되며, 모든 요청은 `/api/v1`을 Base URL로 사용합니다.
+- 백엔드와의 통신은 `axios` 인스턴스를 통해 수행되며, 모든 요청은 `/api/v1`을 Base URL로 사용합니다.
 
 **1) Schedule API**
 | Method | Endpoint | 설명 | 로그인 권한 |
@@ -121,7 +121,7 @@ graph LR
 
 ## 3. 프로젝트 구조 및 설계
 ### 3.1 프로젝트 폴더 구조
-웹 대시보드의 프론트엔드 소스코드는 기능별 모듈화를 위해 다음과 같은 구조로 설계되었습니다.
+- 웹 대시보드의 프론트엔드 소스코드는 기능별 모듈화를 위해 다음과 같은 구조로 설계되었습니다.
 
 ```text
 📦src
@@ -133,11 +133,11 @@ graph LR
  ┃ ┗ 📜taskApi.js
  ┣ 📂assets
  ┃ ┗ 📜react.svg
- ┣ 📂components        # 재사용 가능한 UI 컴포넌트
+ ┣ 📂components        # 각 UI 컴포넌트
  ┃ ┣ 📂layout          # 공통 레이아웃 컴포넌트
- ┃ ┃ ┣ 📂Help          # 도움말 섹션
- ┃ ┃ ┣ 📂InfoBox       # 정보 표시 박스
- ┃ ┃ ┣ 📂MenuBar       # 사이드/네비게이션 바
+ ┃ ┃ ┣ 📂Help          # 도움말 모달 창
+ ┃ ┃ ┣ 📂InfoBox       # 각 기능별 공통 영역
+ ┃ ┃ ┣ 📂MenuBar       # 사이드 메뉴 바
  ┃ ┃ ┗ 📂TitleBar      # 상단 타이틀 바
  ┃ ┣ 📂login           # 로그인 페이지
  ┃ ┗ 📂menu            # 메인 기능별 상세 컴포넌트
@@ -146,11 +146,11 @@ graph LR
  ┃   ┣ 📂Overview         # 대시보드 개요
  ┃   ┣ 📂Schedule         # 일정 관리 메뉴
  ┃   ┗ 📂Task             # 작업 유형 설정 메뉴
- ┣ 📂hooks             # 커스텀 훅
+ ┣ 📂hooks             # 커스텀 Hooks
  ┃ ┣ 📜useSchedules.js
  ┃ ┗ 📜useTasks.js
  ┣ 📜App.css           
- ┣ 📜App.jsx           
+ ┣ 📜App.jsx           # 루트 컴포넌트
  ┣ 📜index.css         
  ┣ 📜main.jsx          
  ┗ 📜MainStore.jsx     # Zustand를 이용한 전역 상태(Menu, Auth 등) 관리
@@ -159,7 +159,7 @@ graph LR
 <br>
 
 ## 4. 데이터베이스 설계 (ERD)
-본 프로젝트는 NoSQL 데이터베이스인 **MongoDB**를 사용하여 비정형 활동 데이터와 유연한 일정 정보를 관리합니다. 각 컬렉션의 구조와 관계는 다음과 같습니다.
+- 본 프로젝트는 NoSQL 데이터베이스인 **MongoDB**를 사용하여 비정형 활동 데이터와 유연한 일정 정보를 관리합니다. 각 컬렉션의 구조와 관계는 다음과 같습니다.
 
 ### 4.1 Entity Relationship Diagram
 
@@ -174,7 +174,7 @@ erDiagram
     SCHEDULE {
         string id PK
         string name
-        string task_id FK
+        string task_id
         string description
         string start_date
         string end_date
@@ -202,7 +202,7 @@ erDiagram
 
     EVENT {
         string id PK "(_id)"
-        string session_id FK
+        string session_id
         string app_name
         date timestamp
     }
@@ -210,7 +210,7 @@ erDiagram
 
 ### 4.2 컬렉션별 상세 명세
 **1) Schedules (일정 관리)**
-사용자가 웹 대시보드에서 설정한 작업 계획 데이터입니다.
+- 사용자가 웹 대시보드에서 설정한 작업 계획 데이터입니다.
 * `id`: 일정 고유 식별자 (String / MongoDB ObjectId)
 * `name`: 일정 제목 (String)
 * `task_id`: 연결된 작업 유형의 ID (String)
@@ -223,7 +223,7 @@ erDiagram
 <br>
 
 **2) Tasks (작업 설정)**
-작업 유형별 프로필 및 프로그램 제어 환경을 정의합니다.
+- 작업 유형별 프로필 및 프로그램 제어 환경을 정의합니다.
 * `id`: 작업 고유 식별자 (String)
 * `name`: 작업 유형 명칭 (String)
 * `description`: 작업 환경 설명 (String)
@@ -233,7 +233,7 @@ erDiagram
 <br>
 
 **3) Sessions (활동 세션)**
-데스크탑 에이전트로부터 수집되어 저장된 실제 작업 이력 데이터입니다.
+- 데스크탑 에이전트로부터 수집되어 저장된 실제 작업 이력 데이터입니다.
 * `_id`: 세션 고유 식별자 (String / MongoDB ObjectId)
 * `client_session_id`: 데스크탑 에이전트에서 생성하는 session_id 형식, 각 세션별 events 정보 구분자 (String)
 * `start_time`: 각 세션이 시작되는 시간 (String, YYYY-MM-DDTHH:mm:ssZ" 형식)
@@ -243,7 +243,7 @@ erDiagram
 <br>
 
 **4) Events (상세 활동 로그)**
-세션 내에서 발생한 구체적인 입력 이벤트와 관련된 로그입니다.
+- 세션 내에서 발생한 구체적인 입력 이벤트와 관련된 로그입니다.
 * `_id`: 이벤트 고유 식별자 (String / UUID 형식)
 * `session_id`: Client Session ID와의 매핑 식별자 (String)
 * `app_name`: 실행 프로세스 명 (예: `chrome.exe`)
@@ -334,7 +334,7 @@ graph LR
 
 ### 5.6 Authentication (로그인 및 인증)
 * **기능**: 보안을 위한 사용자 인증 및 세션 관리를 수행합니다.
-* **구현**:
+* **상세**:
     * `authApi`를 통한 로그인 처리 및 JWT(JSON Web Token) 발급
     * `axiosInstance`의 인터셉터를 활용하여 모든 요청 헤더에 토큰 자동 포함
     * 401 에러 발생 시(세션 만료) 자동으로 상태 초기화 및 로그인 화면으로 리다이렉트
@@ -350,6 +350,7 @@ graph TD
 <br>
 
 ## 6. 메인 기능별 상세 아키텍처
+- 본 웹 대시보드에서 제공하는 주요 기능의 상세 구조는 각각 다음과 같습니다.
 ### 6.1 Schedule (일정 관리)
 - 스케줄 진입 시 서버로부터 전체 일정을 불러와 화면에 렌더링합니다. 사용자는 직관적인 모달 인터페이스를 통해 일정의 추가, 수정, 삭제를 수행하며, 각 작업 성공 시 프론트엔드 상태를 서버 데이터와 즉각적으로 동기화하여 최신 상태를 유지합니다.
 ```mermaid
