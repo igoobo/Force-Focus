@@ -1,27 +1,9 @@
 # backend/app/schemas/event.py
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, ConfigDict, field_validator
-
-
-# -------------------------
-# 공백 방지 공통 유틸
-# -------------------------
-def _strip_and_reject_blank(v: str, field_name: str) -> str:
-    """
-    문자열 양쪽 공백 제거 후,
-    빈 문자열이면 ValidationError 유발을 위해 ValueError 발생.
-    """
-    if v is None:
-        return v
-    if not isinstance(v, str):
-        return v
-    stripped = v.strip()
-    if stripped == "":
-        raise ValueError(f"{field_name} must not be blank")
-    return stripped
 
 
 def _strip_to_none(v):
@@ -42,12 +24,15 @@ def _strip_to_none(v):
 class EventCreate(BaseModel):
     """
     [요청] 단일 이벤트 생성
-    - user_id는 (보통) JWT에서 뽑지만, 테스트/확장 대비로 Optional 허용
+
+    web API 계약:
+    - user_id는 인증 토큰에서 결정되므로 요청 본문에서 받지 않음
+    - session_id는 문자열 식별자 계약을 따름
+    - client_event_id는 클라이언트 측 이벤트 식별자(옵션)
+    - activity_vector는 자유 dict를 허용하되, 클라이언트별 포맷 일관성을 유지해야 함
     """
-    # ✅ 공통 strip 적용
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    user_id: Optional[str] = None
     session_id: Optional[str] = None
     client_event_id: Optional[str] = None
     timestamp: datetime
@@ -55,22 +40,34 @@ class EventCreate(BaseModel):
     window_title: Optional[str] = None
     activity_vector: Dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator("user_id", "session_id", "app_name", "window_title", mode="before")
+    @field_validator("session_id", "client_event_id", "app_name", "window_title", mode="before")
     @classmethod
     def validate_optional_strings(cls, v):
-        # Optional[str]는 "   " -> None으로 정규화 + strip 적용
         return _strip_to_none(v)
+    @field_validator("timestamp", mode="before")
+    @classmethod
+    def validate_timestamp(cls, v):
+        if v is None:
+            return datetime.now(timezone.utc)
+
+        if isinstance(v, str):
+            v = v.replace("Z", "+00:00")
+            dt = datetime.fromisoformat(v)
+        else:
+            dt = v
+
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+
+        return dt
 
 
 class EventBatchCreate(BaseModel):
     """
-    [요청] POST /events/batch (배치 이벤트 생성)
-    Rust의 EventBatchRequest 구조체와 매핑됩니다.
-    {
-      "events": [ ... ]
-    }
+    [요청] 배치 이벤트 생성용 스키마
+    현재 web router에는 /events/batch 엔드포인트가 없으며,
+    다른 클라이언트/에이전트 채널에서 사용할 수 있는 확장 스키마로 취급합니다.
     """
-    # ✅ 공통 strip 적용
     model_config = ConfigDict(str_strip_whitespace=True)
 
     events: List[EventCreate] = Field(min_length=1)
@@ -79,6 +76,7 @@ class EventBatchCreate(BaseModel):
 class EventRead(BaseModel):
     """
     [응답] 이벤트 조회
+    - id는 UUID 문자열 이벤트 식별자
     """
     id: str
     user_id: str
@@ -94,10 +92,8 @@ class EventRead(BaseModel):
 
 class EventCreateResponse(BaseModel):
     """
-    [응답] 이벤트 생성/배치 생성 공용
-    - 단일 생성: event_id
-    - 배치 생성: count
+    [응답] 이벤트 생성 응답
+    현재 web API에서는 단일 생성 응답으로 사용합니다.
     """
     status: str = "success"
-    count: Optional[int] = None
     event_id: Optional[str] = None
