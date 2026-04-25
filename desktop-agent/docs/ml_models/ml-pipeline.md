@@ -177,29 +177,29 @@ W_total = sigmoid(X_context × 5) × 2.0
 
 ```mermaid
 sequenceDiagram
-    participant LOOP as Background (1시간)
-    participant MUM as ModelUpdateManager
-    participant API as Backend API
-    participant FS as 파일 시스템
-    participant AC as AppCore
-    participant IE as InferenceEngine
+    participant L as "Background (1시간)"
+    participant MUM as "ModelUpdateManager"
+    participant API as "Backend API"
+    participant FS as "파일 시스템"
+    participant AC as "AppCore"
+    participant IE as "InferenceEngine"
 
-    LOOP->>MUM: check_and_update(token)
-    MUM->>API: check_latest_model_version()
+    L->>MUM: check_and_update
+    MUM->>API: check_latest_model_version
     API-->>MUM: ModelInfo (version, urls)
 
-    MUM->>API: download → temp_model.onnx
-    MUM->>API: download → temp_scaler.json
+    MUM->>API: download (temp_model.onnx)
+    MUM->>API: download (temp_scaler.json)
 
-    MUM->>AC: lock()
-    AC->>IE: inference_engine = None (파일 핸들 해제)
-    Note over MUM: sleep(100ms) — Windows 파일 락 대기
+    MUM->>AC: lock
+    AC->>IE: set inference_engine to None
+    Note over MUM: sleep 100ms - Windows File Lock
 
-    MUM->>FS: rename(current → .bak)
-    MUM->>FS: rename(temp → final)
+    MUM->>FS: rename current to bak
+    MUM->>FS: rename temp to final
 
-    MUM->>IE: InferenceEngine::new() → AppCore에 주입
-    MUM-->>AC: unlock()
+    MUM->>IE: inject new InferenceEngine
+    MUM-->>AC: unlock
 ```
 
 ### 5.2 ONNX 세션 Lifecycle
