@@ -1,9 +1,10 @@
 # 신규 서브 기능 제안: 맥락 유실 방지 및 작업 공간 롤백 (Workspace Snapshot & Restore)
 
-> **상태**: Proposed (제안됨 - 채택 완료)
-> **적용 대상**: Desktop Agent (`commands/vision.rs`, `core/state.rs`, Frontend Overlay)
+> **상태**: ✅ Implemented (구현 완료)
+> **적용 대상**: Desktop Agent (`commands/vision.rs`, `core/app.rs`, Frontend `InterventionOverlay.tsx`)
 > **예상 작업 시간**: Medium
 > **분류**: 100% Sub Feature (몰입 유지 보조)
+> **구현 위치**: `vision.rs:313-364` (restore_workspace), `app.rs:400-410` (snapshot capture), `InterventionOverlay.tsx` (복귀 버튼)
 
 ---
 

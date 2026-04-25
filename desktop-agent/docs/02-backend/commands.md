@@ -2,7 +2,7 @@
 
 > **범위**: `commands/mod.rs`, `commands/auth.rs`, `commands/session.rs`, `commands/task.rs`, `commands/system.rs`, `commands/window.rs`, `commands/input.rs`, `commands/vision.rs`, `commands/ml.rs`
 > **리뷰 일자**: 2026-03-21
-> **최종 업데이트**: 2026-04-19 (모듈 분리 반영)
+> **최종 업데이트**: 2026-04-25 (Workspace Snapshot/Restore 기능, 줄 수 갱신)
 
 ---
 
@@ -21,7 +21,7 @@ graph LR
         SYS["system.rs<br/>시스템 정보"]
         WIN["window.rs<br/>오버레이 제어"]
         INP["input.rs<br/>입력 통계"]
-        VIS["vision.rs<br/>시각 센서 + 시맨틱"]
+        VIS["vision.rs<br/>시각 센서 + 시맨틱<br/>+ Snapshot/Restore"]
         ML_CMD["ml.rs<br/>모델 업데이트"]
     end
 
@@ -71,7 +71,7 @@ pub mod window;
 
 ---
 
-### 2.2 `commands/auth.rs` (46줄) — 인증 커맨드
+### 2.2 `commands/auth.rs` (38줄) — 인증 커맨드
 
 > `backend_comm.rs`의 인증 로직을 분리한 파일.
 
@@ -89,7 +89,7 @@ pub mod window;
 
 ---
 
-### 2.3 `commands/session.rs` (244줄) — 세션 관리 + 피드백
+### 2.3 `commands/session.rs` (227줄) — 세션 관리 + 피드백
 
 > `backend_comm.rs`의 세션/피드백 로직을 분리한 파일. Commands Layer에서 **가장 복잡한 파일**.
 
@@ -109,7 +109,7 @@ pub mod window;
 
 ---
 
-### 2.4 `commands/task.rs` (53줄) — 태스크 조회
+### 2.4 `commands/task.rs` (45줄) — 태스크 조회
 
 > `backend_comm.rs`의 Task 로직을 분리한 파일.
 
@@ -196,7 +196,7 @@ pub struct InputStats {
 
 ---
 
-### 2.8 `commands/vision.rs` (287줄) — 💥 시각 센서 (Windows API)
+### 2.8 `commands/vision.rs` (343줄) — 💥 시각 센서 + Workspace Snapshot (Windows API)
 
 **이 파일이 Commands 레이어에서 가장 복잡합니다.** Windows API를 직접 호출하는 `unsafe` 코드가 포함되어 있습니다.
 
@@ -208,7 +208,8 @@ pub struct InputStats {
 | `_get_all_visible_windows_internal()` | 모든 보이는 창 목록 (Z-order + 가시영역 계산) | ✅ |
 | `get_process_path_from_pid()` | PID → 프로세스 경로 변환 | ✅ |
 | `enum_window_callback()` | EnumWindows 콜백 (OS가 호출) | ✅ |
-| `extract_semantic_keywords()` | 앱 이름 + 제목 → 토큰화 | ❌ |
+| `extract_semantic_keywords()` | 앱 이름 + 제목 → 토큰화 (중복 제거) | ❌ |
+| `restore_workspace()` | **스냅샷 기반 작업 공간 복구** (Tauri 커맨드) | ✅ |
 
 #### 시각 센서 동작 흐름
 
@@ -257,6 +258,17 @@ sequenceDiagram
 | **🟢 설계** | 시맨틱 토큰 추출 | `extract_semantic_keywords` — 비영숫자로 분리 + 중복 제거. 테스트 포함 ✅ |
 | **🟡 설계** | `get_semantic_tokens` (L314-316) | `extract_semantic_keywords`의 단순 래퍼. 별도 함수로 존재할 이유 불분명 (인라인 가능) |
 | **🟡 이식성** | `#[cfg(not(target_os = "windows"))]` (L289-292) | 비-Windows 빌드에서 `vec![("Unsupported OS".to_string(), false)]` 반환 → 타입 불일치 (`Vec<WindowInfo>` 아님). **컴파일 에러** 발생 가능 |
+
+#### Workspace Snapshot & Restore 기능 (신규)
+
+| 항목 | 내용 |
+|------|------|
+| **구조체** | `WorkspaceSnapshot { timestamp_ms: u64, windows: Vec<WindowInfo> }`, `WinRect { left, top, right, bottom }` |
+| **캐철 시점** | `core/app.rs`의 Core Loop에서 FSM이 **FOCUS 상태로 전이**될 때 1회 캡처 (`_get_all_visible_windows_internal()` 호출) |
+| **저장** | `AppCore.last_snapshot: Option<WorkspaceSnapshot>` (메모리 내 캐싱, 디스크 저장 없음) |
+| **복구 커맨드** | `restore_workspace` (Tauri `#[command]`) |
+| **복구 로직** | 1) 스냅샷에 없는 새 창 → `ShowWindow(SW_MINIMIZE)` (Force-Focus 앱 자체 제외). 2) 스냅샷의 업무 창 → `ShowWindow(SW_RESTORE)` + `SetWindowPos`로 위치/크기 복원 |
+| **안전성** | `GetWindowThreadProcessId`로 PID 확인 → 자체 프로세스 창(오버레이 등)은 최소화 대상에서 제외 ✅ |
 
 #### 시맨틱 필터 & Context Score — 세부 구현
 

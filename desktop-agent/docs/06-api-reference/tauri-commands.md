@@ -1,7 +1,7 @@
 # Tauri 커맨드 API 레퍼런스
 
 > **작성일**: 2026-03-21
-> **최종 업데이트**: 2026-04-19 (Phase 3 모듈 분리 반영, 등록 커맨드 16개 완전 대조)
+> **최종 업데이트**: 2026-04-25 (restore_workspace 커맨드 추가, 17개)
 
 ---
 
@@ -10,7 +10,7 @@
 모든 Tauri 커맨드는 Frontend에서 `invoke('command_name', { args })` 형태로 호출됩니다.
 Backend에서는 `#[command]` 매크로로 정의되며, `lib.rs`의 `invoke_handler`에 등록됩니다.
 
-> 현재 **16개** 커맨드가 등록되어 있습니다 (`lib.rs:193-210`).
+> 현재 **17개** 커맨드가 등록되어 있습니다 (`lib.rs:193-211`).
 
 ---
 
@@ -84,6 +84,7 @@ Backend에서는 `#[command]` 매크로로 정의되며, `lib.rs`의 `invoke_han
 |--------|---------|--------|------|
 | `get_current_active_window_info` | — | `Result<WindowInfo, String>` | 활성 창 정보 (제목, 프로세스명, 경로) |
 | `get_visible_windows` | — | `Result<Vec<WindowInfo>, String>` | 현재 보이는 모든 창 목록 |
+| `restore_workspace` | — | `Result<(), String>` | **스냅샷 기반 작업 공간 복구** (FOCUS 시점 창 배치로 롤백) |
 
 ---
 
@@ -95,7 +96,7 @@ Backend에서는 `#[command]` 매크로로 정의되며, `lib.rs`의 `invoke_han
 
 ---
 
-## 등록 커맨드 전체 요약 (16개)
+## 등록 커맨드 전체 요약 (17개)
 
 | # | 커맨드 | 모듈 | 동기/비동기 |
 |---|--------|------|------------|
@@ -114,6 +115,7 @@ Backend에서는 `#[command]` 매크로로 정의되며, `lib.rs`의 `invoke_han
 | 13 | `get_input_frequency_stats` | `input.rs` | sync |
 | 14 | `get_current_active_window_info` | `vision.rs` | sync |
 | 15 | `get_visible_windows` | `vision.rs` | sync |
-| 16 | `check_model_update` | `ml.rs` | async |
+| 16 | `restore_workspace` | `vision.rs` | sync |
+| 17 | `check_model_update` | `ml.rs` | async |
 
 > **참고**: `get_semantic_tokens` (vision.rs)는 `#[command]`로 정의되어 있지만 `invoke_handler`에 **미등록**입니다. Core Loop 내부에서 직접 호출되는 헬퍼 함수로 사용됩니다.

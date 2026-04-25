@@ -3,7 +3,7 @@
 > **프로젝트**: Force-Focus Desktop Agent
 > **기술 스택**: Tauri 2 (Rust) + React 18 (TypeScript) + ONNX Runtime
 > **작성일**: 2026-03-21
-> **최종 업데이트**: 2026-04-12 (모듈 분리 및 데드코드 제거 반영)
+> **최종 업데이트**: 2026-04-25 (Workspace Snapshot & Restore 기능 반영)
 
 ---
 
@@ -38,7 +38,7 @@ graph TB
             CMD_TASK["task.rs<br/>태스크 조회"]
             CMD_SYS["system.rs<br/>프로세스 목록"]
             CMD_WIN["window.rs<br/>오버레이 제어"]
-            CMD_VIS["vision.rs<br/>Win32 API + 시맨틱 토큰화"]
+            CMD_VIS["vision.rs<br/>Win32 API + 시맨틱 토큰화<br/>+ Workspace Snapshot/Restore"]
             CMD_INP["commands/input.rs<br/>InputStats 구조체"]
             CMD_ML["ml.rs<br/>모델 업데이트 트리거"]
         end
@@ -97,7 +97,8 @@ graph TB
   2. widget-tick 이벤트 브로드캐스트
   3. InputStats에서 현재 입력 상태 읽기
   4. FSM 상태 전이 (state.rs → drift_gauge 적분 제어)
-  5. 개입 판단 (notification / overlay / do_nothing)
+  5. 상태 전이 감지 → FOCUS 진입 시 Workspace Snapshot 캡처
+  6. 개입 판단 (notification / overlay / do_nothing)
 
 매 5초 (Slow Path — ML Sensing):
   1. 활성 창 감지 (vision.rs → Win32 API)
@@ -118,7 +119,7 @@ graph TB
 |------|------|-----------|------|
 | `SessionState` | `Option<ActiveSessionInfo>` | `Arc<Mutex<>>` | Tauri `.manage()` |
 | `InputStats` | 구조체 | `Arc<Mutex<>>` | Tauri `.manage()` |
-| `AppCore` | FSM + ML + global_map | `Mutex<>` | Tauri `.manage()` |
+| `AppCore` | FSM + ML + global_map + Snapshot | `Mutex<>` | Tauri `.manage()` |
 | `StorageManager` | SQLite + XOR obfuscation | `Arc<Mutex<>>` | Tauri `.manage()` |
 | `BackendCommunicator` | HTTP Client | `Arc<>` | Tauri `.manage()` |
 | `SysinfoState` | `sysinfo::System` | `Mutex<>` | Tauri `.manage()` |
@@ -153,16 +154,3 @@ graph TD
 ```
 
 ---
-
-## 5. 리뷰 결과 총괄
-
-| 레이어 | 파일 수 | 발견 | 커밋 | 문서 |
-|--------|--------|------|------|------|
-| Core | 4 | 15건 | `6ecccc6` | [core.md](../02-backend/core.md) |
-| Commands | 9 | 11건 | `cb9aa47`, `984a64b` | [commands.md](../02-backend/commands.md) |
-| AI | 3 | 12건 | `9df0b7e` | [ai.md](../02-backend/ai.md) |
-| Managers | 6 | 11건 | `c7c6741` | [managers.md](../02-backend/managers.md) |
-| Utils | 3 | 6건 | `80db381`, `fe89e11` | [utils.md](../02-backend/utils.md) |
-| Frontend | 9 | 12건 | — | [frontend.md](../03-frontend/frontend.md) |
-| Config | 6 | 8건 | — | [config.md](../04-config/config.md) |
-| **합계** | **40** | **75건** | **6회** | |

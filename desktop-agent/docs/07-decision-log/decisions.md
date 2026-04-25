@@ -1,7 +1,7 @@
 # 의사결정 기록 (Decision Log)
 
 > **작성일**: 2026-03-21
-> **최종 업데이트**: 2026-04-19 (Phase 2~4 의사결정 추가, 상태 갱신)
+> **최종 업데이트**: 2026-04-25 (Workspace Snapshot 기능 의사결정 추가)
 > **범위**: 코드 리뷰 과정에서 발견된 설계 의사결정 및 수정 근거
 
 ---
@@ -58,8 +58,8 @@
 |------|------|
 | **발견** | `App.tsx`(LoginView, SettingsView)는 Tauri `invoke`를 사용하지만, `MainView`는 `fetch` + MSW를 사용. 두 시스템이 공존 |
 | **원인** | 초기 MSW 프로토타입에서 Rust 백엔드 연동으로 전환하는 과정에서 `MainView` 마이그레이션이 미완 |
-| **해결** | Phase 4에서 `api/index.ts`, `mocks/`, `MainView/index.tsx` + 4개 서브컴포넌트 **전체 삭제**. 새 `MainView.tsx`를 Tauri `invoke` 기반으로 재작성 |
-| **상태** | ✅ FIXED (Phase 4) |
+| **해결** | `api/index.ts`, `mocks/`, `MainView/index.tsx` + 4개 서브컴포넌트 **전체 삭제**. 새 `MainView.tsx`를 Tauri `invoke` 기반으로 재작성 |
+| **상태** | ✅ FIXED |
 
 ---
 
@@ -69,12 +69,12 @@
 |------|------|
 | **발견** | `feature.rs`의 `FeatureExtractor`가 정의되어 있지만 실제 사용되지 않음. `app.rs`에서 인라인으로 동일 기능을 구현하되 수학 공식이 불일치 (표준편차 계산, interaction gate 로직) |
 | **위험** | 두 구현 중 어느 것이 정확한지 불명확. 향후 유지보수 시 혼란 |
-| **해결** | Phase 3에서 `feature.rs` **삭제**. `AppCore::start_core_loop()` 인라인 구현을 유일 기준으로 확정 |
-| **상태** | ✅ FIXED (Phase 3, 커밋 `fe89e11`) |
+| **해결** |  `feature.rs` **삭제**. `AppCore::start_core_loop()` 인라인 구현을 유일 기준으로 확정 |
+| **상태** | ✅ FIXED (커밋 `fe89e11`) |
 
 ---
 
-## 7. 보안: OS Keyring → XOR Obfuscation (Phase 2)
+## 7. 보안: OS Keyring → XOR Obfuscation 
 
 | 항목 | 내용 |
 |------|------|
@@ -83,11 +83,11 @@
 | **변경** | `keyring` 의존성 제거 → SQLite 내 XOR 난독화 계층으로 대체 |
 | **대안 비교** | ① AES 암호화 — 키 관리 복잡성, ② OS keyring 유지 — 불안정, ③ **XOR 난독화** — casual inspection 방지 + 안정성 ✅ |
 | **한계** | 키가 바이너리에 하드코딩되어 리버스 엔지니어링으로 복원 가능. 암호화가 아닌 난독화 |
-| **상태** | ✅ 구현됨 (Phase 2) |
+| **상태** | ✅ 구현됨 |
 
 ---
 
-## 8. 구조: backend_comm.rs 모듈 분리 (Phase 3)
+## 8. 구조: backend_comm.rs 모듈 분리
 
 | 항목 | 내용 |
 |------|------|
@@ -98,18 +98,18 @@
 
 ---
 
-## 9. 정리: MSW 프로토타입 전체 제거 (Phase 4)
+## 9. 정리: MSW 프로토타입 전체 제거
 
 | 항목 | 내용 |
 |------|------|
 | **기존** | `api/index.ts`, `mocks/browser.ts`, `MainView/index.tsx` + 4개 서브컴포넌트 — MSW 기반 `fetch` 통신 |
 | **변경** | 전체 삭제. `MainView.tsx`를 Tauri `invoke` 기반으로 새로 작성 |
 | **이유** | MSW 비활성화 상태에서 `MainView`가 동작하지 않음. Tailwind CSS 미설치로 스타일도 미적용. 프론트엔드 15파일 → 15파일 (데드코드 제거 + styles 파일 추가) |
-| **상태** | ✅ FIXED (Phase 4) |
+| **상태** | ✅ FIXED  |
 
 ---
 
-## 10. 스타일: Tailwind → CSS-in-JS 통일 (Phase 4)
+## 10. 스타일: Tailwind → CSS-in-JS 통일 
 
 | 항목 | 내용 |
 |------|------|
@@ -117,4 +117,17 @@
 | **변경** | CSS-in-JS 패턴(`*.styles.ts`)으로통일. `React.CSSProperties` 객체 사용 |
 | **이유** | Tailwind가 설치되지 않은 상태에서 Tailwind 클래스 사용 → 스타일 전혀 미적용 |
 | **예외** | `widget_main.tsx`는 아직 인라인 스타일 직접 사용 (styles 파일 미분리) |
-| **상태** | ✅ 구현됨 (Phase 4) |
+| **상태** | ✅ 구현됨 |
+
+---
+
+## 11. 기능: Workspace Snapshot & Restore 
+
+| 항목 | 내용 |
+|------|------|
+| **문제** | DISTRACTED 상태에서 따짓 창들이 열려 작업 화면이 난잡해지면, 다시 원래 배치로 돌아가는 데 인지적 부하 발생 |
+| **결정** | FOCUS 진입 시점에 `WorkspaceSnapshot`(전체 창 HWND+좌표) 캐철 → 개입 시 "작업 복귀" 버튼으로 롤백 |
+| **구현** | `vision.rs:restore_workspace` (Win32 `ShowWindow`/`SetWindowPos`) + `app.rs:400-410` (전이 감지) + `InterventionOverlay.tsx` (복귀 버튼) |
+| **대안 비교** | ① 가상 데스크톱 — OS 수준 통합 필요, ② 태스크바 그루핑 — 단순 시각적 분류만 가능, ③ **HWND 스냅샷** — 위치+크기+Z-order 까지 복원 가능 ✅ |
+| **제한사항** | 메모리 내 캐싱만 지원 (디스크 저장 없음), 앱 재시작 시 스냅샷 소실 |
+| **상태** | ✅ 구현됨 |

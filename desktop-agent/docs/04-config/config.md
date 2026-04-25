@@ -2,7 +2,7 @@
 
 > **범위**: `Cargo.toml`, `tauri.conf.json`, `vite.config.ts`, `tsconfig.json`, `package.json`, `tests/integration_test.rs`
 > **리뷰 일자**: 2026-03-21
-> **최종 업데이트**: 2026-04-19 (Phase 3/4 변경 반영, CSP/identifier 수정 확인)
+> **최종 업데이트**: 2026-04-19 (CSP/identifier 수정 확인)
 
 ---
 
@@ -91,9 +91,9 @@
 
 | 카테고리 | 분석 |
 |----------|------|
-| **🟡 분류** | `msw`(L31)가 `devDependencies`에 있고 `"msw"` 설정(L35-39)이 루트에 존재. Phase 4에서 MSW 코드는 삭제되었으므로 `msw` 의존성과 설정 제거 권장 |
+| **🟡 분류** | `msw`(L31)가 `devDependencies`에 있고 `"msw"` 설정(L35-39)이 루트에 존재. MSW 코드는 삭제되었으므로 `msw` 의존성과 설정 제거 권장 |
 | **🟢 설계** | Tauri 플러그인 JS 바인딩 (`@tauri-apps/plugin-*`) 모두 `dependencies`에 포함 ✅ |
-| **🟡 정리** | `react-icons`(L21) — Phase 4에서 MSW 기반 MainView 삭제 후 실사용 여부 재확인 필요. `MainView.tsx`(새 버전)에서 사용 중이면 유지, 아니면 삭제 | |
+| **🟡 정리** | `react-icons`(L21) — MSW 기반 MainView 삭제 후 실사용 여부 재확인 필요. `MainView.tsx`(새 버전)에서 사용 중이면 유지, 아니면 삭제 | |
 
 ---
 
@@ -124,7 +124,7 @@
 | C-4 | tauri.conf.json | title ≠ productName 불일치 | ⏳ |
 | C-5 | integration_test.rs | dead imports (`WindowInfo`, `InputStats`) | ⏳ |
 | C-6 | integration_test.rs | 테스트 커버리지 부족 (1개) | ⏳ |
-| C-9 | package.json | `msw` devDeps + 설정 잔존 (Phase 4에서 코드 삭제되었으므로 제거 권장) | ⏳ |
+| C-9 | package.json | `msw` devDeps + 설정 잔존 (코드 삭제되었으므로 제거 권장) | ⏳ |
 
 ### 🟢 낮은 우선순위
 

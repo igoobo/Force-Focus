@@ -2,7 +2,7 @@
 
 > **범위**: `ai/mod.rs`, `ai/inference.rs`, `ai/model_update.rs`
 > **리뷰 일자**: 2026-03-21
-> **최종 업데이트**: 2026-04-12 (Phase 3 데드코드 제거, 세부 구현 문서화)
+> **최종 업데이트**: 2026-04-25 (inference.rs 줄 수 갱신)
 
 ---
 
@@ -34,8 +34,6 @@ flowchart LR
     API --> MU -->|"Hot-Swap"| IE
 ```
 
-> ⚠️ Phase 3(커밋 `fe89e11`)에서 `feature.rs`가 삭제되었습니다. 피처 계산은 `core/app.rs`의 `start_core_loop()` 내부에서 인라인으로 수행됩니다.
-
 **ML 벡터 6차원 구성:**
 
 | Index | Feature | 계산 방식 | 범위 |
@@ -60,19 +58,19 @@ pub mod inference;
 pub mod model_update;
 ```
 
-✅ Phase 3에서 `feature` 모듈 제거됨. 현재 2개 모듈만 선언.
+✅ `feature` 모듈 제거됨. 현재 2개 모듈만 선언.
 
 ---
 
-### ~~2.2 `ai/feature.rs`~~ — ✅ 삭제됨 (Phase 3, 커밋 `fe89e11`)
+### ~~2.2 `ai/feature.rs`~~ — ✅ 삭제됨 (커밋 `fe89e11`)
 
-> 이 파일은 `AppCore::start_core_loop()`에서 동일한 피처 계산을 인라인으로 수행하여 **dead code**로 판명, Phase 3에서 삭제되었습니다.
+> 이 파일은 `AppCore::start_core_loop()`에서 동일한 피처 계산을 인라인으로 수행하여 **dead code**로 판명, 커밋 `fe89e11`에서 삭제되었습니다.
 > 삭제 전 불일치 내역: 모집단/표본 StdDev 수식, 윈도우 크기 (60 vs 12), interaction_gate 조건 분기.
 > 상세는 §4 "핵심 의사결정 기록" 참조.
 
 ---
 
-### 2.3 `ai/inference.rs` (174줄) — 💥 ONNX 추론 엔진
+### 2.3 `ai/inference.rs` (192줄) — 💥 ONNX 추론 엔진
 
 #### 핵심 구조
 
@@ -98,9 +96,9 @@ sequenceDiagram
     CL->>IE: infer(ml_vector, active_tokens)
     IE->>IE: session == None? → Early Return Error
 
-    IE->>CACHE: active_tokens 캐시 히트 확인
-    alt 캐시 히트
-        IE->>IE: input_vector[0] = 1.0 (context 강제 상향)
+    IE->>CACHE: cache_key = tokens.join(" ")
+    alt 캐시 히트 (Short-circuit)
+        IE-->>CL: return (100.0, Inlier) — ONNX 추론 생략
     end
 
     IE->>IE: Standard Scaling (mean/scale 적용)
@@ -140,10 +138,10 @@ scaled[i] = (raw[i] - scaler.mean[i]) / scaler.scale[i]
 | 5. 추론 | `session.run(inputs!["float_input" => tensor])` |
 | 6. 출력 | `outputs["scores"].try_extract_tensor::<f32>()` → `scores[0]` |
 
-#### Local Cache 피드백 메커니즘 (L127-166)
+#### Local Cache 피드백 메커니즘 (L127-161)
 
-사용자가 "나 일하는 중이야" 피드백을 주면, 해당 앱의 토큰을 캐시에 등록하여
-**같은 앱을 사용할 때 일정 시간 동안 False Positive를 방지**합니다.
+사용자가 "나 일하는 중이야" 피드백을 주면, **현재 평가 대상 앱의 토큰 조합**을 캐시에 등록하여
+**같은 앱을 사용할 때 일정 시간 동안 ONNX 추론을 건너뛰고 즉시 Inlier로 판정**합니다.
 
 ```mermaid
 sequenceDiagram
@@ -154,25 +152,25 @@ sequenceDiagram
 
     U->>FE: "이건 업무야" 버튼 클릭
     FE->>BE: invoke("submit_feedback", "is_work")
-    BE->>IE: update_local_cache("youtube", 24)
-    Note over IE: local_cache["youtube"] = now + 24h
+    BE->>BE: cache_key = app.last_evaluated_tokens.clone()
+    BE->>IE: update_local_cache("youtube lecture", 4)
+    Note over IE: local_cache["youtube lecture"] = now + 4h
 
     Note over IE: ...다음 추론 시...
     IE->>IE: infer([0.1, ...], ["youtube", "lecture"])
-    IE->>IE: cache hit! "youtube" 발견
-    IE->>IE: input_vector[0] = 1.0 (강제 상향)
-    Note over IE: context_score가 0.1→1.0으로 변경되어
-    Note over IE: Inlier 판정 유도
+    IE->>IE: cache_key = tokens.join(" ") → "youtube lecture"
+    IE->>IE: cache hit! Short-circuit!
+    IE-->>IE: return (100.0, Inlier) — ONNX 추론 생략
 ```
 
 | 항목 | 구현 |
 |------|------|
-| **캐시 키** | 앱 토큰 (e.g. `"youtube"`, `"figma"`) |
+| **캐시 키** | `active_tokens.join(" ")` — 토큰 전체를 공백으로 합친 문자열 (e.g. `"youtube lecture"`) |
 | **캐시 값** | `Instant` (TTL 만료 시간) |
-| **기본 TTL** | 24시간 |
-| **히트 시 동작** | `input_vector[0] = 1.0` (context_score 강제 만점) |
-| **만료 처리** | Lazy Deletion — 만료된 캐시는 조회 시 무시 (borrow checker 제약) |
-| **제한** | 토큰 중 **하나라도** 히트하면 Trusted로 간주 |
+| **기본 TTL** | 4시간 (`session.rs:63` — `update_local_cache(cache_key, 4)`) |
+| **히트 시 동작** | **ONNX 추론 전체 건너뛰기** — `return Ok((100.0, InferenceResult::Inlier))` (Short-circuit) |
+| **만료 처리** | 조회 시 만료 확인 → 히트 무시 (Lazy) |
+| **매칭 규칙** | 토큰 조합 문자열이 **정확히 일치**해야 히트 (부분 매칭 불가) |
 
 #### ONNX 세션 Lifecycle — Unload/Load/Reload (L78-122)
 

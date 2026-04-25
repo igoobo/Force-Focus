@@ -1,8 +1,8 @@
 # ML 파이프라인 — 훈련부터 추론까지
 
 > **범위**: 서버 학습 (`backend/ml/train.py`) → 모델 배포 → 클라이언트 추론 (`ai/inference.rs`, `core/app.rs`, `core/state.rs`)
-> **작성일**: 2026-04-12 
-> **최종 업데이트**: 2026-04-19 
+> **작성일**: 2026-04-12 (원본 ML_models.md)
+> **최종 업데이트**: 2026-04-25 (코드 대조 완료, 전면 재작성)
 
 ---
 
@@ -67,6 +67,7 @@ flowchart TB
 2. 소문자 변환
 3. 비영숫자 문자로 분할 (space, dot, dash 등)
 4. 빈 토큰 제거
+5. 중복 제거 (순서 유지, 최초 출현만 보존)
   ↓
 출력: ["visual", "studio", "code", "project", "main", "rs"]
 ```
@@ -225,7 +226,7 @@ sequenceDiagram
 
 ---
 
-## 6. 클라이언트 추론 (`ai/inference.rs`)
+## 6. 클라이언트 추론 (`ai/inference.rs` — 163줄)
 
 ### 6.1 추론 파이프라인
 
@@ -262,19 +263,17 @@ for i in 0..6 {
 | `-0.5 < score ≤ 0.0` | **WeakOutlier** | 애매한 이탈 | +0.5 (지연 축적) |
 | `score ≤ -0.5` | **StrongOutlier** | 확정적 이탈 | +1.0 (실시간 축적) |
 
-> 임계값 -0.5는 Isolation Forest/SVM의 decision score 분포에서 도출.
-
-### 6.4 Local Cache 피드백 메커니즘 (`inference.rs:127-166`)
+### 6.4 Local Cache 피드백 메커니즘 (`inference.rs:127-161`)
 
 | 항목 | 구현 |
 |------|------|
 | **트리거** | 사용자 "이건 업무야" 버튼 → `submit_feedback("is_work")` |
-| **캐시 키** | 앱 토큰 (e.g. `"youtube"`, `"figma"`) |
+| **캐시 키** | `active_tokens.join(" ")` — 토큰 전체를 공백으로 합친 문자열 (e.g. `"youtube lecture"`) |
 | **캐시 값** | `Instant` (TTL 만료 시간) |
-| **기본 TTL** | 24시간 |
-| **히트 시 동작** | `input_vector[0] = 1.0` (context_score 강제 만점) |
-| **만료 처리** | Lazy Deletion — 만료된 캐시는 조회 시 무시 |
-| **매칭 규칙** | 토큰 중 **하나라도** 히트하면 Trusted로 간주 |
+| **기본 TTL** | 4시간 |
+| **히트 시 동작** | **ONNX 추론 전체 건너뛰기** — `return Ok((100.0, Inlier))` (Short-circuit) |
+| **만료 처리** | 조회 시 만료 확인 → 히트 무시 (Lazy) |
+| **매칭 규칙** | 토큰 조합 문자열이 **정확히 일치**해야 히트 (부분 매칭 불가) |
 
 ---
 
@@ -327,7 +326,7 @@ stateDiagram-v2
 |------|------|-----|
 | DoNothing (오버레이 숨김) | Gauge ≤ 0 **OR** FOCUS 상태 | — |
 | TriggerNotification | DRIFT + Snooze 만료 | 붉은 테두리 (클릭 통과) |
-| TriggerOverlay | DISTRACTED + Snooze 만료 | 전체 화면 차단 |
+| TriggerOverlay | DISTRACTED + Snooze 만료 | 전체 화면 차단 + **작업 복귀 버튼** |
 
 ---
 
@@ -368,7 +367,7 @@ flowchart TB
 |------|------|------|
 | **수집** | 5초 | Core Loop에서 감지 + 벡터 생성 + LSN 캐싱 |
 | **추론** | 5초 | ONNX 추론 → FSM 전이 → 개입 |
-| **피드백** (단기) | 즉시 | Local Cache → 24h 동안 동일 앱 Inlier 유도 |
+| **피드백** (단기) | 즉시 | Local Cache → 4h 동안 동일 앱 Inlier 유도 |
 | **피드백** (중기) | 60초 | Up-Sync로 서버에 이벤트+피드백 전송 |
 | **학습** | 피드백 수신 시 | 서버에서 OneClassSVM 재학습 (50개 이상) |
 | **배포** | 1시간 | `model_update.rs`에서 최신 모델 확인 + Hot-Swap |

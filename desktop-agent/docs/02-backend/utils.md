@@ -56,7 +56,7 @@ pub mod logging;
 
 ### 2.2 `utils/api.rs` (194줄) — 순수 네트워크 코어
 
-> Phase 3에서 `backend_comm.rs`의 HTTP 클라이언트 + DTO를 분리한 파일.
+> `backend_comm.rs`의 HTTP 클라이언트 + DTO를 분리한 파일.
 > Tauri 커맨드 핸들러(`#[command]`)는 포함하지 않음 — 순수 네트워크 계층.
 
 #### 구조 요약
@@ -96,7 +96,7 @@ pub mod logging;
 
 ### 2.3 분리된 커맨드 모듈 (`commands/auth.rs`, `session.rs`, `task.rs`)
 
-> Phase 3에서 `backend_comm.rs`의 10개 Tauri 커맨드 중 8개가 `commands/` 모듈로 분리.
+> `backend_comm.rs`의 10개 Tauri 커맨드 중 8개가 `commands/` 모듈로 분리.
 
 | 파일 | 커맨드 | 역할 |
 |------|--------|------|

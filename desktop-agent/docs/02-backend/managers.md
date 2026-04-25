@@ -73,7 +73,7 @@ graph TB
 | **✅ 에러** | L418 `SystemTime::now().duration_since(UNIX_EPOCH).unwrap()` — **FIXED** (c7c6741): `unwrap_or_default()` |
 | **🟢 동시성** | 내부 `Mutex<Connection>` — 각 메서드에서 `self.conn.lock().map_err()?`로 안전하게 접근 ✅ |
 | **🟢 트랜잭션** | `delete_events_by_ids`, `delete_feedbacks_by_ids`, `sync_schedules`, `sync_tasks` — 트랜잭션 사용 ✅ |
-| **✅ 보안** | `auth_token` 보안: XOR Obfuscation 계층 적용됨 (Phase 2에서 FIXED). 아래 상세 참조 |
+| **✅ 보안** | `auth_token` 보안: XOR Obfuscation 계층 적용됨 (FIXED). 아래 상세 참조 |
 | **🟢 마이그레이션** | L188 `ALTER TABLE schedules ADD COLUMN start_date` — 실패 시 무시(`let _ =`). 기존 DB 호환성 ✅ |
 | **🟢 테스트** | 3개 테스트 (session CRUD, cache_event) ✅. 인메모리 DB 사용 |
 
@@ -213,7 +213,7 @@ flowchart TB
 | # | 파일 | 이슈 | 상태 |
 |---|------|------|------|
 | M-6 | schedule.rs | 159-162 `unwrap()` 시간 패닉 | ✅ FIXED (c7c6741) |
-| M-7 | storage.rs | auth_token 평문 저장 → XOR Obfuscation 적용 | ✅ FIXED (Phase 2) |
+| M-7 | storage.rs | auth_token 평문 저장 → XOR Obfuscation 적용 | ✅ FIXED |
 | M-8 | tray.rs | L25 `default_window_icon().unwrap()` | ✅ FIXED |
 | M-9 | widget.rs | 모니터 감지 실패 시 기본값 문제 | ✅ FIXED |
 

@@ -2,7 +2,7 @@
 
 > **범위**: `src/` 디렉토리 전체 (React 18 / TypeScript)
 > **리뷰 일자**: 2026-03-21
-> **최종 업데이트**: 2026-04-19 (Phase 4 MSW 제거 + 스타일 분리 반영)
+> **최종 업데이트**: 2026-04-19 (MSW 제거 + 스타일 분리 반영)
 
 ---
 
@@ -49,7 +49,7 @@ graph TB
     SETTINGS --> SS
 ```
 
-> ✅ Phase 4에서 MSW 프로토타입(`api/index.ts`, `mocks/`, `MainView/index.tsx` + 4개 서브컴포넌트)이 모두 삭제되었습니다.
+> ✅ MSW 프로토타입(`api/index.ts`, `mocks/`, `MainView/index.tsx` + 4개 서브컴포넌트)이 모두 삭제되었습니다.
 > 현재 **모든 View가 Tauri `invoke`/`listen` 기반**으로 통일되어 있습니다.
 
 ### 멀티 윈도우 아키텍처
@@ -74,7 +74,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 );
 ```
 
-✅ Phase 4에서 MSW 주석 코드(33줄) 제거됨. 깔끔한 상태.
+✅ MSW 주석 코드(33줄) 제거됨. 깔끔한 상태.
 
 ---
 
@@ -129,7 +129,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 | `ActiveSessionInfo` | `lib.rs::ActiveSessionInfo` | ✅ |
 | `Schedule` | down-sync 스케줄 | ✅ `days_of_week: number[]` (0-based 통일됨) |
 
-> Phase 4에서 MSW 전용 `User`, `Profile`, `Session` 타입 삭제. F-6 수정 완료.
+> MSW 전용 `User`, `Profile`, `Session` 타입 삭제. F-6 수정 완료.
 
 ---
 
@@ -146,7 +146,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 
 ### 2.8 `components/MainView.tsx` (247줄) — 메인 대시보드
 
-> Phase 4에서 MSW 기반 `MainView/index.tsx` + 4개 서브컴포넌트를 **삭제**하고 Tauri `invoke` 기반으로 완전 재작성.
+> MSW 기반 `MainView/index.tsx` + 4개 서브컴포넌트를 **삭제**하고 Tauri `invoke` 기반으로 완전 재작성.
 
 | 카테고리 | 분석 |
 |----------|------|
@@ -165,13 +165,14 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 
 ---
 
-### 2.10 `components/InterventionOverlay.tsx` (121줄) — 개입 오버레이
+### 2.10 `components/InterventionOverlay.tsx` (142줄) — 개입 오버레이
 
 | 카테고리 | 분석 |
 |----------|------|
 | **🟢 설계** | `notification` → 붉은 테두리 (클릭 통과), `blocking` → 전체 화면 차단. 2단계 개입 ✅ |
 | **🟢 에러** | `invoke` 실패 시 `catch` + `finally`로 오버레이 무조건 닫기 (Fail-Safe) ✅ |
 | **🟢 UX** | `pointerEvents: 'none'` (notification), `'auto'` (blocking) 분기 ✅ |
+| **🟢 신규** | **"작업 복귀" 버튼 추가** — `invoke('restore_workspace')` 호출. Workspace Snapshot 기반 창 배치 복구 ✅ |
 
 ---
 
@@ -192,7 +193,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 | `MainView.styles.ts` | 155 | CSS-in-JS 객체. 인라인 스타일 → 객체 분리 |
 | `SettingsView.styles.ts` | 158 | CSS-in-JS 객체. 설정 화면 레이아웃 |
 
-> Phase 4에서 Tailwind 의존성을 제거하고 CSS-in-JS 패턴으로 전환하여 스타일 전략을 통일했습니다.
+> Tailwind 의존성을 제거하고 CSS-in-JS 패턴으로 전환하여 스타일 전략을 통일했습니다.
 
 ---
 
@@ -230,20 +231,20 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 
 ## 4. 핵심 의사결정 기록
 
-### MSW 프로토타입 완전 제거 (Phase 4)
+### MSW 프로토타입 완전 제거
 
 | 항목 | 내용 |
 |------|------|
 | **기존** | 초기 프로토타입에서 MSW(Mock Service Worker)를 사용하여 `fetch` 기반 API로 프론트엔드를 개발 |
-| **변경** | Phase 4에서 MSW 관련 파일(`api/`, `mocks/`, `MainView/index.tsx`, 4개 서브컴포넌트) 전체 삭제 |
+| **변경** | MSW 관련 파일(`api/`, `mocks/`, `MainView/index.tsx`, 4개 서브컴포넌트) 전체 삭제 |
 | **결과** | 모든 View가 Tauri `invoke`/`listen` 기반으로 통일. Tailwind 의존성도 제거 |
 
-### 스타일 전략 통일 (Phase 4)
+### 스타일 전략 통일
 
 | 항목 | 내용 |
 |------|------|
 | **기존** | LoginView/SettingsView = 인라인 스타일, MainView 서브컴포넌트 = Tailwind CSS. **혼재** |
-| **변경** | Phase 4에서 CSS-in-JS 패턴(`*.styles.ts`)으로 통일. `React.CSSProperties` 객체 사용 |
+| **변경** | CSS-in-JS 패턴(`*.styles.ts`)으로 통일. `React.CSSProperties` 객체 사용 |
 | **예외** | `widget_main.tsx`는 아직 인라인 스타일 직접 사용 (styles 파일 미분리) |
 
 ### 멀티 윈도우 진입점 분리

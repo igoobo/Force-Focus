@@ -2,6 +2,7 @@
 
 > **범위**: `main.rs`, `lib.rs`, `core/mod.rs`, `core/app.rs`, `core/state.rs`, `core/input.rs`
 > **리뷰 일자**: 2026-03-21
+> **최종 업데이트**: 2026-04-25 (Workspace Snapshot 기능 반영, 줄 수 갱신)
 
 ---
 
@@ -13,7 +14,7 @@ graph TB
         MAIN["main.rs<br/>(7줄)"]
     end
 
-    subgraph "앱 초기화 — lib.rs (325줄)"
+    subgraph "앱 초기화 — lib.rs (270줄)"
         RUN["run()<br/>플러그인 등록 + 상태 등록 + setup"]
         DL["handle_deep_link()<br/>OAuth 콜백 처리"]
         SETUP_ML["setup_ml_engine()"]
@@ -23,9 +24,9 @@ graph TB
     end
 
     subgraph "Core 모듈"
-        APP["core/app.rs (469줄)<br/>AppCore + start_core_loop"]
-        STATE["core/state.rs (315줄)<br/>StateEngine (FSM)"]
-        INPUT["core/input.rs (51줄)<br/>rdev 입력 리스너"]
+        APP["core/app.rs (449줄)<br/>AppCore + start_core_loop"]
+        STATE["core/state.rs (271줄)<br/>StateEngine (FSM)"]
+        INPUT["core/input.rs (49줄)<br/>rdev 입력 리스너"]
     end
 
     MAIN -->|"desktop_agent_lib::run()"| RUN
@@ -63,7 +64,7 @@ fn main() {
 
 ---
 
-### 2.2 `lib.rs` (269줄) — 앱 초기화 & 등록 허브
+### 2.2 `lib.rs` (270줄) — 앱 초기화 & 등록 허브
 
 #### 2.2.1 전역 상태 타입 정의 (L23-68)
 
@@ -79,7 +80,7 @@ pub type SessionStateArcMutex = Arc<Mutex<Option<ActiveSessionInfo>>>; // 세션
 |------|------|
 | **패턴** | 모든 공유 상태가 `Arc<Mutex<T>>` 래퍼. Tauri의 `.manage()` 시스템과 통합 |
 | **메모리 안정성** | ✅ Arc(참조 카운팅) + Mutex(상호 배제)로 스레드 안전 |
-| **⚠️ 발견 1** | `SysinfoState`는 일반 `Mutex`(Arc 없음)인 반면, 나머지는 `Arc<Mutex<T>>`. Tauri의 `.manage()`가 내부적으로 `Arc`로 감싸주므로 동작은 하지만, 일관성이 없음. Phase 3에서 `commands/system.rs`로 단일화됨 |
+| **⚠️ 발견 1** | `SysinfoState`는 일반 `Mutex`(Arc 없음)인 반면, 나머지는 `Arc<Mutex<T>>`. Tauri의 `.manage()`가 내부적으로 `Arc`로 감싸주므로 동작은 하지만, 일관성이 없음. `commands/system.rs`로 단일화됨 |
 | **⚠️ 발견 2** | `StateEngineArcMutex` 타입이 정의되어 있지만, 실제로는 `lib.rs`에서 `state_engine_manager_state`로 생성하고 `.manage()`에 등록한 뒤 **어디서도 사용하지 않음**. `AppCore` 내부에 별도의 `StateEngine`이 존재 (중복) |
 
 #### 2.2.2 데이터 모델 (L25-53)
@@ -139,12 +140,12 @@ sequenceDiagram
    5-3. handle_app_startup()   — --silent 인자 체크
    5-4. deep_link.on_open_url()
    5-5. start_background_services() — 코어 루프 + 트레이 + 위젯 + 동기화
-6. invoke_handler: 16개 Tauri 커맨드 등록 (Phase 3에서 auth/session/task 분리 반영)
+6. invoke_handler: 16개 Tauri 커맨드 등록 (auth/session/task 분리 반영)
 ```
 
 | 항목 | 분석 |
 |------|------|
-| **⚠️ 발견 6** | `commands::system::SysinfoState` 경로 사용. Phase 3에서 `SysinfoState`를 `commands/system.rs`로 단일화하여 해결됨 |
+| **⚠️ 발견 6** | `commands::system::SysinfoState` 경로 사용. `SysinfoState`를 `commands/system.rs`로 단일화하여 해결됨 |
 | **⚠️ 발견 7** | L214 `.expect("error while running tauri application")` — 앱 실행 실패 시 패닉. 이는 Tauri 표준 패턴이지만, 에러 메시지가 불친절. 최소한 에러 내용을 포함시켜야 함 |
 | **동시성** | L135-137에서 `Arc::new(Mutex::new(...))` 으로 상태 생성 후, `.manage()` + `setup` 클로저에서 사용. 소유권 이동이 명확함 ✅ |
 
@@ -196,7 +197,7 @@ pub mod input;
 
 ---
 
-### 2.4 `core/app.rs` (425줄) — AppCore + 메인 루프
+### 2.4 `core/app.rs` (449줄) — AppCore + 메인 루프
 
 #### 2.4.1 AppCore 구조체 (L22-43)
 
@@ -209,6 +210,9 @@ pub struct AppCore {
     pub current_event_id: Option<String>,          // 피드백 연결용
     pub global_map: HashMap<String, f64>,          // 글로벌 맵 캐시
     pub delta_history: VecDeque<f64>,              // X_burstiness 계산용 (12틱)
+    pub previous_state: FSMState,                  // 전이 감지용 이전 FSM 상태
+    pub last_snapshot: Option<WorkspaceSnapshot>,  // FOCUS 진입 시 작업 공간 스냅샷
+    pub last_evaluated_tokens: String,             // 최근 평가 대상 창 토큰 (오버레이 PID 문제 해결용)
 }
 ```
 
@@ -264,7 +268,10 @@ graph TB
         CHECK_5S -- "No" --> UNLOCK_IS
         
         UNLOCK_IS --> FSM_PROC[StateEngine: 상태 갱신 및 개입 결정]
-        FSM_PROC --> FSM_ACTION{개입 트리거?}
+        FSM_PROC --> SNAP_CHK{"상태 전이 감지<br/>FOCUS 진입?"}
+        SNAP_CHK -- "Yes" --> SNAP_CAP["WorkspaceSnapshot 캐철<br/>(vision.rs 내부 호출)"]
+        SNAP_CHK -- "No" --> FSM_ACTION
+        SNAP_CAP --> FSM_ACTION{개입 트리거?}
         
         %% 개입 액션
         FSM_ACTION -- "TriggerNotification" --> OVL_NOTIFY[오버레이 표시: Click-through]
@@ -316,7 +323,7 @@ let should_hide = gauge_ratio <= 0.0
 | `gauge_ratio <= 0.0` | 게이지 완전 회복 → 오버레이 숨김 |
 | `state == FOCUS` | FOCUS 상태(gauge < 30) → 오버레이 숨김 |
 | **데드락 방지** | `commands::window::hide_overlay()` 대신 직접 `window.hide()` 호출 (해당 함수는 AppCore lock을 다시 시도하므로 교착상태 발생) |
-| **게이지 보존** | `manual_reset()` 륬호출 — 자연 회복 시 게이지를 0으로 초기화하지 않음 |
+| **게이지 보존** | `manual_reset()` 를 호출 — 자연 회복 시 게이지를 0으로 초기화하지 않음 |
 
 #### 2.4.5 `raw_json` 학습용 데이터 (L328-333)
 
@@ -449,7 +456,7 @@ pub fn start_input_listener(input_stats_arc_mutex: InputStatsArcMutex) {
 |---|------|------|------|
 | 1 | lib.rs | `SysinfoState` Arc 패턴 불일관 | ⏳ |
 | 3, 4 | lib.rs | `Task`, `LoggableEventData` dead code 가능성 | ⏳ |
-| 6 | lib.rs | `commands::system::SysinfoState` 경로 혼란 | ✅ FIXED (Phase 3: 단일화) |
+| 6 | lib.rs | `commands::system::SysinfoState` 경로 혼란 | ✅ FIXED (단일화) |
 | 12 | lib.rs | `greet()` 템플릿 코드 잔류 | ✅ FIXED (6ecccc6) |
 | 13 | app.rs | 모든 필드 `pub` 노출 | ⏳ |
 | 14 | app.rs | `create_dir_all().unwrap()` 패닉 | ✅ FIXED (6ecccc6) |
