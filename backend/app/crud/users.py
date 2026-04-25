@@ -34,7 +34,6 @@ def _safe_object_id(user_id: Union[str, ObjectId]) -> Optional[ObjectId]:
     if isinstance(user_id, ObjectId):
         return user_id
 
-    # ✅ 공백 방지 안전망
     if isinstance(user_id, str):
         user_id = user_id.strip()
 
@@ -47,24 +46,20 @@ def _safe_object_id(user_id: Union[str, ObjectId]) -> Optional[ObjectId]:
 def _id_filter(user_id: Union[str, ObjectId]) -> Dict[str, Any]:
     """
     users 컬렉션의 _id 타입이 ObjectId / string 혼재된 상황을 모두 커버하는 필터.
-    - ObjectId로 변환 가능하면: ObjectId / string 둘 다 매칭
-    - 변환 불가하면: string 매칭
+    현재는 과거 데이터 호환을 위해 유지하되,
+    외부 계약상 user id는 ObjectId hex 문자열을 기준으로 사용한다.
     """
-    # ✅ 공백 방지(문자열 _id로 들어오는 케이스)
     if isinstance(user_id, str):
         user_id = user_id.strip()
 
     oid = _safe_object_id(user_id)
 
-    # user_id가 문자열이고 ObjectId 변환도 가능하면(24 hex), 둘 다 조회/업데이트
     if isinstance(user_id, str) and oid is not None:
         return {"$or": [{"_id": oid}, {"_id": user_id}]}
 
-    # 이미 ObjectId면 그대로
     if oid is not None:
         return {"_id": oid}
 
-    # 나머지는 문자열 _id로 취급
     return {"_id": user_id}
 
 
@@ -72,22 +67,17 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-# ---------- READ ----------
-
 async def get_user_by_id(user_id: Union[str, ObjectId]) -> Optional[UserInDB]:
     user = await get_users_collection().find_one(_id_filter(user_id))
     return UserInDB(**user) if user else None
 
 
 async def get_user_by_google_id(google_id: str) -> Optional[UserInDB]:
-    # ✅ 공백 방지
     google_id = _strip_or_none(google_id) or google_id
 
     user = await get_users_collection().find_one({"google_id": google_id})
     return UserInDB(**user) if user else None
 
-
-# ---------- CREATE ----------
 
 async def create_user(
     *,
@@ -97,7 +87,6 @@ async def create_user(
 ) -> UserInDB:
     now = _now()
 
-    # ✅ 공백 방지(서버 방어)
     email = _strip_or_none(email) or email
     google_id = _strip_or_none(google_id) or google_id
 
@@ -116,12 +105,10 @@ async def create_user(
     return UserInDB(**user_data)
 
 
-# ---------- UPDATE ----------
-
 async def update_last_login(user_id: Union[str, ObjectId]) -> Optional[UserInDB]:
     result = await get_users_collection().update_one(
         _id_filter(user_id),
-        {"$set": {"last_login_at": _now()}}
+        {"$set": {"last_login_at": _now()}},
     )
     if result.matched_count == 0:
         return None
@@ -129,21 +116,24 @@ async def update_last_login(user_id: Union[str, ObjectId]) -> Optional[UserInDB]
     return await get_user_by_id(user_id)
 
 
-async def update_settings(user_id: Union[str, ObjectId], settings: Dict[str, Any]) -> Optional[UserInDB]:
-    # settings가 비어 있어도 legacy 키 청소는 수행할 수 있게 구성
+async def update_settings(
+    user_id: Union[str, ObjectId],
+    settings: Dict[str, Any],
+) -> Optional[UserInDB]:
     update_doc: Dict[str, Any] = {
-        "$unset": {"settings.daily_goal_min": ""}  # legacy key cleanup
+        "$unset": {"settings.daily_goal_min": ""}
     }
 
     if settings:
-        # ✅ settings key가 공백/빈 문자열이면 무시 (프리폼 dict 방어)
         safe_items = {}
         for k, v in settings.items():
             if not isinstance(k, str):
                 continue
+
             kk = k.strip()
             if kk == "":
                 continue
+
             safe_items[kk] = v
 
         if safe_items:
@@ -164,7 +154,7 @@ async def add_fcm_token(user_id: Union[str, ObjectId], token: str) -> Optional[U
 
     result = await get_users_collection().update_one(
         _id_filter(user_id),
-        {"$addToSet": {"fcm_tokens": token}}
+        {"$addToSet": {"fcm_tokens": token}},
     )
     if result.matched_count == 0:
         return None
@@ -172,12 +162,18 @@ async def add_fcm_token(user_id: Union[str, ObjectId], token: str) -> Optional[U
     return await get_user_by_id(user_id)
 
 
-async def remove_fcm_token(user_id: Union[str, ObjectId], token: Optional[str] = None) -> Optional[UserInDB]:
+async def remove_fcm_token(
+    user_id: Union[str, ObjectId],
+    token: str,
+) -> Optional[UserInDB]:
     token = _strip_or_none(token)
+    if not token:
+        return None
 
-    update = {"$pull": {"fcm_tokens": token}} if token else {"$set": {"fcm_tokens": []}}
-    result = await get_users_collection().update_one(_id_filter(user_id), update)
-
+    result = await get_users_collection().update_one(
+        _id_filter(user_id),
+        {"$pull": {"fcm_tokens": token}},
+    )
     if result.matched_count == 0:
         return None
 
@@ -189,7 +185,7 @@ async def add_blocked_app(user_id: Union[str, ObjectId], app_name: str) -> Optio
 
     result = await get_users_collection().update_one(
         _id_filter(user_id),
-        {"$addToSet": {"blocked_apps": app_name}}
+        {"$addToSet": {"blocked_apps": app_name}},
     )
     if result.matched_count == 0:
         return None
@@ -202,23 +198,19 @@ async def remove_blocked_app(user_id: Union[str, ObjectId], app_name: str) -> Op
 
     result = await get_users_collection().update_one(
         _id_filter(user_id),
-        {"$pull": {"blocked_apps": app_name}}
+        {"$pull": {"blocked_apps": app_name}},
     )
     if result.matched_count == 0:
         return None
 
     return await get_user_by_id(user_id)
 
+
 async def delete_user(user_id: Union[str, ObjectId]) -> bool:
     """
     ID를 기반으로 사용자를 컬렉션에서 영구 삭제합니다.
-    _id_filter를 사용하여 문자열/ObjectId 혼재 상황을 처리합니다.
+    삭제 계열 함수이므로 성공 여부(bool)를 반환합니다.
     """
-    # 공백 방지 및 필터 생성
     user_filter = _id_filter(user_id)
-    
-    # delete_one 실행
     result = await get_users_collection().delete_one(user_filter)
-    
-    # 삭제된 문서가 1개 이상이면 True 반환
     return result.deleted_count > 0
