@@ -4,6 +4,7 @@ from typing import Annotated, Any
 from bson import ObjectId
 from pydantic import PlainSerializer, BeforeValidator
 
+
 def _to_object_id(v: Any) -> ObjectId:
     """
     DB/요청 등에서 들어오는 _id 값을 ObjectId로 정규화.
@@ -17,8 +18,9 @@ def _to_object_id(v: Any) -> ObjectId:
         return ObjectId(v)
     raise TypeError("Invalid ObjectId")
 
+
 PyObjectId = Annotated[
     ObjectId,
-    BeforeValidator(_to_object_id),                      # ✅ str -> ObjectId
-    PlainSerializer(lambda x: str(x), return_type=str),  # ✅ ObjectId -> str
+    BeforeValidator(_to_object_id),
+    PlainSerializer(lambda x: str(x), return_type=str),
 ]
