@@ -10,8 +10,8 @@ from bson import ObjectId
 class EventInDB(BaseModel):
     """
     MongoDB의 'events' 컬렉션에 저장되는 완전한 형태의 데이터 모델입니다.
-    - 데스크탑 배치 업로드 호환: _id 를 uuid 문자열로 저장
-    - 혹시 기존 데이터가 ObjectId여도 읽을 때 str로 변환
+    - events._id 는 UUID 문자열을 사용합니다.
+    - 혹시 기존 데이터가 ObjectId여도 읽을 때 str로 변환합니다.
     """
     id: str = Field(..., alias="_id")
     user_id: str
@@ -34,4 +34,3 @@ class EventInDB(BaseModel):
         "arbitrary_types_allowed": True,
         "from_attributes": True,
     }
-
