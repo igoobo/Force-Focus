@@ -1,7 +1,7 @@
 # backend/app/api/endpoints/web/sessions.py
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 from app.api.deps import get_current_user_id
 from app.schemas.session import SessionCreate, SessionUpdate, SessionRead
@@ -20,7 +20,7 @@ async def start_session(
 
 @router.get("/", response_model=List[SessionRead])
 async def read_sessions(
-    status: Optional[str] = None,
+    status: Optional[Literal["active", "completed", "cancelled"]] = None,
     limit: int = 50,
     user_id: str = Depends(get_current_user_id),
 ):
@@ -42,13 +42,9 @@ async def read_session(
     session_id: str,
     user_id: str = Depends(get_current_user_id),
 ):
-    session = await session_crud.get_session(session_id)
+    session = await session_crud.get_session(user_id, session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-
-    if session.user_id != user_id:
-        raise HTTPException(status_code=403, detail="Forbidden")
-
     return session
 
 
