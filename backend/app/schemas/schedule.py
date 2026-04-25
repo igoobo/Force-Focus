@@ -1,20 +1,15 @@
 # backend/app/schemas/schedule.py
 
-from pydantic import BaseModel, Field
 from datetime import datetime, time, date
 from typing import Optional, Annotated
 
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
 
-# --- 타입 별칭 (Pylance 경고 제거 + 검증 규칙 유지) ---
 DayOfWeek = Annotated[int, Field(ge=0, le=6)]
 DaysOfWeekCreate = Annotated[list[DayOfWeek], Field(min_length=1)]
-DaysOfWeekUpdate = list[DayOfWeek]
+DaysOfWeekUpdate = Annotated[list[DayOfWeek], Field(min_length=1)]
 
 
-# -------------------------
-# 공백 방지 공통 유틸
-# -------------------------
 def _strip_and_reject_blank(v: str, field_name: str) -> str:
     """
     문자열 양쪽 공백 제거 후,
@@ -45,33 +40,24 @@ def _strip_to_none(v):
     return s or None
 
 
-# --- API 요청(Request) 스키마 ---
-
 class ScheduleCreate(BaseModel):
     """
     [요청] POST /schedules
-    새로운 집중 세션 스케줄을 생성할 때 클라이언트가 보내는 데이터 구조입니다.
+
+    클라이언트 입력 형식:
+    - start_time, end_time: HH:MM[:SS]
+    - start_date, end_date: YYYY-MM-DD
     """
-    # ✅ 공통 strip 적용
     model_config = ConfigDict(str_strip_whitespace=True)
 
     task_id: Optional[str] = None
     name: str
-
-    # ✅ 추가: yyyy-mm-dd
     start_date: Optional[date] = None
     end_date: Optional[date] = None
-
     start_time: time
     end_time: time
-
-    # ✅ 추가: 설명(충분히 긴 문자열 가능)
     description: Optional[str] = None
-
-    # 리스트 내부 요소는 0~6, 최소 1개 이상
     days_of_week: DaysOfWeekCreate
-    # [New] 특정 날짜 실행을 위한 필드 (Optional)
-    start_date: Optional[date] = None
 
     @field_validator("name")
     @classmethod
@@ -81,37 +67,45 @@ class ScheduleCreate(BaseModel):
     @field_validator("task_id", mode="before")
     @classmethod
     def validate_task_id(cls, v):
-        # Optional[str]는 "   " -> None으로 정규화
         return _strip_to_none(v)
 
     @field_validator("description", mode="before")
     @classmethod
     def validate_description(cls, v):
-        # Optional[str]는 "   " -> None으로 정규화
         return _strip_to_none(v)
+
+    @model_validator(mode="after")
+    def validate_schedule_range(self):
+        if self.start_time >= self.end_time:
+            raise ValueError("start_time must be before end_time")
+
+        if self.start_date is not None and self.end_date is not None:
+            if self.start_date > self.end_date:
+                raise ValueError("start_date must be on or before end_date")
+
+        return self
 
 
 class ScheduleUpdate(BaseModel):
     """
     [요청] PUT /schedules/{schedule_id}
-    기존 스케줄 정보를 업데이트할 때 클라이언트가 보내는 데이터 구조입니다.
-    모든 필드는 선택 사항(Optional)입니다.
+
+    현재 구현에서는 선택 필드만 부분 업데이트하는 방식으로 동작합니다.
+
+    클라이언트 입력 형식:
+    - start_time, end_time: HH:MM[:SS]
+    - start_date, end_date: YYYY-MM-DD
     """
-    # ✅ 공통 strip 적용
     model_config = ConfigDict(str_strip_whitespace=True)
 
     task_id: Optional[str] = None
     name: Optional[str] = None
-
-    # ✅ 추가
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     description: Optional[str] = None
-
     start_time: Optional[time] = None
     end_time: Optional[time] = None
     days_of_week: Optional[DaysOfWeekUpdate] = None
-    start_date: Optional[date] = None
     is_active: Optional[bool] = None
 
     @field_validator("name", mode="before")
@@ -124,17 +118,25 @@ class ScheduleUpdate(BaseModel):
     @field_validator("task_id", mode="before")
     @classmethod
     def validate_task_id(cls, v):
-        # Optional[str]는 "   " -> None으로 정규화
         return _strip_to_none(v)
 
     @field_validator("description", mode="before")
     @classmethod
     def validate_description(cls, v):
-        # Optional[str]는 "   " -> None으로 정규화
         return _strip_to_none(v)
 
+    @model_validator(mode="after")
+    def validate_schedule_range(self):
+        if self.start_time is not None and self.end_time is not None:
+            if self.start_time >= self.end_time:
+                raise ValueError("start_time must be before end_time")
 
-# --- API 응답(Response) 스키마 ---
+        if self.start_date is not None and self.end_date is not None:
+            if self.start_date > self.end_date:
+                raise ValueError("start_date must be on or before end_date")
+
+        return self
+
 
 class ScheduleRead(BaseModel):
     """
@@ -145,16 +147,12 @@ class ScheduleRead(BaseModel):
     user_id: str
     task_id: Optional[str] = None
     name: str
-
-    # ✅ 추가
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     description: Optional[str] = None
-
     start_time: time
     end_time: time
     days_of_week: list[int]
-    start_date: Optional[date] = None # Return as date object (YYYY-MM-DD)
     created_at: datetime
     is_active: bool
 
