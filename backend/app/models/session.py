@@ -1,6 +1,6 @@
 # backend/app/models/session.py
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -15,6 +15,7 @@ class SessionInDB(BaseModel):
     """
     id: PyObjectId = Field(default_factory=ObjectId, alias="_id")
     user_id: str
+    client_session_id: Optional[str] = None
     task_id: Optional[str] = None
 
     # ML 모델 도입전 실험적 필드
@@ -26,7 +27,7 @@ class SessionInDB(BaseModel):
     # 세션 종료 후 계산 (초 단위)
     duration: Optional[float] = None
 
-    # active, completed, cancelled 등
+    # active, completed, cancelled
     status: str = "active"
 
     # 목표 집중 시간 (분 단위)
