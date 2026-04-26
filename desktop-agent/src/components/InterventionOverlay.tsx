@@ -59,6 +59,22 @@ const InterventionOverlay: React.FC = () => {
     }
   };
 
+  // 작업 공간 롤백 (Restore Workspace)
+  const handleRestoreClick = async () => {
+    try {
+      console.log("Restoring Workspace...");
+      await invoke('restore_workspace');
+      // 복구 작업도 딴짓을 중단하겠다는 의미이므로 피드백 전송
+      await invoke('submit_feedback', { 
+        feedbackType: "distraction_ignored" 
+      });
+    } catch (error) {
+      console.error('Restore logic failed:', error);
+    } finally {
+      await invoke('hide_overlay').catch(err => console.error("Hide failed:", err));
+    }
+  };
+
   // [UI 분기 1] Notification 모드 (경고 단계)
   // 마우스 클릭은 Rust가 OS 레벨에서 통과시키므로, 여기선 시각적 효과만 주면 됨
   if (mode === 'notification') {
@@ -113,13 +129,19 @@ const InterventionOverlay: React.FC = () => {
               padding: '12px 20px', cursor: 'pointer', borderRadius: '6px', border: 'none',
               backgroundColor: '#4a4a4a', color: 'white', fontSize: '14px'
             }}>
-              아니요, 업무 중입니다 (오류 신고)
+              오류 신고 (업무 중이었습니다)
+            </button>
+            <button onClick={handleRestoreClick} style={{ 
+              padding: '12px 20px', cursor: 'pointer', borderRadius: '6px', border: 'none',
+              backgroundColor: '#3b82f6', color: 'white', fontWeight: 'bold', fontSize: '14px'
+            }}>
+              이전 작업 공간 롤백 후 복귀
             </button>
             <button onClick={handleCloseClick} style={{ 
               padding: '12px 20px', cursor: 'pointer', borderRadius: '6px', border: 'none',
               backgroundColor: '#ff6b6b', color: 'white', fontWeight: 'bold', fontSize: '14px'
             }}>
-              업무 복귀하기
+              현재 창 남겨두고 바로 복귀
             </button>
         </div>
       </div>

@@ -1,62 +1,37 @@
 // 파일 위치: Force-Focus/desktop-agent/src/types/index.ts
+// 프론트엔드 ↔ Rust 백엔드 공유 타입 정의
 
-// handlers.ts의 Mock 데이터 구조를 기반으로 타입 정의
-
-export interface User {
-  id: string;
-  email: string;
-  username: string;
-  settings: {
-    notifications_enabled: boolean;
-    dark_mode: boolean;
-  };
-  blocked_apps: string[];
-}
-
+// Rust의 lib.rs Task 구조체와 일치
 export interface Task {
   id: string;
   user_id: string;
   task_name: string;
   description: string;
   due_date: string;
-  status: 'active' | 'completed' | 'pending';
-  target_executable: string | null;
+  status: string; // Rust 백엔드는 자유 String (F-6 수정: union type → string)
+  target_executable: string;
   target_arguments: string[];
   created_at: string;
   updated_at: string;
 }
 
+// Rust의 lib.rs ActiveSessionInfo와 일치
+export interface ActiveSessionInfo {
+  session_id: string;
+  task_id: string | null;
+  start_time_s: number;
+}
+
+// F-6: User, Profile, Session (MSW 전용) 삭제
+// F-6: Schedule.days_of_week 인덱스 불일치 해소 (0-based로 통일)
 export interface Schedule {
   id: string;
   user_id: string;
-  task_id: string;
+  task_id: string | null;
   name: string;
-  start_time: string; // "HH:MM"
-  end_time: string;   // "HH:MM"
-  days_of_week: number[]; // 1=월, 7=일
-  created_at: string;
+  start_time: string;
+  end_time: string;
+  days_of_week: number[]; // 0=월, 6=일 (Rust Vec<u8>과 일치)
+  start_date: string | null;
   is_active: boolean;
-}
-
-export interface Profile {
-  id: string;
-  user_id: string;
-  profile_name: string;
-  is_default: boolean;
-  model_type: string;
-  time_slices: Array<{ slice_index: number; rules: { [key: string]: number } }>;
-  model_confidence_score: number;
-  last_updated_at: string;
-  custom_thresholds: { [key: string]: number };
-}
-
-export interface Session {
-  id: string;
-  user_id: string;
-  profile_id: string;
-  start_time: string; // ISO string
-  status: 'active' | 'ended';
-  goal_duration: number; // 분 단위
-  interruption_count: number;
-  task_id?: string; // 세션과 연결된 task_id (handlers.ts의 mockCurrentSession에는 없지만 추가 가능성 고려)
 }
