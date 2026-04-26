@@ -554,9 +554,38 @@ export default function Feedback() {
                     <div className="session-info-group">
                       {index === 0 && <span className="latest-badge">최근</span>}
                       <span className="session-date">
-                        {new Date(session.start_time).toLocaleString('ko-KR', { 
-                          month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' 
-                        })} 세션
+                        {(() => {
+                          try {
+                            // 1. 원본 문자열에서 숫자만 추출 (예: 2026, 02, 22, 03, 36...)
+                            const parts = session.start_time.match(/\d+/g);
+                            if (!parts || parts.length < 5) return session.start_time;
+
+                            // 2. UTC 기준으로 Date 객체 생성 (월은 0부터 시작하므로 -1)
+                            const date = new Date(Date.UTC(
+                              parseInt(parts[0]), 
+                              parseInt(parts[1]) - 1, 
+                              parseInt(parts[2]), 
+                              parseInt(parts[3]), 
+                              parseInt(parts[4])
+                            ));
+
+                            // 3. 강제로 9시간(한국 표준시) 더하기
+                            date.setHours(date.getHours());
+
+                            // 4. 출력 (이미 9시간을 더했으므로 다시 변환되지 않게 일반 문자열로 포맷팅)
+                            const month = date.getMonth() + 1;
+                            const day = date.getDate();
+                            const hours = date.getHours();
+                            const minutes = String(date.getMinutes()).padStart(2, '0');
+                            const ampm = hours >= 12 ? '오후' : '오전';
+                            const displayHours = hours % 12 || 12;
+
+                            return `${month}월 ${day}일 ${ampm} ${displayHours}:${minutes}`;
+                            
+                          } catch (e) {
+                            return session.start_time;
+                          }
+                        })()} 세션
                       </span>
                     </div>
                     <span className="arrow-icon">→</span>

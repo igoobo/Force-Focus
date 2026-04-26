@@ -33,6 +33,11 @@ export default function Overview() {
   // 가장 최근 세션의 ID를 정확히 저장하기 위한 상태 추가
   const [latestId, setLatestId] = useState("");
 
+    // 컴포넌트 마운트 시 일정 데이터 불러오기
+  useEffect(() => {
+    fetchSchedules();
+  }, [fetchSchedules]);
+
   // 최신 세션 피드백 자동 로드 로직 추가
   useEffect(() => {
     const fetchLatestFeedback = async () => {
